@@ -39,5 +39,6 @@ namespace Config {
     // --- Misc ---
     constexpr size_t JSON_DOC_SIZE = 256; // Adjust if needed for JSON payload
     constexpr size_t MQTT_MSG_BUFFER_SIZE = 256; // Ensure >= JSON size + overhead
+    constexpr size_t FAILED_REPORT_QUEUE_SIZE = 10;
 }
 #endif //CONFIG_H

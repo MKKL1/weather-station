@@ -2,16 +2,29 @@
 #include <PubSubClient.h>
 #include <esp_sleep.h>
 #include <sys/time.h>
-#include <Config.h>
-#include <JsonDataFormatter.h>
-#include <RainSensor.h>
-#include <TimeManager.h>
-#include <WiFiManager.h>
-#include <MqttClientWrapper.h>
-#include <WeatherData.h>
-#include <WeatherEntry.h>
+#include <cstring> // Required for memset in WeatherEntry if not already included
 
-//For debug
+// --- Project Includes ---
+#include "Config.h" // Assuming FAILED_ENTRY_QUEUE_SIZE and MQTT_TOPIC_WEATHER are here
+#include "JsonDataFormatter.h"
+#include "RainSensor.h"
+#include "TimeManager.h"
+#include "WiFiManager.h"
+#include "MqttClientWrapper.h"
+#include "WeatherData.h"
+#include "WeatherEntry.h"
+#include "CircularQueue.h" // Include your CircularQueue implementation
+
+// --- Constants ---
+#ifndef FAILED_ENTRY_QUEUE_SIZE
+#define FAILED_ENTRY_QUEUE_SIZE 10 // Example size, define in Config.h ideally
+#endif
+
+// --- Persistent Data ---
+static RTC_DATA_ATTR CircularQueue<WeatherEntry, FAILED_ENTRY_QUEUE_SIZE> failedEntriesQueue;
+
+// --- Helper Functions (printBitmask, attemptPublish, calculateEntryCoverageStartTs - unchanged from previous version) ---
+
 inline void printBitmask(const uint8_t *mask, size_t len) {
     for (size_t i = 0; i < len; i++) {
         if (mask[i] < 0x10) Serial.print('0');
@@ -21,217 +34,303 @@ inline void printBitmask(const uint8_t *mask, size_t len) {
     Serial.println();
 }
 
-// Refactored sendRaport without goto
+bool attemptPublish(MqttClientWrapper& mqttClient, const WeatherEntry& entry, const JsonDataFormatter& formatter, TimeManager& timeManager) {
+    const WeatherData weatherData(entry, DeviceInfo(Config::SENSOR_ID, Config::MM_PER_TIP));
+    char messageBuffer[Config::MQTT_MSG_BUFFER_SIZE];
+    if (!formatter.formatData(weatherData, messageBuffer, Config::MQTT_MSG_BUFFER_SIZE)) {
+        Serial.println("!!! ERROR: Failed to format WeatherData into JSON buffer (too small?)");
+        return false;
+    }
+    Serial.print("Attempting to publish entry aligned to end timestamp: ");
+    timeManager.printFormattedTime(entry.timestamp_s);
+    if (mqttClient.publish(Config::MQTT_TOPIC_DATA, messageBuffer)) {
+        Serial.println("  -> Published successfully.");
+        return true;
+    } else {
+        Serial.println("  -> Publish failed.");
+        return false;
+    }
+}
+
+uint32_t calculateEntryCoverageStartTs(const WeatherEntry& entry) {
+    const uint32_t aligned_window_end_ts = (entry.timestamp_s / WeatherEntry::INTERVAL_DURATION_S) * WeatherEntry::INTERVAL_DURATION_S;
+    return aligned_window_end_ts - WeatherEntry::ENTRY_DURATION;
+}
+
+
+// --- Core Logic ---
+
+// Refactored sendRaport - Ensures current entry is ALWAYS created and queued on failure
 void sendRaport(TimeManager& timeManager, const RainSensor& rainSensor) {
     Serial.println("Wakeup Source: Timer");
     Serial.println("--- Starting Reporting Cycle ---");
 
+    // --- 1. Create and Populate Current Entry (ALWAYS) ---
+    Serial.println("Processing current weather data...");
+    const time_t report_trigger_time = timeManager.getRTCEpochTime();
+    Serial.print("Report trigger time: ");
+    timeManager.printFormattedTime(report_trigger_time);
+
+    // Align the END timestamp DOWN to the nearest interval boundary.
+    const uint32_t aligned_window_end_ts = (report_trigger_time / WeatherEntry::INTERVAL_DURATION_S) * WeatherEntry::INTERVAL_DURATION_S;
+    // Calculate the START timestamp of the full period covered by this entry.
+    const uint32_t entry_coverage_start_ts = aligned_window_end_ts - WeatherEntry::ENTRY_DURATION;
+
+    Serial.print("Aligned Window End (Entry Timestamp): ");
+    timeManager.printFormattedTime(aligned_window_end_ts);
+    Serial.print("Current Entry Covers From: ");
+    timeManager.printFormattedTime(entry_coverage_start_ts);
+
+    WeatherEntry current_weather_entry; // Create the entry object
+    current_weather_entry.clearBitmask();
+    current_weather_entry.timestamp_s = report_trigger_time;
+
+    // Add other sensor data (temperature, humidity, pressure) if available
+    // current_weather_entry.temperature = readTemperature(); // Example
+
+    // Populate bitmask from RainSensor events within the calculated window
+    int events_processed = 0;
+    int events_in_range = 0;
+    for (const auto e_time : RainSensor::events()) {
+        // Use the entry's ALIGNED end time for correct window calculation in incrementTipCount
+        if (current_weather_entry.incrementTipCount(e_time, aligned_window_end_ts)) {
+             events_in_range++;
+        }
+        events_processed++;
+    }
+    Serial.printf("Populated current entry: Processed %d total rain events, %d were within the window [%u, %u).\n",
+                  events_processed, events_in_range, entry_coverage_start_ts, aligned_window_end_ts);
+    Serial.print("Current entry final bitmask: ");
+    printBitmask(current_weather_entry.tip_bitmask, WeatherEntry::BITMASK_SIZE_BYTES);
+    // --- End of Current Entry Creation ---
+
+
+    // --- Initialize State Variables ---
     WiFiManager wifiManager(Config::WIFI_SSID, Config::WIFI_PASSWORD);
     MqttClientWrapper mqttClient(Config::MQTT_SERVER_IP, Config::MQTT_PORT,
                                  Config::MQTT_CLIENT_ID_PREFIX, Config::MQTT_TOPIC_STATUS);
+    const JsonDataFormatter formatter{};
 
-    bool wifiConnected = false; // Flag to track WiFi connection status
-    bool reportSent = false;    // Flag to track if the report was successfully sent
+    bool wifiConnected = false;
+    bool mqttConnected = false;
+    bool currentEntrySentSuccessfully = false; // Track if the CURRENT entry was sent
+    uint32_t oldestSuccessfulPruneTs = 0; // Track oldest data successfully sent *this cycle*
 
-    // 1. Try connecting WiFi
+    // --- 2. Attempt Network Connections and Publishing ---
     if (wifiManager.connect(Config::WIFI_CONNECT_TIMEOUT_MS)) {
-        wifiConnected = true; // Mark WiFi as connected
+        wifiConnected = true;
         Serial.println("WiFi connected successfully.");
 
-        // 2. Sync Time (Best Effort) - Only attempt if WiFi is connected
+        // Optional: Sync Time (Best Effort)
         if (timeManager.syncTimeWithNTP(Config::NTP_TIMEOUT_MS)) {
-            time_t syncedTime = timeManager.getRTCEpochTime(); // Use the synced time from NTP if successful
+            const time_t syncedTime = timeManager.getRTCEpochTime();
             timeManager.setInternalRTC(syncedTime);
-            Serial.print("Time synced. ");
+            Serial.print("Time synced. Current time: ");
+            timeManager.printFormattedTime(syncedTime);
         } else {
-            Serial.println("NTP Time sync failed. Continuing with potentially unsynced RTC time.");
+            Serial.print("NTP Time sync failed. Continuing with RTC time: ");
+            timeManager.printFormattedTime(timeManager.getRTCEpochTime());
         }
 
-        // --- Time Alignment Logic ---
-        const time_t report_trigger_time = timeManager.getRTCEpochTime(); // Actual time report function started
-        Serial.print("Report trigger time: ");
-        timeManager.printFormattedTime(report_trigger_time);
-
-        // Calculate the END timestamp for the WeatherEntry, aligned DOWN to the nearest interval boundary.
-        // This defines the end of the last interval covered by this entry.
-        const uint32_t aligned_window_end_ts = (report_trigger_time / WeatherEntry::INTERVAL_DURATION_S) * WeatherEntry::INTERVAL_DURATION_S;
-
-        // Calculate the START timestamp of the full 32-minute period covered by this WeatherEntry.
-        const uint32_t entry_coverage_start_ts = aligned_window_end_ts - WeatherEntry::ENTRY_DURATION;
-
-        Serial.print("Aligned Window End (WeatherEntry.timestamp_s): ");
-        timeManager.printFormattedTime(aligned_window_end_ts); // e.g., 13:40:00
-        Serial.print("WeatherEntry Covers From: ");
-        timeManager.printFormattedTime(entry_coverage_start_ts);  // e.g., 13:08:00
-
-
-        // 3. Try connecting MQTT - Only attempt if WiFi is connected
+        // Attempt MQTT Connection
         if (mqttClient.connect()) {
+            mqttConnected = true;
             Serial.println("MQTT connected successfully.");
 
-            WeatherEntry weather_entry;
-            weather_entry.clearBitmask(); // Clear the bitmask first
-            weather_entry.timestamp_s = report_trigger_time;
+            // --- MQTT Operations ---
 
-            Serial.println("Processing events for the aligned window...");
-            int events_processed = 0;
-            int events_in_range = 0;
+            // A. Retry sending failed entries from the queue
+            Serial.printf("Attempting to send %d queued entries...\n", failedEntriesQueue.getCount());
+            size_t processedCount = 0;
+            const size_t initialQueueCount = failedEntriesQueue.getCount();
 
-            // Iterate through *all* stored events. incrementTipCount will filter them.
-            // Assuming RainSensor::events() returns a collection (like std::vector or std::deque)
-            // Note: Ensure RainSensor::events() holds events for AT LEAST WeatherEntry::ENTRY_DURATION
-            for (const auto e_time : RainSensor::events()) {
-                 // incrementTipCount checks if e_time is within [entry_start_ts, aligned_end_ts)
-                 if (weather_entry.incrementTipCount(e_time, report_trigger_time)) {
-                    // Serial.printf("  -> Added event at timestamp %u to interval index %lu\n",
-                    //               e_time, (e_time - entry_start_ts) / WeatherEntry::INTERVAL_DURATION_S);
-                    events_in_range++;
-                 }
-                 events_processed++;
+            while (processedCount < initialQueueCount && !failedEntriesQueue.isEmpty()) {
+                processedCount++;
+                WeatherEntry entryToRetry;
+                if (!failedEntriesQueue.peek(entryToRetry)) break; // Safety check
+
+                if (attemptPublish(mqttClient, entryToRetry, formatter, timeManager)) {
+                    const uint32_t queued_entry_start_ts = calculateEntryCoverageStartTs(entryToRetry);
+                    if (oldestSuccessfulPruneTs == 0 || queued_entry_start_ts < oldestSuccessfulPruneTs) {
+                        oldestSuccessfulPruneTs = queued_entry_start_ts;
+                    }
+                    failedEntriesQueue.pop(entryToRetry); // Remove on success
+                    Serial.println("  -> Queued entry removed.");
+                } else {
+                    Serial.println("  -> Oldest queued entry failed to send. Stopping retry attempts.");
+                    break; // Stop retrying if the oldest fails
+                }
+                 delay(50); // Small delay between publishes if needed
             }
-
-            Serial.printf("Processed %d total events, %d were within the current entry's %u-second window [%u, %u).\n",
-                          events_processed, events_in_range, WeatherEntry::ENTRY_DURATION, aligned_window_end_ts, entry_coverage_start_ts);
-
-            Serial.print("Final entry bitmask: ");
-            printBitmask(weather_entry.tip_bitmask, WeatherEntry::BITMASK_SIZE_BYTES);
-
-            // Add other sensor data (temperature, humidity, pressure) if available
-            // weather_entry.temperature = ...;
-            // weather_entry.humidity = ...;
-            // weather_entry.pressure = ...;
+            Serial.printf("Finished processing %d queued entries.\n", processedCount);
 
 
-            const WeatherData weatherData(weather_entry, DeviceInfo(Config::SENSOR_ID, Config::MM_PER_TIP));
-            const JsonDataFormatter formatter{};
-            // Allocate on stack if possible, or ensure proper deletion if using new[]
-            char messageBuffer[Config::MQTT_MSG_BUFFER_SIZE];
-            formatter.formatData(weatherData, messageBuffer, Config::MQTT_MSG_BUFFER_SIZE);
+            // B. Attempt to send the CURRENT entry (already created)
+            Serial.println("Attempting to send current entry...");
+            if (attemptPublish(mqttClient, current_weather_entry, formatter, timeManager)) {
+                currentEntrySentSuccessfully = true; // Mark as sent
+                // Update pruning timestamp if needed
+                if (oldestSuccessfulPruneTs == 0 || entry_coverage_start_ts < oldestSuccessfulPruneTs) {
+                    oldestSuccessfulPruneTs = entry_coverage_start_ts;
+                }
+            } // If it fails, currentEntrySentSuccessfully remains false
 
-            if (mqttClient.publish("weather/update", messageBuffer)) {
-                 Serial.println("MQTT message published successfully.");
-                 reportSent = true; // Mark report as sent
-
-                 // !!! IMPORTANT !!!
-                 // Add logic here to prune events from RainSensor's persistent storage
-                 // that are now *older* than the start of the window we just reported.
-                 // Only do this *after* successful transmission.
-                 // Example: RainSensor::pruneEventsOlderThan(entry_start_ts);
-
-            } else {
-                 Serial.println("MQTT message publish failed.");
-                 // Data remains in RainSensor buffer for next attempt
-            }
-
-            delay(100); // Allow time for MQTT operations
+            // Disconnect MQTT after operations
+            delay(100); // Allow time for MQTT ack/processing
             mqttClient.disconnect();
             Serial.println("MQTT disconnected.");
-            // --- End of MQTT Connected Block ---
+            mqttConnected = false; // Update state
 
         } else { // MQTT connection failed
-            Serial.println("MQTT connection failed. Data remains in buffer.");
-            // No need to publish MQTT status if the connection failed.
-            // WiFi is still connected at this point and will be disconnected below.
+             Serial.println("MQTT connection failed.");
+             // currentEntrySentSuccessfully remains false
         }
-
     } else { // WiFi connection failed
-        Serial.println("WiFi connection failed. Skipping report cycle.");
-        // Data remains in RainSensor buffer for next attempt
-        // wifiConnected remains false
+        Serial.println("WiFi connection failed.");
+        // currentEntrySentSuccessfully remains false
     }
 
-    // --- Cleanup and Sleep Preparation ---
-    // This section executes regardless of the success/failure of the above steps.
+    // --- 3. Queue Current Entry IF it wasn't sent ---
+    if (!currentEntrySentSuccessfully) {
+        Serial.println("Current weather entry was not sent successfully. Adding to queue.");
+        if (!failedEntriesQueue.push(current_weather_entry)) {
+             // Ouch, queue is full AND we couldn't send the current one. Oldest *failed* entry gets dropped.
+             Serial.println("!!! WARNING: Failed entry queue is full! Could not add current entry. Oldest failed entry was dropped. !!!");
+        } else {
+             Serial.printf("Current entry added to queue. Queue size: %d/%d\n",
+                           failedEntriesQueue.getCount(), failedEntriesQueue.getCapacity());
+        }
+    } else {
+         Serial.println("Current weather entry was sent successfully.");
+    }
 
-    // 9. Disconnect WiFi *if* it was connected
-    if (wifiConnected) {
+
+    // --- 4. Pruning Rain Sensor Data (Conditional) ---
+    if (oldestSuccessfulPruneTs > 0) {
+        Serial.print("Pruning RainSensor events older than timestamp: ");
+        timeManager.printFormattedTime(oldestSuccessfulPruneTs);
+        // !!! IMPORTANT: Requires RainSensor::pruneEventsOlderThan(uint32_t timestamp) implementation !!!
+        // RainSensor::pruneEventsOlderThan(oldestSuccessfulPruneTs);
+        Serial.println("NOTE: RainSensor event pruning needs implementation in RainSensor class.");
+    } else {
+         Serial.println("No reports sent successfully this cycle. Skipping RainSensor event pruning.");
+    }
+
+
+    // --- 5. Cleanup and Sleep ---
+    if (wifiConnected) { // Disconnect WiFi if we connected it
         wifiManager.disconnect();
         Serial.println("WiFi disconnected.");
     }
 
-    Serial.println("--- Reporting Cycle Ended or Skipped ---");
+    Serial.println("--- Reporting Cycle Ended ---");
     Serial.println("Configuring sleep (Timer + GPIO)...");
-    rainSensor.setupWakeupPin(); // Setup GPIO wakeup
-    esp_sleep_enable_timer_wakeup(Config::REPORT_INTERVAL_US); // Setup Timer wakeup
+    rainSensor.setupWakeupPin();
+    esp_sleep_enable_timer_wakeup(Config::REPORT_INTERVAL_US);
     Serial.println("Entering deep sleep...");
-    delay(100); // Allow serial print to finish
+    delay(100);
     esp_deep_sleep_start();
 
-    // The program should not reach here as esp_deep_sleep_start() does not return.
+    // Should not reach here
     Serial.println("!!! ERROR: Code continued after deep sleep call? !!!");
 }
 
+// Sync Time function (can remain as is, or simplified if only needed at boot)
 void syncTime(TimeManager& timeManager) {
     WiFiManager wifiManager(Config::WIFI_SSID, Config::WIFI_PASSWORD);
     if (wifiManager.connect(Config::WIFI_CONNECT_TIMEOUT_MS)) {
+        Serial.println("WiFi connected for time sync.");
         if (timeManager.syncTimeWithNTP(Config::NTP_TIMEOUT_MS)) {
             const time_t syncedTime = timeManager.getRTCEpochTime();
             timeManager.setInternalRTC(syncedTime);
-            Serial.print("Time synced. ");
+            Serial.print("Time synced successfully. Current time: ");
+            timeManager.printFormattedTime(syncedTime);
         } else {
-            Serial.println("NTP Time sync failed. Continuing with potentially unsynced time.");
+            Serial.println("NTP Time sync failed.");
         }
         wifiManager.disconnect();
+        Serial.println("WiFi disconnected after time sync attempt.");
+    } else {
+        Serial.println("WiFi connection failed during time sync attempt.");
     }
 }
 
-// The rest of your main.cpp (setup, loop) remains the same as the previous version
+// --- Setup and Loop (largely unchanged from previous version) ---
+
 void setup() {
     delay(500);
     Serial.begin(115200);
     delay(100);
 
-    Serial.println("\n\n--- ESP32 Rain Gauge Booting ---");
-    Serial.print("Current Time (RTC): ");
+    Serial.println("\n\n--- ESP32 Weather Station Booting ---");
+
     TimeManager timeManager;
+    Serial.print("Current Time (RTC on boot): ");
     timeManager.printFormattedTime(timeManager.getRTCEpochTime());
+
     const RainSensor rainSensor(Config::RAIN_SENSOR_PIN);
 
     const esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
-    switch(wakeup_reason) {
-        case ESP_SLEEP_WAKEUP_EXT0:
-        {
-            Serial.println("Wakeup Source: Rain Tip GPIO");
-            const time_t now = timeManager.getRTCEpochTime();
-            if (now > 1672531200) { // Check if time seems valid (e.g., after 1st Jan 2023)
-                timeManager.printFormattedTime(now);
-                RainSensor::handleTipWakeupEvent(now);
-            } else {
-                Serial.println("RTC time seems invalid, tip not logged.");
-            }
 
-            Serial.println("Configuring sleep (Timer + GPIO)...");
-            rainSensor.setupWakeupPin();
-            esp_sleep_enable_timer_wakeup(Config::REPORT_INTERVAL_US);
-            Serial.println("Entering deep sleep...");
-            delay(100);
-            esp_deep_sleep_start();
-            break;
-        }
-        case ESP_SLEEP_WAKEUP_TIMER:
-        {
-            sendRaport(timeManager, rainSensor);
-            // sendRaport now handles going back to sleep internally
-            break; // Should not be reached
-        }
-        default:
-            Serial.printf("Wakeup Source: Other/Reset (%d)\n", wakeup_reason);
-            Serial.println("Configuring sleep (Timer + GPIO)...");
-            rainSensor.setupWakeupPin();
-            syncTime(timeManager);
-            RainSensor::resetPersistedData(timeManager.getRTCEpochTime());
-            esp_sleep_enable_timer_wakeup(Config::REPORT_INTERVAL_US);
-            Serial.println("Initial boot or Reset. Entering deep sleep...");
-            delay(100);
-            esp_deep_sleep_start();
-            break;
+    switch(wakeup_reason) {
+        case ESP_SLEEP_WAKEUP_EXT0: // Rain Tip GPIO
+            {
+                Serial.println("Wakeup Source: Rain Tip GPIO");
+                const time_t now = timeManager.getRTCEpochTime();
+                if (TimeManager::isTimeValid(now)) {
+                    Serial.print("Logging tip event at: ");
+                    timeManager.printFormattedTime(now);
+                    RainSensor::handleTipWakeupEvent(now); // Must persist event
+                } else {
+                    Serial.println("RTC time seems invalid, tip not logged reliably.");
+                }
+                Serial.println("Configuring sleep (Timer + GPIO)...");
+                rainSensor.setupWakeupPin();
+                esp_sleep_enable_timer_wakeup(Config::REPORT_INTERVAL_US);
+                Serial.println("Entering deep sleep...");
+                delay(100);
+                esp_deep_sleep_start();
+                break;
+            }
+        case ESP_SLEEP_WAKEUP_TIMER: // Reporting Interval
+            {
+                 // Check/Initialize queue only on timer wakeups (where sendRaport runs)
+                 if (!failedEntriesQueue.isInitialized()) {
+                     Serial.println("RTC Data invalid/First Boot: Initializing failed entries queue.");
+                     failedEntriesQueue.reset();
+                 }
+                 Serial.printf("Failed entry queue status on wakeup: %d/%d used.\n",
+                              failedEntriesQueue.getCount(), failedEntriesQueue.getCapacity());
+
+                sendRaport(timeManager, rainSensor); // Handles reporting, queueing, and sleep
+                break;
+            }
+        default: // Reset, Power-On, or Other Wakeup Source
+            {
+                Serial.printf("Wakeup Source: Other/Reset (%d)\n", wakeup_reason);
+                Serial.println("Performing initial setup/reset tasks...");
+                syncTime(timeManager); // Attempt time sync
+
+                 Serial.println("Initializing/Resetting failed entries queue.");
+                 failedEntriesQueue.reset(); // Clear queue on reset
+
+                Serial.println("Initializing/Resetting RainSensor persistent data.");
+                RainSensor::resetPersistedData(timeManager.getRTCEpochTime()); // Reset sensor data
+
+                Serial.println("Configuring sleep (Timer + GPIO)...");
+                rainSensor.setupWakeupPin();
+                esp_sleep_enable_timer_wakeup(Config::REPORT_INTERVAL_US);
+                Serial.println("Initial boot or Reset complete. Entering deep sleep...");
+                delay(100);
+                esp_deep_sleep_start();
+                break;
+            }
     }
 }
-
 
 void loop() {
     Serial.println("!!! ERROR: Reached loop() - Deep sleep logic failed? !!!");
     delay(10000);
-    esp_sleep_enable_timer_wakeup(Config::REPORT_INTERVAL_US); // Re-enable timer just in case
+    esp_sleep_enable_timer_wakeup(Config::REPORT_INTERVAL_US);
     esp_deep_sleep_start();
 }

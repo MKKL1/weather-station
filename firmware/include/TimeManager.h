@@ -10,11 +10,12 @@
 class TimeManager {
 private:
     bool m_timeSynchronized = false;
+
+public:
     static bool isTimeValid(const time_t t) {
         return t > 946684800;
     }
 
-public:
     TimeManager() {
         setenv("TZ", Config::TZ_INFO, 1);
         tzset();
