@@ -54,7 +54,6 @@ public:
                 Serial.println(" connected!");
                 Serial.print("  Client ID: "); Serial.println(m_clientId);
                 m_connected = true;
-                 publish(m_statusTopic, "online_connected", true);
                 return true;
             } else {
                 Serial.print("\n  Failed, rc="); Serial.print(m_mqttClient.state());
@@ -70,26 +69,20 @@ public:
     }
 
     void disconnect() {
-        bool was_connected = m_connected;
         if (m_connected) {
-             Serial.println("Disconnecting MQTT (internal flag was true)...");
-              if (was_connected) {
-                  publish(m_statusTopic, "offline_disconnecting", true);
-                  delay(100);
-              }
              m_mqttClient.disconnect();
         }
         m_connected = false;
     }
 
-    bool publish(const char* topic, const char* payload, const bool retained = false) {
+    bool publish(const char* topic, const uint8_t* payload, const unsigned int length) {
         if (!isConnected()) {
             Serial.println("MQTT Publish Error: Not connected.");
             return false;
         }
         Serial.print("MQTT Publish ["); Serial.print(topic); Serial.print("] ");
 
-        if (m_mqttClient.publish(topic, payload, retained)) {
+        if (m_mqttClient.publish(topic, payload, length)) {
             Serial.println("  Success.");
             return true;
         } else {

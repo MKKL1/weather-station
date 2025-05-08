@@ -7,6 +7,6 @@
 
 class JsonDataFormatter final : public DataFormatter {
 public:
-    size_t formatData(const WeatherData& data, char* buffer, size_t bufferSize) const override;
+    size_t formatData(const WeatherData& data, uint8_t* buffer, size_t bufferSize) const override;
 };
 #endif // JSON_DATA_FORMATTER_H

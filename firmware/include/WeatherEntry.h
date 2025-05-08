@@ -68,5 +68,10 @@ struct  WeatherEntry {
 
         return true;
     }
+
+    static uint32_t calcStartTime(const uint32_t timestamp_s) {
+        const uint32_t aligned_window_end_ts = (timestamp_s / INTERVAL_DURATION_S) * INTERVAL_DURATION_S;
+        return aligned_window_end_ts - ENTRY_DURATION;
+    }
 };
 #endif //WEATHERENTRY_H

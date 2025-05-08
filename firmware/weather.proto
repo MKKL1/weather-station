@@ -1,0 +1,23 @@
+syntax = "proto3";
+package proto;
+
+message Histogram {
+  bytes data = 1;
+  uint32 count = 2;
+  uint32 interval_duration = 3;
+  uint32 start_time = 4;
+}
+
+message DeviceInfo {
+  string id = 1;
+  float mmPerTip = 2;
+}
+
+message WeatherData {
+  uint64 created_at = 1;
+  float temperature = 2;
+  float pressure = 3;
+  float humidity = 4;
+  Histogram tips = 5;
+  DeviceInfo info = 6;
+}

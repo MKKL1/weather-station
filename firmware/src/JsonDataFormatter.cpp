@@ -12,7 +12,7 @@ inline void printBitmask(const uint8_t *mask, size_t len) {
 }
 
 
-size_t JsonDataFormatter::formatData(const WeatherData &data, char *buffer, size_t bufferSize) const {
+size_t JsonDataFormatter::formatData(const WeatherData &data, uint8_t *buffer, size_t bufferSize) const {
     if (!buffer || bufferSize == 0) return 0;
 
     JsonDocument jsonDoc;

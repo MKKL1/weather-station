@@ -6,7 +6,7 @@ namespace Config {
     // --- Network ---
     constexpr const char* WIFI_SSID = "dd-wrt";         // <<< YOUR WIFI SSID
     constexpr const char* WIFI_PASSWORD = ""; // <<< YOUR WIFI PASSWORD
-    constexpr const char* MQTT_SERVER_IP = "192.168.33.106"; // <<< YOUR MQTT BROKER IP/HOSTNAME
+    constexpr const char* MQTT_SERVER_IP = "192.168.33.115"; // <<< YOUR MQTT BROKER IP/HOSTNAME
     constexpr uint16_t MQTT_PORT = 1883;
     constexpr const char* MQTT_CLIENT_ID_PREFIX = "WS-";
     constexpr const char* SENSOR_ID = "SOME_IDENTIFIER";

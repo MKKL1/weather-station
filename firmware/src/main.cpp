@@ -5,6 +5,8 @@
 #include <cstring> // Required for memset in WeatherEntry if not already included
 
 // --- Project Includes ---
+#include <ProtoDataFormatter.h>
+
 #include "Config.h" // Assuming FAILED_ENTRY_QUEUE_SIZE and MQTT_TOPIC_WEATHER are here
 #include "JsonDataFormatter.h"
 #include "RainSensor.h"
@@ -29,21 +31,29 @@ inline void printBitmask(const uint8_t *mask, size_t len) {
     for (size_t i = 0; i < len; i++) {
         if (mask[i] < 0x10) Serial.print('0');
         Serial.print(mask[i], HEX);
-        Serial.print(' ');
     }
     Serial.println();
 }
 
-bool attemptPublish(MqttClientWrapper& mqttClient, const WeatherEntry& entry, const JsonDataFormatter& formatter, TimeManager& timeManager) {
+bool attemptPublish(MqttClientWrapper& mqttClient, const WeatherEntry& entry, const DataFormatter& formatter, const TimeManager& timeManager) {
     const WeatherData weatherData(entry, DeviceInfo(Config::SENSOR_ID, Config::MM_PER_TIP));
-    char messageBuffer[Config::MQTT_MSG_BUFFER_SIZE];
-    if (!formatter.formatData(weatherData, messageBuffer, Config::MQTT_MSG_BUFFER_SIZE)) {
+    uint8_t messageBuffer[Config::MQTT_MSG_BUFFER_SIZE];
+    const auto size = formatter.formatData(weatherData, messageBuffer, Config::MQTT_MSG_BUFFER_SIZE);
+    if (!size) {
         Serial.println("!!! ERROR: Failed to format WeatherData into JSON buffer (too small?)");
         return false;
     }
     Serial.print("Attempting to publish entry aligned to end timestamp: ");
     timeManager.printFormattedTime(entry.timestamp_s);
-    if (mqttClient.publish(Config::MQTT_TOPIC_DATA, messageBuffer)) {
+
+    Serial.print("Data: ");
+    printBitmask(messageBuffer, size);
+    Serial.println();
+
+    Serial.print("Data entire: ");
+    printBitmask(messageBuffer, Config::MQTT_MSG_BUFFER_SIZE);
+
+    if (mqttClient.publish(Config::MQTT_TOPIC_DATA, messageBuffer, size)) {
         Serial.println("  -> Published successfully.");
         return true;
     } else {
@@ -109,7 +119,7 @@ void sendRaport(TimeManager& timeManager, const RainSensor& rainSensor) {
     WiFiManager wifiManager(Config::WIFI_SSID, Config::WIFI_PASSWORD);
     MqttClientWrapper mqttClient(Config::MQTT_SERVER_IP, Config::MQTT_PORT,
                                  Config::MQTT_CLIENT_ID_PREFIX, Config::MQTT_TOPIC_STATUS);
-    const JsonDataFormatter formatter{};
+    const ProtoDataFormatter formatter{};
 
     bool wifiConnected = false;
     bool mqttConnected = false;
@@ -150,7 +160,7 @@ void sendRaport(TimeManager& timeManager, const RainSensor& rainSensor) {
                 if (!failedEntriesQueue.peek(entryToRetry)) break; // Safety check
 
                 if (attemptPublish(mqttClient, entryToRetry, formatter, timeManager)) {
-                    const uint32_t queued_entry_start_ts = calculateEntryCoverageStartTs(entryToRetry);
+                    const uint32_t queued_entry_start_ts = WeatherEntry::calcStartTime(entryToRetry.timestamp_s);
                     if (oldestSuccessfulPruneTs == 0 || queued_entry_start_ts < oldestSuccessfulPruneTs) {
                         oldestSuccessfulPruneTs = queued_entry_start_ts;
                     }
