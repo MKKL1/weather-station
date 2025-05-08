@@ -67,12 +67,14 @@ size_t ProtoDataFormatter::formatData(const WeatherData &data, uint8_t *buffer, 
     hist.data.funcs.encode = &histogram_data_callback;
     hist.data.arg  = &arg;
     weather_proto.tips = hist;
+    weather_proto.has_tips = true;
 
     proto_DeviceInfo dev_info = proto_DeviceInfo_init_default;
     dev_info.id.arg = reinterpret_cast<void*>(const_cast<char*>(Config::SENSOR_ID));
     dev_info.id.funcs.encode = &encode_string;
     dev_info.mmPerTip = Config::MM_PER_TIP;
     weather_proto.info = dev_info;
+    weather_proto.has_info = true;
 
 
     // 4) Encode!
