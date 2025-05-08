@@ -2,6 +2,8 @@
 #define WEATHERENTRY_H
 
 #include <cstdint>
+#include <cstddef>
+#include <cstring>
 
 struct  WeatherEntry {
     //This configuration gives exactly 1 interval outside 30 minute range

@@ -1,40 +1,83 @@
+// RainSensor.cpp
 #include "RainSensor.h"
+#include <esp_sleep.h>
+#include <esp_err.h>
 
-void RainSensor::setupWakeupPin() const {
-    // Ensure pin is configured correctly (e.g., INPUT_PULLUP) BEFORE enabling wakeup
-    // This prevents spurious wakeups immediately after configuration.
+// Uncomment to enable debug logs
+//#define RAIN_DEBUG
+#ifdef RAIN_DEBUG
+  #define RAIN_LOG(...) Serial.printf(__VA_ARGS__)
+  #define RAIN_LOGLN(...) Serial.println(__VA_ARGS__)
+#else
+  #define RAIN_LOG(...)
+  #define RAIN_LOGLN(...)
+#endif
+
+namespace RainSensor {
+
+// Initialize static RTC vars
+RTC_DATA_ATTR time_t Sensor::s_lastTip = 0;
+RTC_DATA_ATTR CircularQueue<time_t, Config::MAX_RAIN_EVENTS> Sensor::s_queue;
+
+Sensor::Sensor(gpio_num_t pin) : m_pin(pin) {}
+
+void Sensor::begin() const {
     pinMode(m_pin, INPUT_PULLUP);
-    delay(50); // Small delay might help ensure pull-up is stable
+    delay(50);
+    configureWakeup_();
+}
 
-    Serial.printf("Configuring GPIO %d for deep sleep wakeup (EXT0, falling edge)\n", m_pin);
-    // Wake up when the pin goes LOW (0 = FALLING edge for pull-up sensor)
-    esp_err_t err = esp_sleep_enable_ext0_wakeup(m_pin, 0);
-    if (err != ESP_OK) {
-        Serial.printf("ERROR configuring EXT0 wakeup: %s\n", esp_err_to_name(err));
+void Sensor::configureWakeup_() const {
+    esp_sleep_enable_ext0_wakeup(m_pin, 0);
+    RAIN_LOG("RainSensor: wakeup on GPIO %d\n", m_pin);
+}
+
+bool Sensor::handleTip(const time_t now) {
+    if (s_lastTip != 0 && now - s_lastTip < DEBOUNCE_SEC) {
+        RAIN_LOGLN("RainSensor: tip ignored (debounce)");
+        return false;
     }
-}
-
-void RainSensor::handleTipWakeupEvent(const time_t wakeupTime) {
-    constexpr time_t DEBOUNCE_TIME_SEC = 5;
-
-    Serial.printf("s_lastTipTimestamp: %d, wakeupTime: %d", s_lastTipTimestamp, wakeupTime);
-    if (wakeupTime - s_lastTipTimestamp >= DEBOUNCE_TIME_SEC || s_lastTipTimestamp == 0) {
-        s_lastTipTimestamp = wakeupTime;
-        queue.push(static_cast<uint16_t>((s_lastResetTimestamp - wakeupTime)/60));
-    } else {
-        Serial.printf("RainSensor: Tip ignored (debounce). Last tip: %lu, Current: %lu\n",
-                    static_cast<unsigned long>(s_lastTipTimestamp), static_cast<unsigned long>(wakeupTime));
+    if (s_queue.isFull()) {
+        RAIN_LOGLN("RainSensor: queue full, overwriting oldest");
     }
+    s_queue.push(now);
+    s_lastTip = now;
+    RAIN_LOG("RainSensor: tip recorded at %lu\n", static_cast<unsigned long>(now));
+    return true;
 }
 
-void RainSensor::resetPersistedData(const time_t resetTime) {
-    Serial.println("RainSensor::resetPersistedData");
-    s_lastResetTimestamp = resetTime;
-    s_lastTipTimestamp = 0;
+void Sensor::reset(const time_t baseline) {
+    s_queue.reset();
+    s_lastTip = baseline;
+    RAIN_LOGLN("RainSensor: data reset at baseline %lu", static_cast<unsigned long>(baseline));
 }
 
-// --- Initialize Static RTC Variables ---
-// These definitions allocate the memory in the RTC slow RAM segment.
-RTC_DATA_ATTR time_t RainSensor::s_lastResetTimestamp = 0;
-RTC_DATA_ATTR time_t RainSensor::s_lastTipTimestamp = 0;
-RTC_DATA_ATTR CircularQueue<uint16_t, RainSensor::CIRCULAR_QUEUE_SIZE> RainSensor::queue;
+// Iterator definitions
+Sensor::Iterator::Iterator(size_t idx) : idx_(idx) {}
+
+time_t Sensor::Iterator::operator*() const {
+    return s_queue[idx_];
+}
+
+Sensor::Iterator& Sensor::Iterator::operator++() {
+    ++idx_;
+    return *this;
+}
+
+bool Sensor::Iterator::operator!=(const Iterator& other) const {
+    return idx_ != other.idx_;
+}
+
+Sensor::Range Sensor::events() {
+    return Range{};
+}
+
+Sensor::Iterator Sensor::Range::begin() const {
+    return Iterator{0};
+}
+
+Sensor::Iterator Sensor::Range::end() const {
+    return Iterator{ s_queue.getCount() };
+}
+
+} // namespace RainSensor

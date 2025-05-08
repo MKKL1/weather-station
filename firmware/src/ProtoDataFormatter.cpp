@@ -61,7 +61,7 @@ size_t ProtoDataFormatter::formatData(const WeatherData &data, uint8_t *buffer, 
     };
 
     proto_Histogram hist = proto_Histogram_init_default;
-    hist.count             = WeatherEntry::BITMASK_SIZE_BYTES;
+    hist.count             = WeatherEntry::NUM_INTERVALS_PER_ENTRY;
     hist.interval_duration = WeatherEntry::INTERVAL_DURATION_S;
     hist.start_time        = WeatherEntry::calcStartTime(data.weatherEntry.timestamp_s);
     hist.data.funcs.encode = &histogram_data_callback;

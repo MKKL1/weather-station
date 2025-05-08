@@ -1,9 +1,11 @@
+// CircularQueue.h
 #ifndef CIRCULARQUEUE_H
 #define CIRCULARQUEUE_H
 
 #include <array>
 #include <cstddef>
 #include <vector>
+#include <algorithm>
 
 template <typename T, size_t Size>
 class CircularQueue {
@@ -17,11 +19,19 @@ private:
     bool initialized = false;
 
 public:
+    /**
+     * Clears the buffer and marks as initialized.
+     */
     void reset() {
         head = tail = count = 0;
         std::fill(buffer.begin(), buffer.end(), T{});
         initialized = true;
     }
+
+    /**
+     * Alias for reset().
+     */
+    void clear() { reset(); }
 
     [[nodiscard]] bool isInitialized() const { return initialized; }
     [[nodiscard]] bool isEmpty()        const { return count == 0; }
@@ -29,9 +39,12 @@ public:
     [[nodiscard]] size_t getCount()     const { return count; }
     [[nodiscard]] size_t getCapacity()  const { return Size; }
 
+    /**
+     * Pushes an item; if full, overwrites the oldest.
+     */
     bool push(const T& item) {
         if (isFull()) {
-            // drop oldest to make room
+            // overwrite oldest
             tail = (tail + 1) % Size;
             --count;
         }
@@ -41,6 +54,19 @@ public:
         return true;
     }
 
+    /**
+     * Removes the oldest item without retrieving it.
+     */
+    void pop() {
+        if (!isEmpty()) {
+            tail = (tail + 1) % Size;
+            --count;
+        }
+    }
+
+    /**
+     * Retrieves and removes the oldest item.
+     */
     bool pop(T& item) {
         if (isEmpty()) return false;
         item = buffer[tail];
@@ -49,6 +75,9 @@ public:
         return true;
     }
 
+    /**
+     * Peeks at the oldest item without removing it.
+     */
     bool peek(T& item) const {
         if (isEmpty()) return false;
         item = buffer[tail];
@@ -68,24 +97,6 @@ public:
         }
         return v;
     }
-
-    // ── new: try to process the oldest element in-place ──
-    // If processor(item) returns true, remove it; otherwise leave it for retry.
-    template <typename Processor>
-    bool processNext(Processor&& processor) {
-        if (isEmpty()) return false;
-        T& item = buffer[tail];
-        if (std::forward<Processor>(processor)(item)) {
-            // only pop on success
-            tail = (tail + 1) % Size;
-            --count;
-            return true;
-        }
-        return false;
-    }
 };
 
-
-
-
-#endif //CIRCULARQUEUE_H
+#endif // CIRCULARQUEUE_H

@@ -1,70 +1,76 @@
+// WiFiManager.h
 #ifndef WIFI_MANAGER_H
 #define WIFI_MANAGER_H
 
-#include <Wifi.h>
+#include <WiFi.h>
+#include <Arduino.h>
 
-class WiFiManager {
-private:
-    const char* m_ssid;
-    const char* m_password;
-    bool m_connected = false;
+namespace WiFiManager {
 
-public:
-    WiFiManager(const char* ssid, const char* password)
-        : m_ssid(ssid), m_password(password) {}
-
-    bool connect(uint32_t timeoutMs) {
+    /**
+     * Connects to the specified WiFi network within the given timeout.
+     * Returns true if connected successfully.
+     */
+    inline bool connect(const char* ssid, const char* password, uint32_t timeoutMs = 10000) {
         if (WiFi.status() == WL_CONNECTED) {
-             m_connected = true;
-             Serial.println("WiFi already connected.");
-             printStatus();
-             return true;
+            Serial.println("WiFi already connected.");
+            return true;
         }
 
         WiFi.mode(WIFI_STA);
-        WiFi.begin(m_ssid, m_password);
-        Serial.print("Connecting to WiFi "); Serial.print(m_ssid);
+        WiFi.begin(ssid, password);
+        Serial.printf("Connecting to WiFi '%s'", ssid);
 
-        unsigned long startAttemptTime = millis();
-        while (WiFi.status() != WL_CONNECTED && millis() - startAttemptTime < timeoutMs) {
-            Serial.print(".");
+        unsigned long start = millis();
+        while (WiFi.status() != WL_CONNECTED && millis() - start < timeoutMs) {
+            Serial.print('.');
             delay(500);
         }
 
         if (WiFi.status() == WL_CONNECTED) {
-            m_connected = true;
-            Serial.println("\nWiFi connected!");
-            printStatus();
+            Serial.println("\nWiFi connected.");
             return true;
-        } else {
-            m_connected = false;
-            Serial.println("\nWiFi connection failed!");
+        }
+
+        Serial.println("\nWiFi connection failed.");
+        WiFi.disconnect(true);
+        WiFi.mode(WIFI_OFF);
+        return false;
+    }
+
+    /**
+     * Disconnects from WiFi and powers off the radio.
+     */
+    inline void disconnect() {
+        if (WiFi.status() == WL_CONNECTED) {
+            Serial.println("Disconnecting WiFi.");
             WiFi.disconnect(true);
-             WiFi.mode(WIFI_OFF);
-            return false;
+            WiFi.mode(WIFI_OFF);
         }
     }
 
-    void disconnect() {
-        if (m_connected) {
-            Serial.println("Disconnecting WiFi...");
-            WiFi.disconnect(true);
-             WiFi.mode(WIFI_OFF);
-        }
-        m_connected = false;
+    /**
+     * Returns true if WiFi is currently connected.
+     */
+    inline bool isConnected() {
+        return WiFi.status() == WL_CONNECTED;
     }
 
-    bool isConnected() const {
-        return m_connected;
-    }
-
-    void printStatus() const {
-         if (m_connected) {
-            Serial.print("  IP Address: "); Serial.println(WiFi.localIP());
-            Serial.print("  RSSI: "); Serial.print(WiFi.RSSI()); Serial.println(" dBm");
+    /**
+     * Prints the current IP and RSSI if connected, or status if not.
+     */
+    inline void printStatus() {
+        if (WiFi.status() == WL_CONNECTED) {
+            Serial.print("IP: ");
+            Serial.println(WiFi.localIP());
+            Serial.print("RSSI: ");
+            Serial.print(WiFi.RSSI());
+            Serial.println(" dBm");
         } else {
-            Serial.println("  WiFi Status: Disconnected");
+            Serial.println("WiFi: Disconnected");
         }
     }
-};
+
+} // namespace WiFiManager
+
 #endif // WIFI_MANAGER_H

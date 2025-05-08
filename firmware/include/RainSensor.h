@@ -1,67 +1,77 @@
+// RainSensor.h
 #ifndef RAIN_SENSOR_H
 #define RAIN_SENSOR_H
 
-#include <CircularQueue.h>
-#include "Arduino.h"
+#include <ctime>
+#include <Arduino.h>
+#include "CircularQueue.h"
+#include "Config.h"
 
-class RainSensor {
-    constexpr static  size_t CIRCULAR_QUEUE_SIZE = 256;
-    static RTC_DATA_ATTR time_t s_lastTipTimestamp;
-    static RTC_DATA_ATTR time_t s_lastResetTimestamp; //SET ON FIRST BOOT
-    static RTC_DATA_ATTR CircularQueue<uint16_t, CIRCULAR_QUEUE_SIZE> queue;
-    gpio_num_t m_pin;
+namespace RainSensor {
 
-public:
-    explicit RainSensor(const gpio_num_t sensorPin) : m_pin(sensorPin) {}
-
-    void setupWakeupPin() const;
-
-    static void handleTipWakeupEvent(time_t wakeupTime);
-
-    static void resetPersistedData(time_t resetTime);
-
-    class EventTimeIterator {
+    /**
+     * Rain sensor abstraction using a circular queue in RTC memory.
+     * Records tip event timestamps and provides access to historic events.
+     */
+    class Sensor {
     public:
-        using iterator_category = std::forward_iterator_tag;
-        using value_type        = time_t;
-        using difference_type   = std::ptrdiff_t;
-        using pointer           = time_t*;
-        using reference         = time_t&;
+        explicit Sensor(gpio_num_t pin);
 
-        explicit EventTimeIterator(const size_t idx) : idx_{idx} {}
+        /**
+         * Configure the sensor pin and enable wakeup.
+         * Call once in setup().
+         */
+        void begin() const;
 
-        time_t operator*() const {
-            // offset in seconds stored at logical index idx_
-            const uint16_t offset = queue[idx_];
-            return s_lastResetTimestamp + offset;
-        }
+        /**
+         * Record a tip event at the given time (RTC epoch seconds).
+         * Returns true if the event was recorded (debounced).
+         */
+        bool handleTip(time_t now);
 
-        EventTimeIterator& operator++() {
-            ++idx_;
-            return *this;
-        }
+        /**
+         * Clear all persisted events and reset timestamps.
+         * Call on first boot or reset.
+         */
+        void reset(time_t baseline);
 
-        bool operator!=(EventTimeIterator const& o) const {
-            return idx_ != o.idx_;
-        }
+        /**
+         * Iterator over recorded event times.
+         */
+        class Iterator {
+        public:
+            Iterator(size_t idx);
+            time_t operator*() const;
+            Iterator& operator++();
+            bool operator!=(const Iterator& other) const;
+        private:
+            size_t idx_;
+        };
+
+        /**
+         * Range type for iterating events.
+         */
+        struct Range {
+            Iterator begin() const;
+            Iterator end() const;
+        };
+
+        /**
+         * Accessor for event range.
+         */
+        static Range events();
 
     private:
-        size_t idx_;
+        gpio_num_t m_pin;
+        static const time_t DEBOUNCE_SEC = 5;
+
+        // RTC-persistent storage
+        static RTC_DATA_ATTR time_t s_lastTip;
+        static RTC_DATA_ATTR CircularQueue<time_t, Config::MAX_RAIN_EVENTS> s_queue;
+
+        void configureWakeup_() const;
     };
 
-    struct EventTimeRange {
-        [[nodiscard]] EventTimeIterator begin() const {
-            return EventTimeIterator{0};
-        }
-        [[nodiscard]] EventTimeIterator end() const {
-            return EventTimeIterator{ queue.getCount() };
-        }
-    };
-
-    // call this to iterate:
-    static EventTimeRange events() {
-        return {};
-    }
-};
+} // namespace RainSensor
 
 #endif // RAIN_SENSOR_H
