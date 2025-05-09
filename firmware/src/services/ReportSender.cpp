@@ -36,15 +36,15 @@ void ReportSender::send(const WeatherEntry& currentEntry) {
         // enqueue via wrapper even if never connected
         publishEntry(currentEntry);
     }
-    WiFiManager::disconnect();
+    // WiFiManager::disconnect();
 }
 
 void ReportSender::connectServices() {
-    if (!WiFiManager::connect(Config::WIFI_SSID, Config::WIFI_PASSWORD, Config::WIFI_CONNECT_TIMEOUT_MS)) {
-        Serial.println("WiFi connect failed");
-        return;
-    }
-    Serial.println("WiFi connected");
+    // if (!WiFiManager::connect(Config::WIFI_SSID, Config::WIFI_PASSWORD, Config::WIFI_CONNECT_TIMEOUT_MS)) {
+    //     Serial.println("WiFi connect failed");
+    //     return;
+    // }
+    // Serial.println("WiFi connected");
 
     if (!_mqtt.connect()) {
         Serial.println("MQTT connect failed");

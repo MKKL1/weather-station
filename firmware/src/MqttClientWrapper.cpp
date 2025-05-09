@@ -29,8 +29,8 @@ Client::Client(const char* serverIp, uint16_t port, const char* clientIdPrefix)
              clientIdPrefix, mac[3], mac[4], mac[5]);
 }
 
-bool Client::connect(uint32_t timeoutMs) {
-    if (WiFi.status() != WL_CONNECTED) {
+bool Client::connect(const uint32_t timeoutMs) {
+    if (WiFiClass::status() != WL_CONNECTED) {
         MQTT_LOGLN("MQTT: WiFi not connected, cannot connect.");
         return false;
     }
@@ -51,7 +51,7 @@ void Client::disconnect() {
     if (m_mqtt.connected()) m_mqtt.disconnect();
 }
 
-bool Client::publish(const char* topic, const uint8_t* payload, uint16_t length) {
+bool Client::publish(const char* topic, const uint8_t* payload, const uint16_t length) {
     if (!m_mqtt.connected()) {
         MQTT_LOGLN("MQTT: not connected, queuing message.");
         enqueue_(topic, payload, length);
@@ -75,9 +75,9 @@ void Client::enqueue_(const char* topic, const uint8_t* payload, uint16_t length
 
 void Client::retryQueued() {
     if (!m_mqtt.connected()) return;
-    size_t initial = m_queue.getCount();
+    const size_t initial = m_queue.getCount();
     for (size_t i = 0; i < initial; ++i) {
-        Message msg;
+        Message msg{};
         if (!m_queue.peek(msg)) break;
         if (sendMessage_(msg)) {
             m_queue.pop();

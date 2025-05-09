@@ -2,7 +2,7 @@
 #include "controllers/SleepController.h"
 #include <esp_sleep.h>
 #include <Arduino.h>
-#include <controllers/SleepController.h>
+#include <TimeManager.h>
 
 Application::Application()
   : _sensor(Config::RAIN_SENSOR_PIN),
@@ -36,7 +36,7 @@ void Application::handleWakeup() {
     handler->handle(_sensor);
 }
 
-void Application::goToSleep() const {
+void Application::goToSleep() {
     SleepController::configure();
     esp_deep_sleep_start();
 }

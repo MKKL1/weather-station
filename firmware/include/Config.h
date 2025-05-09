@@ -1,5 +1,7 @@
 #ifndef CONFIG_H
 #define CONFIG_H
+#include <controllers/ConfigTrigger.h>
+#include <controllers/StatusLED.h>
 #include <hal/gpio_types.h>
 
 namespace Config {
@@ -41,5 +43,7 @@ namespace Config {
     constexpr size_t MQTT_MSG_BUFFER_SIZE = 256; // Ensure >= JSON size + overhead
     constexpr size_t FAILED_MQTT_QUEUE_SIZE = 10;
     constexpr size_t MAX_RAIN_EVENTS = 256;
+    const ConfigTrigger CONFIG_BUTTON_PIN{GPIO_NUM_39};
+    const StatusLED AP_LED_PIN{GPIO_NUM_32};
 }
 #endif //CONFIG_H

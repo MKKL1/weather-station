@@ -4,7 +4,7 @@ void setup() {
     Application app;
     app.init();
     app.handleWakeup();
-    app.goToSleep();
+    Application::goToSleep();
 }
 
 void loop() {}

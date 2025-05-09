@@ -47,12 +47,12 @@ namespace MQTT {
     private:
         WiFiClient m_wifiClient;
         PubSubClient m_mqtt;
-        char m_clientId[64];
+        char m_clientId[64]{};
 
         // Persistent queue of failed publishes
         static RTC_DATA_ATTR CircularQueue<Message, Config::FAILED_MQTT_QUEUE_SIZE> m_queue;
 
-        void enqueue_(const char* topic, const uint8_t* payload, uint16_t length);
+        static void enqueue_(const char* topic, const uint8_t* payload, uint16_t length);
         bool sendMessage_(const Message& msg);
     };
 
