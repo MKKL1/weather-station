@@ -70,20 +70,18 @@ size_t ProtoDataFormatter::formatData(const WeatherData &data, uint8_t *buffer, 
     weather_proto.has_tips = true;
 
     proto_DeviceInfo dev_info = proto_DeviceInfo_init_default;
-    dev_info.id.arg = reinterpret_cast<void*>(const_cast<char*>(Config::SENSOR_ID));
+    dev_info.id.arg = reinterpret_cast<void*>(const_cast<char*>("A"));
     dev_info.id.funcs.encode = &encode_string;
-    dev_info.mmPerTip = Config::MM_PER_TIP;
+    dev_info.mmPerTip = 2.5f;
     weather_proto.info = dev_info;
     weather_proto.has_info = true;
 
 
-    // 4) Encode!
     if (!pb_encode(&stream, proto_WeatherData_fields, &weather_proto)) {
         Serial.print("Protobuf encode failed: ");
         Serial.println(PB_GET_ERROR(&stream));
         return 0;
     }
 
-    // 5) stream.bytes_written now contains the number of bytes used
     return stream.bytes_written;
 }

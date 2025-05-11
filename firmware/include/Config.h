@@ -6,21 +6,21 @@
 
 namespace Config {
     // --- Network ---
-    constexpr const char* WIFI_SSID = "dd-wrt";         // <<< YOUR WIFI SSID
-    constexpr const char* WIFI_PASSWORD = ""; // <<< YOUR WIFI PASSWORD
-    constexpr const char* MQTT_SERVER_IP = "192.168.33.115"; // <<< YOUR MQTT BROKER IP/HOSTNAME
-    constexpr uint16_t MQTT_PORT = 1883;
+    // constexpr const char* WIFI_SSID = "dd-wrt";         // <<< YOUR WIFI SSID
+    // constexpr const char* WIFI_PASSWORD = ""; // <<< YOUR WIFI PASSWORD
+    // constexpr const char* MQTT_SERVER_IP = "192.168.33.115"; // <<< YOUR MQTT BROKER IP/HOSTNAME
+    // constexpr uint16_t MQTT_PORT = 1883;
     constexpr const char* MQTT_CLIENT_ID_PREFIX = "WS-";
-    constexpr const char* SENSOR_ID = "SOME_IDENTIFIER";
-    constexpr const char* MQTT_TOPIC_DATA = "weather/data";
-    constexpr const char* MQTT_TOPIC_STATUS = "weather/status";
+    // constexpr const char* SENSOR_ID = "SOME_IDENTIFIER";
+    // constexpr const char* MQTT_TOPIC_DATA = "weather/data";
+    // constexpr const char* MQTT_TOPIC_STATUS = "weather/status";
 
     // --- Hardware & Calibration ---
     // IMPORTANT: Choose an RTC GPIO pin that supports EXT0/EXT1 wakeup!
     // Common choices: 0, 2, 4, 12-15, 25-27, 32-39 (check your specific ESP32 board)
     constexpr gpio_num_t RAIN_SENSOR_PIN = GPIO_NUM_36; // <<< YOUR RAIN SENSOR PIN
     // IMPORTANT: Set this to YOUR rain gauge's specification
-    constexpr float MM_PER_TIP = 0.2794f; // Millimeters of rain per tip event (e.g., 0.2794 for 0.01 inch)
+    // constexpr float MM_PER_TIP = 0.2794f; // Millimeters of rain per tip event (e.g., 0.2794 for 0.01 inch)
 
     // --- Timing & Sleep ---
     // How often to wake up via Timer for reporting (in milliseconds)

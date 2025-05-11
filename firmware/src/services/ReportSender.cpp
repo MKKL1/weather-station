@@ -22,9 +22,12 @@ inline void printBitmask(const uint8_t *mask, size_t len) {
 }
 
 ReportSender::ReportSender(const char* mqttServer,
-                           uint16_t    mqttPort,
-                           const char* mqttClientIdPrefix)
-  : _mqtt(mqttServer, mqttPort, mqttClientIdPrefix) {}
+                           const uint16_t mqttPort,
+                           const char* chipId,
+                           const char* mqttTopic,
+                           const float mmpt)
+    : _mqtt(mqttServer, mqttPort, Config::MQTT_CLIENT_ID_PREFIX), _chipId(chipId), _mqttTopic(mqttTopic), _mmpt(mmpt) {
+}
 
 void ReportSender::send(const WeatherEntry& currentEntry) {
     connectServices();
@@ -62,7 +65,7 @@ void ReportSender::retryQueued() {
 void ReportSender::publishEntry(const WeatherEntry& entry) {
     uint8_t buffer[Config::MQTT_MSG_BUFFER_SIZE];
     const size_t len = ProtoDataFormatter{}.formatData(
-        WeatherData(entry, DeviceInfo(Config::SENSOR_ID, Config::MM_PER_TIP)),
+        WeatherData(entry, DeviceInfo(_chipId, _mmpt)),
         buffer,
         sizeof(buffer)
     );
@@ -76,7 +79,7 @@ void ReportSender::publishEntry(const WeatherEntry& entry) {
         Serial.println("Formatting failed");
         return;
     }
-    if (_mqtt.publish(Config::MQTT_TOPIC_DATA, buffer, len)) {
+    if (_mqtt.publish(_mqttTopic, buffer, len)) {
         Serial.println("Published entry");
     } else {
         Serial.println("Publish failed, queued for retry");

@@ -1,9 +1,66 @@
 #ifndef WIFI_CONFIG_MANAGER_H
 #define WIFI_CONFIG_MANAGER_H
 
+#include <AppConfig.h>
 #include <FS.h>
 #include <WiFiManager.h>
 #include <controllers/StatusLED.h>
+
+class PortParameter : public WiFiManagerParameter {
+public:
+    /// \param id           unique field ID
+    /// \param placeholder  label/placeholder text
+    /// \param value        default port (e.g. 1883)
+    /// \param length       max input characters (5 digits + maybe one extra)
+    PortParameter(const char *id,
+                  const char *placeholder,
+                  uint16_t value = 1883,
+                  const uint8_t length = 6)
+      : WiFiManagerParameter("")
+    {
+        // custom HTML ensures numeric input with bounds
+        constexpr auto attrs = "type=\"number\" min=\"1\" max=\"65535\"";
+        init(id,
+             placeholder,
+             String(value).c_str(),
+             length,
+             attrs,
+             WFM_LABEL_BEFORE);
+    }
+
+    /// Returns the entered port, clamped to [1, 65535]
+    [[nodiscard]] uint16_t getValue() const {
+        const long v = String(WiFiManagerParameter::getValue()).toInt();
+        if (v < 1)      return 1;
+        if (v > 65535)  return 65535;
+        return static_cast<uint16_t>(v);
+    }
+};
+
+
+// class IntParameter : public WiFiManagerParameter {
+// public:
+//     IntParameter(const char *id, const char *placeholder, long value, const uint8_t length = 10)
+//         : WiFiManagerParameter("") {
+//         init(id, placeholder, String(value).c_str(), length, "", WFM_LABEL_BEFORE);
+//     }
+//
+//     [[nodiscard]] long getValue() const {
+//         return String(WiFiManagerParameter::getValue()).toInt();
+//     }
+// };
+
+class FloatParameter : public WiFiManagerParameter {
+public:
+    FloatParameter(const char *id, const char *placeholder, const float value, const uint8_t length = 10)
+        : WiFiManagerParameter("") {
+        init(id, placeholder, String(value).c_str(), length, "", WFM_LABEL_BEFORE);
+    }
+
+    [[nodiscard]] float getValue() const {
+        return String(WiFiManagerParameter::getValue()).toFloat();
+    }
+};
 
 /**
  * Handles captive-portal configuration of:
@@ -15,39 +72,33 @@
  */
 class WiFiConfigManager {
 public:
-    struct dConfig {
-        String wifiSSID;
-        String wifiPass;
-        String mqttServer;
-        String mmPerTip;    // stored as string, convert to float with toFloat()
-    };
-
     WiFiConfigManager();
     /**
      * Mounts LITTLEFS, loads any existing config, then
      * runs a captive portal if needed.
      * Returns true if we ended up connected to WiFi.
      */
-    bool begin();
+    bool begin() {
+        return begin_(false);
+    }
 
-    bool forceAP();
-
-    [[nodiscard]] dConfig getConfig() const { return _cfg; }
+    bool forceAP() {
+        return begin_(true);
+    }
 
 private:
-    void loadConfig_();
-    void saveConfig_() const;
     bool begin_(bool forceAP);
     static void saveConfigCallback_();
 
     WiFiManager           _portal;
-    WiFiManagerParameter  _paramMqtt;
-    WiFiManagerParameter  _paramMmpt;
-    dConfig                _cfg;
-    bool                  _shouldSave = false;
+    WiFiManagerParameter  _paramMqttAddr;
+    PortParameter         _paramMqttPort;
+    WiFiManagerParameter  _paramMqttTopic;
+    WiFiManagerParameter  _paramChipId;
+    FloatParameter        _paramMmpt;
     StatusLED             _apLed;
+    bool                  _shouldSave = false;
 
-    // Single-instance pointer for static callback
     static WiFiConfigManager* _instance;
 };
 

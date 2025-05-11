@@ -9,8 +9,10 @@
 class ReportSender {
 public:
     ReportSender(const char* mqttServer,
-                 uint16_t    mqttPort,
-                 const char* mqttClientIdPrefix);
+                   uint16_t    mqttPort,
+                   const char* chipId,
+                   const char* mqttTopic,
+                   float       mmpt);
 
     void send(const WeatherEntry& currentEntry);
 
@@ -21,6 +23,9 @@ private:
 
     MQTT::Client _mqtt;
     bool         _mqttConnected = false;
+    const char*  _chipId;
+    const char*  _mqttTopic{};
+    const float  _mmpt;
 };
 
 #endif // REPORT_SENDER_H

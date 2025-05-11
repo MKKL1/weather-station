@@ -1,7 +1,6 @@
 #include "handlers/InitialBoot.h"
 #include "controllers/SleepController.h"
 #include "controllers/ConfigTrigger.h"
-#include "controllers/StatusLED.h"
 #include "TimeManager.h"
 #include <Arduino.h>
 #include <esp_sleep.h>
@@ -11,7 +10,7 @@ void InitialBoot::handle(RainSensor::Sensor& sensor) {
     Serial.printf("Wakeup Source: Other/Reset (%d)\n", esp_sleep_get_wakeup_cause());
     Serial.println("Initial setup...");
 
-    ConfigTrigger cfgBtn(Config::CONFIG_BUTTON_PIN);
+    const ConfigTrigger cfgBtn(Config::CONFIG_BUTTON_PIN);
     WiFiConfigManager wifiConfig{};
 
     if (cfgBtn.shouldEnterConfig()) {
@@ -23,7 +22,7 @@ void InitialBoot::handle(RainSensor::Sensor& sensor) {
     else {
         // normal WiFi connect + NTP sync
         if (wifiConfig.begin()) {
-            Serial.println("Connected to WiFi: " + wifiConfig.getConfig().wifiSSID);
+            Serial.println("Connected to WiFi: " + ConfigStore::getConfig().wifiSSID);
 
             if (TimeManager::syncTimeWithNTP(Config::NTP_TIMEOUT_MS)) {
                 time_t synced = TimeManager::getRTCEpochTime();

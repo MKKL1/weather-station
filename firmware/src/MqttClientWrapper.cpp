@@ -4,7 +4,7 @@
 #include <esp_sleep.h>
 
 // Uncomment for debug
-// #define MQTT_DEBUG
+#define MQTT_DEBUG
 #ifdef MQTT_DEBUG
   #define MQTT_LOG(...) Serial.printf(__VA_ARGS__)
   #define MQTT_LOGLN(...) Serial.println(__VA_ARGS__)
@@ -18,9 +18,10 @@ namespace MQTT {
 // Define static RTC-persistent queue
 RTC_DATA_ATTR CircularQueue<Message, Config::FAILED_MQTT_QUEUE_SIZE> Client::m_queue;
 
-Client::Client(const char* serverIp, uint16_t port, const char* clientIdPrefix)
+Client::Client(const char* serverIp, const uint16_t port, const char* clientIdPrefix)
     : m_mqtt(m_wifiClient)
 {
+    MQTT_LOG("Creating MQTT client to %s:%d", serverIp , port);
     m_mqtt.setServer(serverIp, port);
     // build clientId from prefix + MAC
     uint8_t mac[6];
@@ -37,7 +38,7 @@ bool Client::connect(const uint32_t timeoutMs) {
     unsigned long start = millis();
     while (!m_mqtt.connected() && millis() - start < timeoutMs) {
         if (m_mqtt.connect(m_clientId)) {
-            MQTT_LOGLN("MQTT: connected as %s", m_clientId);
+            MQTT_LOG("MQTT: connected as %s", m_clientId);
             return true;
         }
         MQTT_LOGLN("MQTT: connect failed, retrying...");
