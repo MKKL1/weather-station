@@ -12,7 +12,8 @@ public:
                    uint16_t    mqttPort,
                    const char* chipId,
                    const char* mqttTopic,
-                   float       mmpt);
+                   float       mmpt,
+                   const uint32_t instanceId);
 
     void send(const WeatherEntry& currentEntry);
 
@@ -26,6 +27,7 @@ private:
     const char*  _chipId;
     const char*  _mqttTopic{};
     const float  _mmpt;
+    const uint32_t _instanceId;
 };
 
 #endif // REPORT_SENDER_H

@@ -25,8 +25,9 @@ ReportSender::ReportSender(const char* mqttServer,
                            const uint16_t mqttPort,
                            const char* chipId,
                            const char* mqttTopic,
-                           const float mmpt)
-    : _mqtt(mqttServer, mqttPort, Config::MQTT_CLIENT_ID_PREFIX), _chipId(chipId), _mqttTopic(mqttTopic), _mmpt(mmpt) {
+                           const float mmpt,
+                           const uint32_t instanceId)
+    : _mqtt(mqttServer, mqttPort, Config::MQTT_CLIENT_ID_PREFIX), _chipId(chipId), _mqttTopic(mqttTopic), _mmpt(mmpt), _instanceId(instanceId) {
 }
 
 void ReportSender::send(const WeatherEntry& currentEntry) {
@@ -63,9 +64,11 @@ void ReportSender::retryQueued() {
 }
 
 void ReportSender::publishEntry(const WeatherEntry& entry) {
+    Serial.printf("Instance id: %u \n", _instanceId);
+
     uint8_t buffer[Config::MQTT_MSG_BUFFER_SIZE];
     const size_t len = ProtoDataFormatter{}.formatData(
-        WeatherData(entry, DeviceInfo(_chipId, _mmpt)),
+        WeatherData(entry, DeviceInfo(_chipId, _mmpt, _instanceId)),
         buffer,
         sizeof(buffer)
     );

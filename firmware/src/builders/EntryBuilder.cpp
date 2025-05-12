@@ -21,6 +21,9 @@ WeatherEntry EntryBuilder::buildCurrentEntry() {
     WeatherEntry entry;
     entry.clearBitmask();
     entry.timestamp_s = alignedEnd;
+    entry.humidity = 20;
+    entry.temperature = 30;
+    entry.pressure = 100;
 
     // 3) Populate rain-tip bitmask
     int processed = 0, inRange = 0;

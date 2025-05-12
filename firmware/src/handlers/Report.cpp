@@ -6,6 +6,7 @@
 #include "services/ReportSender.h"
 #include "controllers/SleepController.h"
 #include "TimeManager.h"
+#include "InstanceIdGen.h"
 #include <Arduino.h>
 #include <WiFiConfigManager.h>
 
@@ -50,13 +51,17 @@ void Report::handle(RainSensor::Sensor& sensor) {
 
     Serial.println("WiFi connected for reporting.");
 
+    const uint32_t i_id = InstanceIdGen::getInstanceId();
+
+    Serial.printf("Instance id: %u \n", i_id);
     // --- Use values obtained directly from WCM getters ---
     ReportSender sender{
         server,
         port,
         chipId,
         topic,
-        mmPerTip
+        mmPerTip,
+        i_id
     };
 
     Serial.printf("ReportSender initialized with: Server=%s, Port=%u, Chip=%s, Topic=%s, MMpT=%.2f\n",

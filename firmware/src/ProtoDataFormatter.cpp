@@ -70,9 +70,10 @@ size_t ProtoDataFormatter::formatData(const WeatherData &data, uint8_t *buffer, 
     weather_proto.has_tips = true;
 
     proto_DeviceInfo dev_info = proto_DeviceInfo_init_default;
-    dev_info.id.arg = reinterpret_cast<void*>(const_cast<char*>("A"));
+    dev_info.id.arg = reinterpret_cast<void*>(const_cast<char*>(data.deviceInfo.sensorId.c_str()));
     dev_info.id.funcs.encode = &encode_string;
-    dev_info.mmPerTip = 2.5f;
+    dev_info.mmPerTip = data.deviceInfo.mmPerTip;
+    dev_info.instanceId = data.deviceInfo.instanceId;
     weather_proto.info = dev_info;
     weather_proto.has_info = true;
 

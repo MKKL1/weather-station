@@ -5,12 +5,13 @@
 #include <string_view>
 
 struct DeviceInfo {
-    std::string_view sensorId;
+    std::string      sensorId;
     float            mmPerTip{};
+    uint32_t         instanceId;
 
-    explicit constexpr DeviceInfo(const std::string_view id, const float mm = 0.0f) noexcept
-      : sensorId(id), mmPerTip(mm)
-    {}
+    explicit DeviceInfo(const std::string_view id, const float mm, const uint32_t instanceId) noexcept
+        : sensorId(id), mmPerTip(mm), instanceId(instanceId) {
+    }
 };
 
 struct WeatherData {

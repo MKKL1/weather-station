@@ -20,6 +20,7 @@ typedef struct _proto_Histogram {
 typedef struct _proto_DeviceInfo {
     pb_callback_t id;
     float mmPerTip;
+    uint32_t instanceId;
 } proto_DeviceInfo;
 
 typedef struct _proto_WeatherData {
@@ -40,10 +41,10 @@ extern "C" {
 
 /* Initializer values for message structs */
 #define proto_Histogram_init_default             {{{NULL}, NULL}, 0, 0, 0}
-#define proto_DeviceInfo_init_default            {{{NULL}, NULL}, 0}
+#define proto_DeviceInfo_init_default            {{{NULL}, NULL}, 0, 0}
 #define proto_WeatherData_init_default           {0, 0, 0, 0, false, proto_Histogram_init_default, false, proto_DeviceInfo_init_default}
 #define proto_Histogram_init_zero                {{{NULL}, NULL}, 0, 0, 0}
-#define proto_DeviceInfo_init_zero               {{{NULL}, NULL}, 0}
+#define proto_DeviceInfo_init_zero               {{{NULL}, NULL}, 0, 0}
 #define proto_WeatherData_init_zero              {0, 0, 0, 0, false, proto_Histogram_init_zero, false, proto_DeviceInfo_init_zero}
 
 /* Field tags (for use in manual encoding/decoding) */
@@ -53,6 +54,7 @@ extern "C" {
 #define proto_Histogram_start_time_tag           4
 #define proto_DeviceInfo_id_tag                  1
 #define proto_DeviceInfo_mmPerTip_tag            2
+#define proto_DeviceInfo_instanceId_tag          3
 #define proto_WeatherData_created_at_tag         1
 #define proto_WeatherData_temperature_tag        2
 #define proto_WeatherData_pressure_tag           3
@@ -71,7 +73,8 @@ X(a, STATIC,   SINGULAR, UINT32,   start_time,        4)
 
 #define proto_DeviceInfo_FIELDLIST(X, a) \
 X(a, CALLBACK, SINGULAR, STRING,   id,                1) \
-X(a, STATIC,   SINGULAR, FLOAT,    mmPerTip,          2)
+X(a, STATIC,   SINGULAR, FLOAT,    mmPerTip,          2) \
+X(a, STATIC,   SINGULAR, UINT32,   instanceId,        3)
 #define proto_DeviceInfo_CALLBACK pb_default_field_callback
 #define proto_DeviceInfo_DEFAULT NULL
 
