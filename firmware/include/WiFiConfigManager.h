@@ -62,33 +62,54 @@ public:
     }
 };
 
-/**
- * Handles captive-portal configuration of:
- *   - WiFi SSID / password (via WiFiManager)
- *   - MQTT server address
- *   - Rain gauge mm-per-tip calibration
- *
- * Stores settings in LITTLEFS (/wifi_config.json).
- */
 class WiFiConfigManager {
 public:
-    WiFiConfigManager();
+    const char* getMqttServer() const { return _paramMqttAddr.getValue(); }
+    uint16_t getMqttPort() const { return _paramMqttPort.getValue(); } // Assuming PortParameter has matching getValue()
+    const char* getMqttTopic() const { return _paramMqttTopic.getValue(); }
+    const char* getChipId() const { return _paramChipId.getValue(); }
+    float getMmPerTip() const { return _paramMmpt.getValue(); }
     /**
-     * Mounts LITTLEFS, loads any existing config, then
-     * runs a captive portal if needed.
-     * Returns true if we ended up connected to WiFi.
+     * Gets the singleton instance of WiFiConfigManager.
+     * If the instance hasn't been initialized yet, this will create it.
      */
-    bool begin() {
-        return begin_(false);
-    }
+    static WiFiConfigManager& getInstance();
 
-    bool forceAP() {
-        return begin_(true);
-    }
+    /**
+     * Loads or reloads configuration from the filesystem.
+     * Called automatically when needed, but can be called manually to refresh.
+     */
+    void loadConfig();
+
+    /**
+     * Connects to WiFi using saved credentials, or runs a captive portal if needed.
+     * Must call init() before using this method.
+     * Returns true if successfully connected to WiFi.
+     */
+    bool connect();
+
+    /**
+     * Forces the device into AP mode for configuration.
+     * Must call init() before using this method.
+     * Returns true if the configuration was successful.
+     */
+    bool forceAP();
+
+    /**
+     * Checks if the configuration has been initialized.
+     */
+    bool isInitialized() const { return _initialized; }
 
 private:
-    bool begin_(bool forceAP);
-    static void saveConfigCallback_();
+    // Private constructor to prevent direct instantiation
+    WiFiConfigManager();
+
+    // Delete copy constructor and assignment operator
+    WiFiConfigManager(const WiFiConfigManager&) = delete;
+    WiFiConfigManager& operator=(const WiFiConfigManager&) = delete;
+
+    bool beginConnection(bool forceAP);
+    static void saveConfigCallback();
 
     WiFiManager           _portal;
     WiFiManagerParameter  _paramMqttAddr;
@@ -98,7 +119,9 @@ private:
     FloatParameter        _paramMmpt;
     StatusLED             _apLed;
     bool                  _shouldSave = false;
+    bool                  _initialized = false;
 
+    // The singleton instance
     static WiFiConfigManager* _instance;
 };
 
