@@ -3,10 +3,9 @@
 
 inline void printBitmask(const uint8_t *mask, size_t len) {
     for (size_t i = 0; i < len; i++) {
-        // pad with a leading zero if needed
         if (mask[i] < 0x10) Serial.print('0');
         Serial.print(mask[i], HEX);
-        Serial.print(' ');   // space between bytes, remove if you want a continuous string
+        Serial.print(' ');
     }
     Serial.println();
 }

@@ -69,6 +69,8 @@ public:
     const char* getMqttTopic() const { return _paramMqttTopic.getValue(); }
     const char* getChipId() const { return _paramChipId.getValue(); }
     float getMmPerTip() const { return _paramMmpt.getValue(); }
+    const char* getMqttPass() const { return _paramMqttPass.getValue(); }
+    const char* getMqttUser() const { return _paramMqttUser.getValue(); }
     /**
      * Gets the singleton instance of WiFiConfigManager.
      * If the instance hasn't been initialized yet, this will create it.
@@ -111,15 +113,17 @@ private:
     bool beginConnection(bool forceAP);
     static void saveConfigCallback();
 
-    WiFiManager           _portal;
-    WiFiManagerParameter  _paramMqttAddr;
-    PortParameter         _paramMqttPort;
-    WiFiManagerParameter  _paramMqttTopic;
-    WiFiManagerParameter  _paramChipId;
-    FloatParameter        _paramMmpt;
-    StatusLED             _apLed;
-    bool                  _shouldSave = false;
-    bool                  _initialized = false;
+    WiFiManager          _portal;
+    WiFiManagerParameter _paramMqttAddr;
+    PortParameter        _paramMqttPort;
+    WiFiManagerParameter _paramMqttUser;
+    WiFiManagerParameter _paramMqttPass;
+    WiFiManagerParameter _paramMqttTopic;
+    WiFiManagerParameter _paramChipId;
+    FloatParameter       _paramMmpt;
+    StatusLED            _apLed;
+    bool                 _shouldSave = false;
+    bool                 _initialized = false;
 
     // The singleton instance
     static WiFiConfigManager* _instance;

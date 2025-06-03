@@ -1,9 +1,7 @@
-// RainSensor.cpp
 #include "RainSensor.h"
 #include <esp_sleep.h>
 #include <esp_err.h>
 
-// Uncomment to enable debug logs
 //#define RAIN_DEBUG
 #ifdef RAIN_DEBUG
   #define RAIN_LOG(...) Serial.printf(__VA_ARGS__)

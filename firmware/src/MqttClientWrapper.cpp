@@ -18,10 +18,10 @@ namespace MQTT {
 // Define static RTC-persistent queue
 RTC_DATA_ATTR CircularQueue<Message, Config::FAILED_MQTT_QUEUE_SIZE> Client::m_queue;
 
-Client::Client(const char* serverIp, const uint16_t port, const char* clientIdPrefix)
-    : m_mqtt(m_wifiClient)
-{
-    MQTT_LOG("Creating MQTT client to %s:%d", serverIp , port);
+Client::Client(const char* serverIp, const uint16_t port, const char* user, const char* pass, const char* clientIdPrefix)
+    : m_mqtt(m_wifiClient), _user(user), _password(pass) {
+
+    MQTT_LOG("Creating MQTT client to %s:%d", serverIp, port);
     m_mqtt.setServer(serverIp, port);
     // build clientId from prefix + MAC
     uint8_t mac[6];
@@ -35,9 +35,16 @@ bool Client::connect(const uint32_t timeoutMs) {
         MQTT_LOGLN("MQTT: WiFi not connected, cannot connect.");
         return false;
     }
-    unsigned long start = millis();
+
+    const char* user = (_user && _user[0] != '\0') ? _user : NULL;
+    const char* password = (_password && _password[0] != '\0') ? _password : NULL;
+
+    Serial.println("Connecting to MQTT client...");
+    // Serial.printf("Mqtt User: '%s' Pass: '%s'", user, password);
+
+    const unsigned long start = millis();
     while (!m_mqtt.connected() && millis() - start < timeoutMs) {
-        if (m_mqtt.connect(m_clientId)) {
+        if (m_mqtt.connect(m_clientId, user, password)) {
             MQTT_LOG("MQTT: connected as %s", m_clientId);
             return true;
         }

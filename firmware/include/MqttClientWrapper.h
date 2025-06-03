@@ -22,7 +22,7 @@ namespace MQTT {
 
     class Client {
     public:
-        Client(const char* serverIp, uint16_t port, const char* clientIdPrefix);
+        Client(const char* serverIp, uint16_t port, const char* user, const char* pass, const char* clientIdPrefix);
 
         /**
          * Connects to MQTT broker.
@@ -48,6 +48,8 @@ namespace MQTT {
         WiFiClient m_wifiClient;
         PubSubClient m_mqtt;
         char m_clientId[64]{};
+        const char *_user;
+        const char *_password;
 
         // Persistent queue of failed publishes
         static RTC_DATA_ATTR CircularQueue<Message, Config::FAILED_MQTT_QUEUE_SIZE> m_queue;

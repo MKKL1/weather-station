@@ -25,9 +25,11 @@ ReportSender::ReportSender(const char* mqttServer,
                            const uint16_t mqttPort,
                            const char* chipId,
                            const char* mqttTopic,
+                           const char* mqttUser,
+                           const char* mqttPass,
                            const float mmpt,
                            const uint32_t instanceId)
-    : _mqtt(mqttServer, mqttPort, Config::MQTT_CLIENT_ID_PREFIX), _chipId(chipId), _mqttTopic(mqttTopic), _mmpt(mmpt), _instanceId(instanceId) {
+    : _mqtt(mqttServer, mqttPort, mqttUser, mqttPass, Config::MQTT_CLIENT_ID_PREFIX), _chipId(chipId), _mqttTopic(mqttTopic), _mmpt(mmpt), _instanceId(instanceId) {
 }
 
 void ReportSender::send(const WeatherEntry& currentEntry) {
@@ -37,10 +39,8 @@ void ReportSender::send(const WeatherEntry& currentEntry) {
         publishEntry(currentEntry);
         _mqtt.disconnect();
     } else {
-        // enqueue via wrapper even if never connected
         publishEntry(currentEntry);
     }
-    // WiFiManager::disconnect();
 }
 
 void ReportSender::connectServices() {

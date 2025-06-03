@@ -9,11 +9,13 @@
 class ReportSender {
 public:
     ReportSender(const char* mqttServer,
-                   uint16_t    mqttPort,
-                   const char* chipId,
-                   const char* mqttTopic,
-                   float       mmpt,
-                   const uint32_t instanceId);
+                    uint16_t    mqttPort,
+                    const char* chipId,
+                    const char* mqttTopic,
+                    const char* mqttUser,
+                    const char* mqttPass,
+                    float       mmpt,
+                    uint32_t instanceId);
 
     void send(const WeatherEntry& currentEntry);
 

@@ -13,11 +13,13 @@ WiFiConfigManager& WiFiConfigManager::getInstance() {
 
 WiFiConfigManager::WiFiConfigManager()
     :
-      _paramMqttAddr("mqtt",   "MQTT Server",      ConfigStore::cfg.mqttServer, MQTT_SERVER_MAX_LEN), // Pass char* directly
-      _paramMqttPort("port",   "MQTT Port",        ConfigStore::cfg.mqttPort), // Custom param takes int
+      _paramMqttAddr("mqtt",   "MQTT Server",      ConfigStore::cfg.mqttServer, MQTT_SERVER_MAX_LEN),
+      _paramMqttPort("port",   "MQTT Port",        ConfigStore::cfg.mqttPort),
       _paramMqttTopic("topic", "MQTT Data Topic",  ConfigStore::cfg.mqttDataTopic, MQTT_TOPIC_MAX_LEN),
       _paramChipId("chip",     "Chip ID",          ConfigStore::cfg.chipId, CHIP_ID_MAX_LEN),
-      _paramMmpt("mmpt",       "mm per tip",       ConfigStore::cfg.mmPerTip), // Custom param takes float
+      _paramMmpt("mmpt",       "mm per tip",       ConfigStore::cfg.mmPerTip),
+      _paramMqttPass("pass", "Mqtt Password", ConfigStore::cfg.mqttPassword, MQTT_PASS_MAX_LEN),
+      _paramMqttUser("user", "Mqtt User", ConfigStore::cfg.mqttUser, MQTT_USER_MAX_LEN),
       _apLed(::Config::AP_LED_PIN)
 {
     // Set up the portal configuration
@@ -31,6 +33,8 @@ WiFiConfigManager::WiFiConfigManager()
     // register params
     _portal.addParameter(&_paramMqttAddr);
     _portal.addParameter(&_paramMqttPort);
+    _portal.addParameter(&_paramMqttUser);
+    _portal.addParameter(&_paramMqttPass);
     _portal.addParameter(&_paramMqttTopic);
     _portal.addParameter(&_paramChipId);
     _portal.addParameter(&_paramMmpt);
@@ -54,6 +58,8 @@ void WiFiConfigManager::loadConfig() {
     // Update parameters with loaded values FROM ConfigStore::cfg
     _paramMqttAddr.setValue(ConfigStore::cfg.mqttServer, MQTT_SERVER_MAX_LEN);
     _paramMqttPort.setValue(portStr, sizeof(portStr));
+    _paramMqttUser.setValue(ConfigStore::cfg.mqttUser, MQTT_USER_MAX_LEN);
+    _paramMqttPass.setValue(ConfigStore::cfg.mqttPassword, MQTT_PASS_MAX_LEN);
     _paramMqttTopic.setValue(ConfigStore::cfg.mqttDataTopic, MQTT_TOPIC_MAX_LEN);
     _paramChipId.setValue(ConfigStore::cfg.chipId, CHIP_ID_MAX_LEN);
     _paramMmpt.setValue(mmptStr, sizeof(mmptStr));
@@ -103,26 +109,24 @@ bool WiFiConfigManager::beginConnection(const bool forceAP) {
 
     Serial.println("Exited portal, continue normally");
 
-    // If we should save the config, make sure it's saved now
     if (_shouldSave) {
         _shouldSave = false;
 
-        // Copy values FROM parameters INTO ConfigStore::cfg
-        // Use strlcpy for safety when copying from WiFiManagerParameter char* results
         strlcpy(ConfigStore::cfg.mqttServer, _paramMqttAddr.getValue(), MQTT_SERVER_MAX_LEN);
-        ConfigStore::cfg.mqttPort = _paramMqttPort.getValue(); // Assuming getValue returns uint16_t
+        ConfigStore::cfg.mqttPort = _paramMqttPort.getValue();
+        strlcpy(ConfigStore::cfg.mqttUser, _paramMqttUser.getValue(), MQTT_USER_MAX_LEN);
+        strlcpy(ConfigStore::cfg.mqttPassword, _paramMqttPass.getValue(), MQTT_PASS_MAX_LEN);
         strlcpy(ConfigStore::cfg.mqttDataTopic, _paramMqttTopic.getValue(), MQTT_TOPIC_MAX_LEN);
         strlcpy(ConfigStore::cfg.chipId, _paramChipId.getValue(), CHIP_ID_MAX_LEN);
-        ConfigStore::cfg.mmPerTip = _paramMmpt.getValue();   // Assuming getValue returns float
+        ConfigStore::cfg.mmPerTip = _paramMmpt.getValue();
 
-        // Get WiFi creds (WiFiManager usually saves these itself, but good practice to store in your config too)
         strlcpy(ConfigStore::cfg.wifiSSID, WiFi.SSID().c_str(), WIFI_SSID_MAX_LEN);
         strlcpy(ConfigStore::cfg.wifiPass, WiFi.psk().c_str(), WIFI_PASS_MAX_LEN);
 
-        ConfigStore::save(); // Save the updated ConfigStore::cfg to LittleFS
+        ConfigStore::save();
 
         Serial.println("Config saved after portal exit");
-        Serial.printf("Saved MQTT Server: %s\n", ConfigStore::cfg.mqttServer); // Verify saved value
+        Serial.printf("Saved MQTT Server: %s\n", ConfigStore::cfg.mqttServer);
     }
 
     return true;
@@ -134,8 +138,6 @@ void WiFiConfigManager::saveConfigCallback() {
         Serial.println("Setting shouldSave to true");
         _instance->_shouldSave = true;
 
-        // Log the values *as retrieved from the portal parameters*
         Serial.printf("Portal MQTT Addr Param: %s\n", _instance->_paramMqttAddr.getValue());
-        // Log other params as needed
     }
 }
