@@ -6,7 +6,8 @@ builder.Services.AddControllers();
 
 // Add services to the container.
 builder.Services.AddOpenApi();
-builder.Services.AddSingleton<IDBService, InfluxDBService>();
+builder.Services.AddSingleton<IDBQueryService, InfluxDBQueryService>();
+builder.Services.AddSingleton<ISensorService, ExampleSensor>();
 
 var app = builder.Build();
 

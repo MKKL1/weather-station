@@ -7,17 +7,18 @@ namespace Controllers;
 [Route("[controller]")]
 public class SensorController : ControllerBase
 {
-    private readonly IDBService _dbService;
+    //private readonly IDBQueryService _dbService;
+    private readonly ISensorService _sensor;
 
-    public SensorController(IDBService dbService)
+    public SensorController(ISensorService sensorService)
     {
-        _dbService = dbService;
+        _sensor = sensorService;
     }
 
     [HttpGet("hello-world")] 
     public IActionResult GetHelloWorld()
     {
-        //var data = _dbService.QueryAsync()
+        var data = _sensor.GetTemperatureNow();
         return Ok("SIEMA ENIU");
     }
 }

@@ -5,12 +5,12 @@ using Microsoft.Extensions.Configuration;
 
 namespace app.Services;
 
-public class InfluxDBService : IDBService
+public class InfluxDBQueryService : IDBQueryService
 {
     private readonly string _url;
     private readonly string _token;
 
-    public InfluxDBService(IConfiguration configuration)
+    public InfluxDBQueryService(IConfiguration configuration)
     {
         _url = configuration.GetValue<string>("InfluxDB:Url") ?? "http://localhost:8086";
         _token = configuration.GetValue<string>("InfluxDB:Token")
