@@ -5,7 +5,7 @@ using InfluxDB.Client.Api.Domain;
 
 namespace app.Services;
 
-public interface IDBService
+public interface IDBRService
 {
     Task<T> QueryAsync<T>(Func<QueryApi, Task<T>> action);
 }

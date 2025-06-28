@@ -5,7 +5,8 @@ using Microsoft.Extensions.Configuration;
 
 namespace app.Services;
 
-public class InfluxDBService : IDBService
+//TODO to jest w zlym miejscu, to jestr tylko przyklad uzycia InfluxDB
+public class InfluxDBService : IDBRService
 {
     private readonly string _url;
     private readonly string _token;

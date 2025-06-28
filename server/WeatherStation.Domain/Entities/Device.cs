@@ -6,7 +6,7 @@ public class Location(double latitude, double longitude)
     public double Longitude { get;} = longitude;
 }
 
-public class Sensor
+public class Device
 {
     public Guid Id { get; set; }
     public string Name { get; set; }

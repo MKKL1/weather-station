@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
@@ -9,11 +9,12 @@
   <ItemGroup>
     <PackageReference Include="InfluxDB.Client" Version="4.18.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.3" />
+	<ProjectReference Include="..\WeatherStation.Application\WeatherStation.Application.csproj" />
+	<ProjectReference Include="..\WeatherStation.Infrastructure\WeatherStation.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <Folder Include="Controllers\" />
-    <Folder Include="Services\" />
   </ItemGroup>
 
 </Project>
