@@ -4,7 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Controllers;
 
 [ApiController]
-[Route("[controller]")]
+[Route("sensor")]
 public class SensorController : ControllerBase
 {
     private readonly IDBService _dbService;
