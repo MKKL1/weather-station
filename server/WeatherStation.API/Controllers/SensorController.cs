@@ -26,10 +26,6 @@ public class SensorController : ControllerBase
         try
         {
             var snapshot = await _measurementQueryService.GetSnapshot(deviceId);
-            if (snapshot == null)
-            {
-                return NotFound($"No data found for device {deviceId}");
-            }
             return Ok(snapshot);
         }
         catch (Exception)

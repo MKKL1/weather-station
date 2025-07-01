@@ -11,6 +11,7 @@ public class MeasurementQueryService : IMeasurementQueryService
 
     public async Task<Measurement> GetSnapshot(string deviceId)
     {
+        //TODO we should check that device exists and if user can access it
         return await _repository.GetSnapshot(deviceId);
     }
 }
