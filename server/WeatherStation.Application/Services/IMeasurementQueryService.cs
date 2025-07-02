@@ -4,5 +4,5 @@ namespace WeatherStation.Application.Services;
 
 public interface IMeasurementQueryService
 {
-	public Task<Measurement> GetSnapshot(string deviceId);
+	public Task<Measurement?> GetSnapshot(string deviceId);
 }

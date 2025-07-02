@@ -1,6 +1,7 @@
-using WeatherStation.Application.Services;
 using WeatherStation.Domain.Entities;
 using WeatherStation.Domain.Repositories;
+
+namespace WeatherStation.Application.Services;
 
 public class MeasurementQueryService : IMeasurementQueryService
 {
@@ -10,7 +11,7 @@ public class MeasurementQueryService : IMeasurementQueryService
         _repository = repository;
     }
 
-    public async Task<Measurement> GetSnapshot(string deviceId)
+    public async Task<Measurement?> GetSnapshot(string deviceId)
     {
         //TODO we should check that device exists and if user can access it
         return await _repository.GetSnapshot(deviceId);

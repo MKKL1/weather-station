@@ -23,10 +23,8 @@ public class InfluxDbMeasurementRepository : IMeasurementRepository
     /**
      * Gets last value from range of 1h
      */
-    public async Task<Measurement> GetSnapshot(string deviceId)
+    public async Task<Measurement?> GetSnapshot(string deviceId)
     {
-        //TODO handle no data
-        
         //TODO Replace temporary 7d range
         //TODO Make start time configurable
         var flux = $$"""
@@ -70,8 +68,9 @@ public class InfluxDbMeasurementRepository : IMeasurementRepository
             .QueryAsync(flux, _org);
 
         if (tables == null || tables.Count == 0 || tables[0].Records.Count == 0)
-            throw new InvalidOperationException($"No data for device '{deviceId}'.");
-
+        {
+            return null;
+        }
         var record = tables[0].Records.First();
         
         var maybeInstant = record.GetTime();

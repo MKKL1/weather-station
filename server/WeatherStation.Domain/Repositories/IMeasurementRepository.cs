@@ -4,5 +4,5 @@ namespace WeatherStation.Domain.Repositories;
 
 public interface IMeasurementRepository
 {
-    public Task<Measurement> GetSnapshot(string deviceId);
+    public Task<Measurement?> GetSnapshot(string deviceId);
 }
