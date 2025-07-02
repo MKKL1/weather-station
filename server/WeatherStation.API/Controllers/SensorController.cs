@@ -1,4 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
+using WeatherStation.API.Responses;
+using WeatherStation.Application.Services;
 
 namespace Controllers;
 
@@ -26,7 +28,15 @@ public class SensorController : ControllerBase
         try
         {
             var snapshot = await _measurementQueryService.GetSnapshot(deviceId);
-            return Ok(snapshot);
+            var dto = new SnapshotResponse(snapshot.DeviceId,
+                snapshot.Timestamp,
+                snapshot.Values
+                    .ToDictionary(
+                        kv => kv.Key.ToString().ToLowerInvariant(), //Kinda tricky, may not always work
+                        kv => kv.Value
+                    )
+                );
+            return Ok(dto);
         }
         catch (Exception)
         {

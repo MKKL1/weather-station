@@ -3,6 +3,8 @@ using InfluxDB.Client.Core.Flux.Domain;
 using Microsoft.Extensions.Configuration;
 using WeatherStation.Domain.Entities;
 using WeatherStation.Domain.Repositories;
+using NodaTime;                 
+using NodaTime.Extensions;
 
 namespace WeatherStation.Infrastructure;
 
@@ -23,36 +25,48 @@ public class InfluxDbMeasurementRepository : IMeasurementRepository
      */
     public async Task<Measurement> GetSnapshot(string deviceId)
     {
-        var mockSnapshot = new Measurement(
-            deviceId,
-            DateTimeOffset.MinValue,
-            new Dictionary<MetricType, float>()
-        );
-        
-        //TODO make start time configurable
+        //TODO Replace temporary 7d range
+        //TODO Make start time configurable
         var flux = $"""
-                     from(bucket: "{_bucket}")
-                     |> range(start: -7d)
-                     |> filter(fn: (r) =>
-                          r._measurement == "weather_conditions" and
-                          (r._field == "humidity" or
-                           r._field == "pressure" or
-                           r._field == "temperature") and
-                          r.device_id == "{deviceId}"
-                        )
-                     |> group(columns: ["device_id", "_field"])
-                     |> last(column: "_value")
-                     |> pivot(
-                          rowKey:    ["device_id"],
-                          columnKey: ["_field"],
-                          valueColumn: "_value"
-                        )
-                     |> yield(name: "latest_conditions_by_device")
-                     
-                     """;
+                        from(bucket: "{_bucket}")
+                        |> range(start: -7d)
+                        |> filter(fn: (r) =>
+                             r._measurement == "weather_conditions" and
+                             (r._field == "humidity" or
+                              r._field == "pressure" or
+                              r._field == "temperature") and
+                             r.device_id == "{deviceId}"
+                           )
+                        |> group(columns: ["device_id", "_field"])
+                        |> last(column: "_value")
+                        |> pivot(
+                             rowKey:    ["device_id", "_time"],
+                             columnKey: ["_field"],
+                             valueColumn: "_value"
+                           )
+                        |> yield(name: "latest_conditions_by_device")
+                    """;
 
-        var res = await _client.GetQueryApi().QueryAsync(flux, _org);
-        //TODO map results to Measurement object
-        return await Task.FromResult(mockSnapshot);
+        var tables = await _client.GetQueryApi().QueryAsync(flux, _org);
+        if (tables == null || tables.Count == 0 || tables[0].Records.Count == 0)
+            throw new InvalidOperationException($"No data for device '{deviceId}'.");
+
+        var record = tables[0].Records.First();
+        
+        var maybeInstant = record.GetTime();
+        if (!maybeInstant.HasValue)
+            throw new InvalidOperationException("Flux didn't return a _time for the last point.");
+        
+        var timestamp = maybeInstant.Value.ToDateTimeOffset();
+
+        var values = new Dictionary<MetricType, float>();
+        if (record.Values.TryGetValue("temperature", out var tVal) && tVal is double td)
+            values[MetricType.Temperature] = (float)td;
+        if (record.Values.TryGetValue("pressure", out var pVal) && pVal is double pd)
+            values[MetricType.Pressure] = (float)pd;
+        if (record.Values.TryGetValue("humidity", out var hVal) && hVal is double hd)
+            values[MetricType.Humidity] = (float)hd;
+
+        return new Measurement(deviceId, timestamp, values);
     }
 }

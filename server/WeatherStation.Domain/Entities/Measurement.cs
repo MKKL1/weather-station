@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace WeatherStation.Domain.Entities;
+﻿namespace WeatherStation.Domain.Entities;
 
 public enum MetricType
 {
@@ -20,12 +14,10 @@ public class Measurement
     {
         DeviceId = deviceId ?? throw new ArgumentNullException(nameof(deviceId));
         Timestamp = timestamp;
-        _values = values ?? throw new ArgumentNullException(nameof(values));
+        Values = values ?? throw new ArgumentNullException(nameof(values));
     }
 
     public string DeviceId { get; }
     public DateTimeOffset Timestamp { get; }
-    private readonly Dictionary<MetricType, float> _values;
-
-    // Methods to access values by metric type
+    public Dictionary<MetricType, float> Values { get; }
 }

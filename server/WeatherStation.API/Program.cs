@@ -1,3 +1,4 @@
+using WeatherStation.Application.Services;
 using WeatherStation.Domain.Repositories;
 using WeatherStation.Infrastructure;
 
