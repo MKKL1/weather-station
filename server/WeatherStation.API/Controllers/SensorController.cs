@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using WeatherStation.API.Responses;
+using WeatherStation.Application.Services;
 
-namespace Controllers;
+namespace WeatherStation.API.Controllers;
 
 [ApiController]
 [Route("api/v1/sensor")]
@@ -23,18 +25,19 @@ public class SensorController : ControllerBase
     [HttpGet("{deviceId}/data/now")]
     public async Task<IActionResult> GetDeviceSnapshot([FromRoute] string deviceId)
     {
-        try
+        var snapshot = await _measurementQueryService.GetSnapshot(deviceId);
+        if (snapshot is null)
         {
-            var snapshot = await _measurementQueryService.GetSnapshot(deviceId);
-            if (snapshot == null)
-            {
-                return NotFound($"No data found for device {deviceId}");
-            }
-            return Ok(snapshot);
+            return NotFound(new { Message = $"Snapshot for device {deviceId} not found" });
         }
-        catch (Exception)
-        {
-            return StatusCode(500, "Internal server error");
-        }
+        var dto = new SnapshotResponse(snapshot.DeviceId,
+            snapshot.Timestamp,
+            snapshot.Values
+                .ToDictionary(
+                    kv => kv.Key.ToString().ToLowerInvariant(), //Kinda tricky, may not always work
+                    kv => kv.Value
+                )
+            );
+        return Ok(dto);
     }
 }

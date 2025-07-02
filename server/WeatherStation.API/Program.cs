@@ -1,16 +1,17 @@
-using app.Services;
+using WeatherStation.Application.Services;
 using WeatherStation.Domain.Repositories;
 using WeatherStation.Infrastructure;
+
+DotNetEnv.Env.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddControllers();
 
-// Add services to the container.
 builder.Services.AddOpenApi();
-//builder.Services.AddSingleton<IDBRService, InfluxDBService>();
 builder.Services.AddScoped<IMeasurementQueryService, MeasurementQueryService>();
-builder.Services.AddScoped<IMeasurementRepository, InfluxDBMeasurementRepository>();
+builder.Services.AddScoped<IMeasurementRepository, InfluxDbMeasurementRepository>();
+builder.Services.AddScoped<IInfluxDbClientFactory, InfluxDbClientFactory>();
 
 
 var app = builder.Build();
