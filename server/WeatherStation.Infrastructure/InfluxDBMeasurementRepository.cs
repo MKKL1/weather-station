@@ -16,13 +16,10 @@ public class InfluxDbMeasurementRepository : IMeasurementRepository
     public InfluxDbMeasurementRepository(IInfluxDbClientFactory clientFactory, IConfiguration configuration)
     {
         _client = clientFactory.GetClient();
-        _bucket = configuration["InfluxDb:Bucket"] ?? throw new InvalidOperationException("InfluxDb:Bucket");
-        _org = configuration["InfluxDb:Org"] ?? throw new InvalidOperationException("InfluxDb:Org");
+        _bucket = configuration["InfluxDb:Bucket"] ?? throw new InvalidOperationException("Missing configuration key InfluxDb:Bucket");
+        _org = configuration["InfluxDb:Org"] ?? throw new InvalidOperationException("Missing configuration key InfluxDb:Org");
     }
-
-    /**
-     * Gets last value from range of 1h
-     */
+    
     public async Task<Measurement?> GetSnapshot(string deviceId)
     {
         //TODO Replace temporary 7d range

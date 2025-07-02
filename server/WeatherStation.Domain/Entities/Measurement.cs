@@ -19,5 +19,5 @@ public class Measurement
 
     public string DeviceId { get; }
     public DateTimeOffset Timestamp { get; }
-    public Dictionary<MetricType, float> Values { get; }
+    public IReadOnlyDictionary<MetricType, float> Values { get; }
 }
