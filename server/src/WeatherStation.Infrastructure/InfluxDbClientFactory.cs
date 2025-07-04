@@ -8,11 +8,11 @@ public class InfluxDbClientFactory : IInfluxDbClientFactory
     private readonly string _url;
     private readonly string _token;
     
-    public InfluxDbClientFactory(IConfiguration configuration)
+    public InfluxDbClientFactory(string url, string token)
     {
-        _url = configuration["InfluxDb:Url"] ?? throw new InvalidOperationException("Missing configuration key: InfluxDb:Url");
-        _token = configuration["InfluxDb:Token"] ?? throw new InvalidOperationException("Missing configuration key: InfluxDb:Token");
+        _url = url;
+        _token = token;
     }
     
-    public InfluxDBClient GetClient() => new(_url, _token);
+    public IInfluxDBClient GetClient() => new InfluxDBClient(_url, _token);
 }

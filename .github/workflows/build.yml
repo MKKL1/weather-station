@@ -1,0 +1,42 @@
+name: Build and test
+
+on:
+  push:
+    branches: [ $default-branch ]
+  pull_request:
+    branches: [ $default-branch ]
+
+jobs:
+  build:
+    name: Build Solution 
+    runs-on: ubuntu-latest
+
+    # <<< Set the working directory once for all `run:` steps
+    defaults:
+      run:
+        working-directory: server
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: List server files
+        run: ls -la
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+          cache: true
+          cache-dependency-path: |
+            server/WeatherStation.sln
+            server/src/**/*.csproj
+            server/tests/**/*.csproj
+
+      - name: Restore dependencies
+        run: dotnet restore WeatherStation.sln
+
+      - name: Build
+        run: dotnet build --no-restore --configuration Release
+
+      - name: Test
+        run: dotnet test --no-build --configuration Release --verbosity normal

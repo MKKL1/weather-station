@@ -13,11 +13,11 @@ public class InfluxDbMeasurementRepository : IMeasurementRepository
     private readonly IInfluxDBClient _client;
     private readonly string _bucket;
     private readonly string _org;
-    public InfluxDbMeasurementRepository(IInfluxDbClientFactory clientFactory, IConfiguration configuration)
+    public InfluxDbMeasurementRepository(IInfluxDbClientFactory clientFactory, string bucket, string org)
     {
         _client = clientFactory.GetClient();
-        _bucket = configuration["InfluxDb:Bucket"] ?? throw new InvalidOperationException("Missing configuration key InfluxDb:Bucket");
-        _org = configuration["InfluxDb:Org"] ?? throw new InvalidOperationException("Missing configuration key InfluxDb:Org");
+        _bucket = bucket;
+        _org = org;
     }
     
     public async Task<Measurement?> GetSnapshot(string deviceId)
