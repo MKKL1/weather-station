@@ -5,6 +5,7 @@ using WeatherStation.Domain.Entities;
 using WeatherStation.Domain.Repositories;
 using NodaTime;                 
 using NodaTime.Extensions;
+using System.Diagnostics.Metrics;
 
 namespace WeatherStation.Infrastructure;
 
@@ -105,5 +106,48 @@ public class InfluxDbMeasurementRepository : IMeasurementRepository
 
             return false;
         }
+    }
+
+    public async Task<IEnumerable<Measurement?>> GetRange(string deviceId, DateTime startTime, DateTime endTime, TimeSpan interval, IEnumerable<MetricType> requestedMetrics)
+    {
+        var flux = "";
+
+        //var tables = await _client
+        //    .GetQueryApi()
+        //    .QueryAsync(flux, _org);
+
+
+
+        //throw new NotImplementedException();
+        return GetRangeMock();
+    }
+
+    private IEnumerable<Measurement?> GetRangeMock()
+    {
+        IEnumerable<Measurement?> data = new List<Measurement?>
+    {
+        new Measurement(
+            "device-1",
+            DateTimeOffset.UtcNow.AddMinutes(-30),
+            new Dictionary<MetricType, float>
+            {
+                { MetricType.Temperature, 22.5f },
+                { MetricType.Pressure, 1012.3f },
+                { MetricType.Humidity, 55.2f }
+            }
+        ),
+        new Measurement(
+            "device-1",
+            DateTimeOffset.UtcNow,
+            new Dictionary<MetricType, float>
+            {
+                { MetricType.Temperature, 23.1f },
+                { MetricType.Pressure, 1011.8f },
+                { MetricType.Humidity, 54.9f }
+            }
+        )
+    };
+
+        return data;
     }
 }
