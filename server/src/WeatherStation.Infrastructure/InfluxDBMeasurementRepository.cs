@@ -110,12 +110,54 @@ public class InfluxDbMeasurementRepository : IMeasurementRepository
 
     public async Task<IEnumerable<Measurement?>> GetRange(string deviceId, DateTime startTime, DateTime endTime, TimeSpan interval, IEnumerable<MetricType> requestedMetrics)
     {
-        var flux = "";
+        var enumerable = requestedMetrics as MetricType[] ?? requestedMetrics.ToArray();
+        var flux = $$"""
+                     deviceId = "{{deviceId}}"
+                     startTime = {{startTime:yyyy-MM-ddTHH:mm:ssZ}}
+                     endTime = {{endTime:yyyy-MM-ddTHH:mm:ssZ}}
+                     interval = {{ToInfluxInterval(interval)}}
+                     includeTemperature = {{enumerable.Contains(MetricType.Temperature).ToString().ToLowerInvariant()}}
+                     includePressure = {{enumerable.Contains(MetricType.Pressure).ToString().ToLowerInvariant()}}
+                     includeHumidity = {{enumerable.Contains(MetricType.Humidity).ToString().ToLowerInvariant()}}
+                     includeRainfall = {{enumerable.Contains(MetricType.Rainfall).ToString().ToLowerInvariant()}}
 
-        //var tables = await _client
-        //    .GetQueryApi()
-        //    .QueryAsync(flux, _org);
+                     weatherConditions = from(bucket: "{{_bucket}}")
+                         |> range(start: startTime, stop: endTime)
+                         |> filter(fn: (r) =>
+                             r._measurement == "weather_conditions" and
+                             r.device_id == deviceId and
+                             (
+                                 (includeTemperature and r._field == "temperature") or
+                                 (includePressure and r._field == "pressure") or
+                                 (includeHumidity and r._field == "humidity")
+                             )
+                         )
+                         |> aggregateWindow(every: interval, fn: mean, createEmpty: false)
 
+                     rainfallData = from(bucket: "{{_bucket}}")
+                         |> range(start: startTime, stop: endTime)
+                         |> filter(fn: (r) =>
+                             includeRainfall and
+                             r._measurement == "weather_tips" and
+                             r._field == "rainfall_mm" and
+                             r.device_id == deviceId
+                         )
+                         |> aggregateWindow(every: interval, fn: sum, createEmpty: false)
+                         |> map(fn: (r) => ({r with _measurement: "weather_conditions", _field: "rainfall"}))
+
+                     union(tables: [weatherConditions, rainfallData])
+                         |> group(columns: ["_time"])
+                         |> pivot(
+                             rowKey: ["_time"],
+                             columnKey: ["_field"],
+                             valueColumn: "_value"
+                         )
+                         |> sort(columns: ["_time"])
+                     """;
+
+        var tables = await _client
+            .GetQueryApi()
+            .QueryAsync(flux, _org);
 
 
         //throw new NotImplementedException();
@@ -149,5 +191,59 @@ public class InfluxDbMeasurementRepository : IMeasurementRepository
     };
 
         return data;
+    }
+    
+    /// <summary>
+    /// Converts a TimeSpan to InfluxDB interval string format
+    /// </summary>
+    /// <param name="timeSpan">The TimeSpan to convert</param>
+    /// <returns>InfluxDB interval string (e.g., "1h", "30m", "5s")</returns>
+    public static string ToInfluxInterval(TimeSpan timeSpan)
+    {
+        // Handle edge cases
+        if (timeSpan == TimeSpan.Zero)
+            throw new ArgumentException("TimeSpan cannot be zero");
+        
+        if (timeSpan < TimeSpan.Zero)
+            throw new ArgumentException("TimeSpan cannot be negative");
+
+        // Try to find the best unit representation
+        // Priority: days > hours > minutes > seconds > milliseconds > microseconds > nanoseconds
+        
+        if (timeSpan.TotalDays >= 1 && timeSpan.TotalDays % 1 == 0)
+        {
+            return $"{(int)timeSpan.TotalDays}d";
+        }
+        
+        if (timeSpan.TotalHours >= 1 && timeSpan.TotalHours % 1 == 0)
+        {
+            return $"{(int)timeSpan.TotalHours}h";
+        }
+        
+        if (timeSpan.TotalMinutes >= 1 && timeSpan.TotalMinutes % 1 == 0)
+        {
+            return $"{(int)timeSpan.TotalMinutes}m";
+        }
+        
+        if (timeSpan.TotalSeconds >= 1 && timeSpan.TotalSeconds % 1 == 0)
+        {
+            return $"{(int)timeSpan.TotalSeconds}s";
+        }
+        
+        if (timeSpan.TotalMilliseconds >= 1 && timeSpan.TotalMilliseconds % 1 == 0)
+        {
+            return $"{(int)timeSpan.TotalMilliseconds}ms";
+        }
+        
+        // For very small intervals, use microseconds
+        var microseconds = timeSpan.TotalMilliseconds * 1000;
+        if (microseconds >= 1 && microseconds % 1 == 0)
+        {
+            return $"{(int)microseconds}us";
+        }
+        
+        // Fall back to nanoseconds for extremely small intervals
+        var nanoseconds = timeSpan.Ticks * 100; // 1 tick = 100 nanoseconds
+        return $"{nanoseconds}ns";
     }
 }
