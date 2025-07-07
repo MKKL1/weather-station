@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using WeatherStation.API.Responses;
+using WeatherStation.Application.Enums;
 using WeatherStation.Application.Services;
+using WeatherStation.Domain.Entities;
 
 namespace WeatherStation.API.Controllers;
 
@@ -40,4 +42,34 @@ public class SensorController : ControllerBase
             );
         return Ok(dto);
     }
+
+    [HttpGet("{deviceId}/data")]
+    public async Task<IActionResult> GetMeasurementRange(
+        [FromRoute] string deviceId,
+        [FromQuery] DateTime startTime,
+        [FromQuery] DateTime endTime,
+        [FromQuery] TimeInterval interval,
+        [FromQuery] IEnumerable<MetricType> metrics) //TODO: handle this by single string, to handle multiple comma separated metrics (but remember to also keep repeated parameter name logic as it works rn)
+    {
+        IEnumerable<Measurement?> data;
+        try
+        {
+            data = await _measurementQueryService.GetRange(deviceId, startTime, endTime, interval, metrics);
+            
+            if (!data.Any())
+            {
+                return NotFound(new { Message = $"No data found for device {deviceId} in the specified range." });
+            }
+
+        } catch (ArgumentOutOfRangeException)
+        {
+            return BadRequest(new { Message = "Invalid time range or interval specified." });
+        }
+
+        var response = new DataResponse(deviceId, startTime, endTime, interval, data);
+
+        return Ok(response);
+    }
+
+
 }

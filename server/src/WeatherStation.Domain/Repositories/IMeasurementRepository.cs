@@ -12,4 +12,6 @@ public interface IMeasurementRepository
     /// The task result is the latest <see cref="Measurement"/> object if found; otherwise, <c>null</c>.
     /// </returns>
     public Task<Measurement?> GetSnapshot(string deviceId);
+
+    public Task<IEnumerable<Measurement?>> GetRange(string deviceId, DateTime startTime, DateTime endTime, TimeSpan interval, IEnumerable<MetricType> requestedMetrics);
 }
