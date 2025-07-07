@@ -66,7 +66,7 @@ public class SensorController : ControllerBase
             return BadRequest(new { Message = "Invalid time range or interval specified." });
         }
 
-        var response = new DataResponse(deviceId, startTime, endTime, interval, data);
+        var response = new DataResponse(deviceId, startTime, endTime, interval, data, metrics);
 
         return Ok(response);
     }
