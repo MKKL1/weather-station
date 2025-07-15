@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WeatherStation.API.Responses;
 using WeatherStation.Application.Enums;
@@ -17,6 +18,7 @@ public class SensorController : ControllerBase
         _measurementQueryService = measurementQueryService;
     }
 
+    [Authorize]
     [HttpGet("hello-world")] 
     public IActionResult GetHelloWorld()
     {
