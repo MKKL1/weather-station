@@ -39,9 +39,8 @@ builder.Services.AddAuthentication(options =>
     .AddJwtBearer(options =>
     {
         options.Authority = builder.Configuration["OpenIDConnectSettings:Authority"];
-        options.Audience  = builder.Configuration["OpenIDConnectSettings:ClientId"];
+        options.Audience  = "account";
         options.RequireHttpsMetadata = false;
-
         options.Events = new JwtBearerEvents
         {
             OnMessageReceived = ctx =>
