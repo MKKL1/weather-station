@@ -1,4 +1,7 @@
+using System.IdentityModel.Tokens.Jwt;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Tokens;
 using WeatherStation.API.Options;
 using WeatherStation.Application.Services;
 using WeatherStation.Domain.Repositories;
@@ -28,10 +31,53 @@ builder.Services.AddScoped<IMeasurementRepository, InfluxDbMeasurementRepository
 });
 
 
+builder.Services.AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme    = JwtBearerDefaults.AuthenticationScheme;
+    })
+    .AddJwtBearer(options =>
+    {
+        options.Authority = builder.Configuration["OpenIDConnectSettings:Authority"];
+        options.Audience  = "account"; //TODO it's best to change it to OpenIDConnectSettings:ClientID but it requires additional mapping inside keycloak
+        options.RequireHttpsMetadata = false;
+        // options.Events = new JwtBearerEvents
+        // {
+        //     OnMessageReceived = ctx =>
+        //     {
+        //         Console.WriteLine($"[Jwt] MessageReceived: {ctx.Token?.Substring(0,10)}...");
+        //         return Task.CompletedTask;
+        //     },
+        //     OnAuthenticationFailed = ctx =>
+        //     {
+        //         Console.WriteLine($"[Jwt] Auth Failed: {ctx.Exception.Message}");
+        //         return Task.CompletedTask;
+        //     },
+        //     OnTokenValidated = ctx =>
+        //     {
+        //         Console.WriteLine($"[Jwt] Validated for {ctx.Principal.Identity.Name}");
+        //         return Task.CompletedTask;
+        //     }
+        // };
+
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            RoleClaimType = "roles",
+            NameClaimType = JwtRegisteredClaimNames.Name
+        };
+    });
+
+
+
+
+
 var app = builder.Build();
 
 app.UseHttpsRedirection();
 app.UseRouting();
+app.UseAuthentication(); 
+app.UseAuthorization();
 app.MapControllers();
+
 
 app.Run();
