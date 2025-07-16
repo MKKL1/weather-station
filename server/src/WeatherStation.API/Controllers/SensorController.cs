@@ -26,6 +26,11 @@ public class SensorController : ControllerBase
         return Ok("SIEMA ENIU");
     }
 
+    //TODO openapi
+    /// <summary>
+    /// Endpoint that provides most recent data from device specified in url
+    /// </summary>
+    [Authorize]
     [HttpGet("{deviceId}/data/now")]
     public async Task<IActionResult> GetDeviceSnapshot([FromRoute] string deviceId)
     {
@@ -45,6 +50,10 @@ public class SensorController : ControllerBase
         return Ok(dto);
     }
 
+    /// <summary>
+    /// Endpoint that allows user to filter data from given device by query parameters (not raw data)
+    /// </summary>
+    [Authorize]
     [HttpGet("{deviceId}/data")]
     public async Task<IActionResult> GetMeasurementRange(
         [FromRoute] string deviceId,

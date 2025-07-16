@@ -39,26 +39,26 @@ builder.Services.AddAuthentication(options =>
     .AddJwtBearer(options =>
     {
         options.Authority = builder.Configuration["OpenIDConnectSettings:Authority"];
-        options.Audience  = "account";
+        options.Audience  = "account"; //TODO it's best to change it to OpenIDConnectSettings:ClientID but it requires additional mapping inside keycloak
         options.RequireHttpsMetadata = false;
-        options.Events = new JwtBearerEvents
-        {
-            OnMessageReceived = ctx =>
-            {
-                Console.WriteLine($"[Jwt] MessageReceived: {ctx.Token?.Substring(0,10)}...");
-                return Task.CompletedTask;
-            },
-            OnAuthenticationFailed = ctx =>
-            {
-                Console.WriteLine($"[Jwt] Auth Failed: {ctx.Exception.Message}");
-                return Task.CompletedTask;
-            },
-            OnTokenValidated = ctx =>
-            {
-                Console.WriteLine($"[Jwt] Validated for {ctx.Principal.Identity.Name}");
-                return Task.CompletedTask;
-            }
-        };
+        // options.Events = new JwtBearerEvents
+        // {
+        //     OnMessageReceived = ctx =>
+        //     {
+        //         Console.WriteLine($"[Jwt] MessageReceived: {ctx.Token?.Substring(0,10)}...");
+        //         return Task.CompletedTask;
+        //     },
+        //     OnAuthenticationFailed = ctx =>
+        //     {
+        //         Console.WriteLine($"[Jwt] Auth Failed: {ctx.Exception.Message}");
+        //         return Task.CompletedTask;
+        //     },
+        //     OnTokenValidated = ctx =>
+        //     {
+        //         Console.WriteLine($"[Jwt] Validated for {ctx.Principal.Identity.Name}");
+        //         return Task.CompletedTask;
+        //     }
+        // };
 
         options.TokenValidationParameters = new TokenValidationParameters
         {
