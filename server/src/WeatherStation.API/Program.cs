@@ -1,3 +1,4 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using WeatherStation.API.Options;
 using WeatherStation.Application.Services;
@@ -7,6 +8,11 @@ using WeatherStation.Infrastructure;
 DotNetEnv.Env.Load();
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddDbContext<WeatherStationDbContext>(options =>
+{
+    options.UseNpgsql(builder.Configuration.GetConnectionString("PortainerConnection"));
+});
 
 builder.Services
     .Configure<InfluxDbOptions>(builder.Configuration.GetSection("InfluxDb"));
@@ -27,11 +33,16 @@ builder.Services.AddScoped<IMeasurementRepository, InfluxDbMeasurementRepository
     return new InfluxDbMeasurementRepository(clientFactory, opts.Bucket, opts.Org);
 });
 
-
 var app = builder.Build();
 
 app.UseHttpsRedirection();
 app.UseRouting();
 app.MapControllers();
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<WeatherStationDbContext>();
+    db.Database.Migrate();
+}
 
 app.Run();

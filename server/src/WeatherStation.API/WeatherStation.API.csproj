@@ -7,12 +7,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+	<PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.7" />
+	<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.0" />
     <PackageReference Include="dotenv.net" Version="3.2.1" />
     <PackageReference Include="DotNetEnv" Version="3.1.1" />
     <PackageReference Include="InfluxDB.Client" Version="4.18.0" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.3" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="9.0.4" />
 	<ProjectReference Include="..\WeatherStation.Application\WeatherStation.Application.csproj" />
 	<ProjectReference Include="..\WeatherStation.Infrastructure\WeatherStation.Infrastructure.csproj" />
+	  
   </ItemGroup>
 
   <ItemGroup>
