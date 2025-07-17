@@ -1,4 +1,5 @@
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -7,6 +8,7 @@ using WeatherStation.API.Options;
 using WeatherStation.Application.Services;
 using WeatherStation.Domain.Repositories;
 using WeatherStation.Infrastructure;
+using WeatherStation.Infrastructure.Tables;
 
 DotNetEnv.Env.Load();
 
@@ -23,6 +25,7 @@ builder.Services
 builder.Services.AddControllers();
 
 builder.Services.AddOpenApi();
+builder.Services.AddAutoMapper(_ => {}, typeof(UserMappingProfile));
 builder.Services.AddScoped<IMeasurementQueryService, MeasurementQueryService>();
 builder.Services.AddScoped<IInfluxDbClientFactory, InfluxDbClientFactory>(sp =>
 {
@@ -69,6 +72,46 @@ builder.Services.AddAuthentication(options =>
         {
             RoleClaimType = "roles",
             NameClaimType = JwtRegisteredClaimNames.Name
+        };
+
+        options.Events = new JwtBearerEvents()
+        {
+            OnTokenValidated = async ctx =>
+            {
+                var principal = ctx.Principal!;
+                var subClaim = principal.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+                var nameClaim = principal.FindFirst(ClaimTypes.Name)?.Value;
+
+                if (string.IsNullOrEmpty(subClaim))
+                {
+                    return;
+                }
+
+                //TODO it should probably call repository
+                var db = ctx.HttpContext.RequestServices.GetRequiredService<WeatherStationDbContext>();
+
+                if (!Guid.TryParse(subClaim, out var subClaimAsGuid))
+                {
+                    return;
+                }
+
+                var user = await db.Users.SingleOrDefaultAsync(u => u.Id.Equals(subClaimAsGuid),
+                    ctx.HttpContext.RequestAborted);
+
+                if (user == null)
+                {
+                    user = new Users
+                    {
+                        Id = subClaimAsGuid,
+                        Name = nameClaim!,
+                        Devices = new List<Devices>()
+                    };
+                    db.Users.Add(user);
+                    await db.SaveChangesAsync(ctx.HttpContext.RequestAborted);
+                }
+
+
+            }
         };
     });
 
