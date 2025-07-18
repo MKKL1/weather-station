@@ -9,28 +9,27 @@ public class WeatherStationDbContext : DbContext
     {
     }
 
-    public DbSet<Devices> Devices { get; set; }
-    public DbSet<Users> Users { get; set; }
+    public DbSet<DeviceDAO> Devices { get; set; }
+    public DbSet<UserDAO> Users { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // Configure your entities here
-        // Example: modelBuilder.Entity<Device>().ToTable("Devices");
         base.OnModelCreating(modelBuilder);
 
-        modelBuilder.Entity<Devices>( e =>
+        modelBuilder.Entity<DeviceDAO>( e =>
         {
-            e.HasOne(d => d.User)
+            e.HasOne(d => d.UserDao)
             .WithMany(u => u.Devices)
             .HasForeignKey(d => d.UserId)
             .OnDelete(DeleteBehavior.Cascade);
 
-            e.HasIndex(d => d.Name).IsUnique();
+            e.HasIndex(d => d.Name).IsUnique(); //This is pretty much our PK
         });
 
-        modelBuilder.Entity<Users>(e =>
+        modelBuilder.Entity<UserDAO>(e =>
         {
             e.HasIndex(u => u.Name).IsUnique();
+            e.HasIndex(u => u.Email).IsUnique();
         });
     }
     

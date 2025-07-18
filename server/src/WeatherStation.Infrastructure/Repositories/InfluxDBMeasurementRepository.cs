@@ -1,13 +1,8 @@
 ﻿using InfluxDB.Client;
-using InfluxDB.Client.Core.Flux.Domain;
-using Microsoft.Extensions.Configuration;
 using WeatherStation.Domain.Entities;
 using WeatherStation.Domain.Repositories;
-using NodaTime;                 
-using NodaTime.Extensions;
-using System.Diagnostics.Metrics;
 
-namespace WeatherStation.Infrastructure;
+namespace WeatherStation.Infrastructure.Repositories;
 
 public class InfluxDbMeasurementRepository : IMeasurementRepository
 {
