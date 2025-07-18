@@ -6,8 +6,10 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using WeatherStation.API.Options;
 using WeatherStation.Application.Services;
+using WeatherStation.Domain;
 using WeatherStation.Domain.Repositories;
 using WeatherStation.Infrastructure;
+using WeatherStation.Infrastructure.Repositories;
 using WeatherStation.Infrastructure.Tables;
 
 DotNetEnv.Env.Load();
@@ -38,7 +40,8 @@ builder.Services.AddScoped<IMeasurementRepository, InfluxDbMeasurementRepository
     var clientFactory = sp.GetRequiredService<IInfluxDbClientFactory>();
     return new InfluxDbMeasurementRepository(clientFactory, opts.Bucket, opts.Org);
 });
-
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IUserRepository, UserRepositoryImpl>();
 builder.Services.AddAuthentication(options =>
     {
         options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -49,68 +52,33 @@ builder.Services.AddAuthentication(options =>
         options.Authority = builder.Configuration["OpenIDConnectSettings:Authority"];
         options.Audience  = "account"; //TODO it's best to change it to OpenIDConnectSettings:ClientID but it requires additional mapping inside keycloak
         options.RequireHttpsMetadata = false;
-        // options.Events = new JwtBearerEvents
-        // {
-        //     OnMessageReceived = ctx =>
-        //     {
-        //         Console.WriteLine($"[Jwt] MessageReceived: {ctx.Token?.Substring(0,10)}...");
-        //         return Task.CompletedTask;
-        //     },
-        //     OnAuthenticationFailed = ctx =>
-        //     {
-        //         Console.WriteLine($"[Jwt] Auth Failed: {ctx.Exception.Message}");
-        //         return Task.CompletedTask;
-        //     },
-        //     OnTokenValidated = ctx =>
-        //     {
-        //         Console.WriteLine($"[Jwt] Validated for {ctx.Principal.Identity.Name}");
-        //         return Task.CompletedTask;
-        //     }
-        // };
-
         options.TokenValidationParameters = new TokenValidationParameters
         {
             RoleClaimType = "roles",
-            NameClaimType = JwtRegisteredClaimNames.Name
+            NameClaimType = "preferred_username",
         };
-
+        
         options.Events = new JwtBearerEvents()
         {
             OnTokenValidated = async ctx =>
             {
                 var principal = ctx.Principal!;
-                var subClaim = principal.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
-                var nameClaim = principal.FindFirst(ClaimTypes.Name)?.Value;
+                var email = principal.FindFirst(ClaimTypes.Email)?.Value;
+                var name = principal
+                               .FindFirst("preferred_username")?.Value
+                           ?? principal.FindFirst(JwtRegisteredClaimNames.Name)?.Value
+                           ?? principal.FindFirst("name")?.Value
+                           ?? principal.FindFirst("given_name")?.Value
+                           ?? principal.FindFirst(ClaimTypes.Name)?.Value;
 
-                if (string.IsNullOrEmpty(subClaim))
+                if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(name))
                 {
+                    ctx.Fail("Required claim(s) missing: email or name.");
                     return;
                 }
-
-                //TODO it should probably call repository
-                var db = ctx.HttpContext.RequestServices.GetRequiredService<WeatherStationDbContext>();
-
-                if (!Guid.TryParse(subClaim, out var subClaimAsGuid))
-                {
-                    return;
-                }
-
-                var user = await db.Users.SingleOrDefaultAsync(u => u.Id.Equals(subClaimAsGuid),
-                    ctx.HttpContext.RequestAborted);
-
-                if (user == null)
-                {
-                    user = new Users
-                    {
-                        Id = subClaimAsGuid,
-                        Name = nameClaim!,
-                        Devices = new List<Devices>()
-                    };
-                    db.Users.Add(user);
-                    await db.SaveChangesAsync(ctx.HttpContext.RequestAborted);
-                }
-
-
+                
+                var userService = ctx.HttpContext.RequestServices.GetRequiredService<IUserService>();
+                await userService.CreateUserIfNotExists(email, name, ctx.HttpContext.RequestAborted);
             }
         };
     });

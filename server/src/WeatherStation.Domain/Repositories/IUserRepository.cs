@@ -1,6 +1,6 @@
 using WeatherStation.Domain.Entities;
 
-namespace WeatherStation.Domain;
+namespace WeatherStation.Domain.Repositories;
 
 public interface IUserRepository
 {

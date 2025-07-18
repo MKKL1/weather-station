@@ -1,5 +1,6 @@
 using WeatherStation.Domain;
 using WeatherStation.Domain.Entities;
+using WeatherStation.Domain.Repositories;
 
 namespace WeatherStation.Application.Services;
 

@@ -10,6 +10,7 @@ using NodaTime;
 using NodaTime.Extensions;
 using WeatherStation.Domain.Entities;
 using WeatherStation.Infrastructure;
+using WeatherStation.Infrastructure.Repositories;
 using Xunit;
 
 namespace WeatherStation.Infrastructure.Tests
