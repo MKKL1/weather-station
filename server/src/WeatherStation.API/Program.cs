@@ -6,11 +6,9 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using WeatherStation.API.Options;
 using WeatherStation.Application.Services;
-using WeatherStation.Domain;
 using WeatherStation.Domain.Repositories;
 using WeatherStation.Infrastructure;
 using WeatherStation.Infrastructure.Repositories;
-using WeatherStation.Infrastructure.Tables;
 
 DotNetEnv.Env.Load();
 
@@ -63,6 +61,7 @@ builder.Services.AddAuthentication(options =>
             OnTokenValidated = async ctx =>
             {
                 var principal = ctx.Principal!;
+                //TODO it should be moved in different place
                 var email = principal.FindFirst(ClaimTypes.Email)?.Value;
                 var name = principal
                                .FindFirst("preferred_username")?.Value
@@ -73,6 +72,7 @@ builder.Services.AddAuthentication(options =>
 
                 if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(name))
                 {
+                    //TODO log/provide user with information that something may be wrong with given token
                     ctx.Fail("Required claim(s) missing: email or name.");
                     return;
                 }
