@@ -8,9 +8,9 @@ public class UserMappingProfile : Profile
 {
     public UserMappingProfile()
     {
-        CreateMap<User, UserDAO>()
+        CreateMap<User, UserDao>()
             .ForMember(dest => dest.Devices, opt => opt.Ignore());
             
-        CreateMap<UserDAO, User>();
+        CreateMap<UserDao, User>();
     }
 }

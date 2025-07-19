@@ -20,6 +20,7 @@ public class DeviceController(IDeviceService deviceService) : ControllerBase
         {
             return Unauthorized();
         }
+        //TODO map to response
         return Ok(await deviceService.GetUserDevices(guid.Value, HttpContext.RequestAborted));
     }
 }

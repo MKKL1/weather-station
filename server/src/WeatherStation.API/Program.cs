@@ -26,8 +26,13 @@ builder.Services.AddControllers();
 
 builder.Services.AddOpenApi();
 builder.Services.AddAutoMapper(_ => {}, typeof(UserMappingProfile));
-builder.Services.AddScoped<IMeasurementQueryService, MeasurementQueryService>();
+builder.Services.AddAutoMapper(_ => { }, typeof(DeviceMappingProfile));
+
 builder.Services.AddScoped<IDeviceService, DeviceService>();
+builder.Services.AddScoped<IDeviceRepository, DeviceRepositoryImpl>();
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IUserRepository, UserRepositoryImpl>();
+builder.Services.AddScoped<IMeasurementQueryService, MeasurementQueryService>();
 builder.Services.AddScoped<IInfluxDbClientFactory, InfluxDbClientFactory>(sp =>
 {
     var opts = sp.GetRequiredService<IOptions<InfluxDbOptions>>().Value;
@@ -39,8 +44,6 @@ builder.Services.AddScoped<IMeasurementRepository, InfluxDbMeasurementRepository
     var clientFactory = sp.GetRequiredService<IInfluxDbClientFactory>();
     return new InfluxDbMeasurementRepository(clientFactory, opts.Bucket, opts.Org);
 });
-builder.Services.AddScoped<IUserService, UserService>();
-builder.Services.AddScoped<IUserRepository, UserRepositoryImpl>();
 builder.Services.AddAuthentication(options =>
     {
         options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
