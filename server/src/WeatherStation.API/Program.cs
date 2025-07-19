@@ -27,6 +27,7 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 builder.Services.AddAutoMapper(_ => {}, typeof(UserMappingProfile));
 builder.Services.AddScoped<IMeasurementQueryService, MeasurementQueryService>();
+builder.Services.AddScoped<IDeviceService, DeviceService>();
 builder.Services.AddScoped<IInfluxDbClientFactory, InfluxDbClientFactory>(sp =>
 {
     var opts = sp.GetRequiredService<IOptions<InfluxDbOptions>>().Value;
@@ -62,6 +63,11 @@ builder.Services.AddAuthentication(options =>
             {
                 var principal = ctx.Principal!;
                 //TODO it should be moved in different place
+                //TODO check if email is verified
+                
+                //TODO on second though, we may go back to identifying by identity provider's id, but then we would have to ensure
+                //that migration from one idp to another is possible
+                
                 var email = principal.FindFirst(ClaimTypes.Email)?.Value;
                 var name = principal
                                .FindFirst("preferred_username")?.Value
@@ -78,13 +84,21 @@ builder.Services.AddAuthentication(options =>
                 }
                 
                 var userService = ctx.HttpContext.RequestServices.GetRequiredService<IUserService>();
-                await userService.CreateUserIfNotExists(email, name, ctx.HttpContext.RequestAborted);
+                var user = await userService.GetOrCreateUser(email, name, ctx.HttpContext.RequestAborted);
+                //Inject user id for further use
+                var idIdentity = new ClaimsIdentity([new Claim("app_user_id", user.Id.ToString())]);
+                principal.AddIdentity(idIdentity);
             }
         };
     });
 
 
 var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+}
 
 app.UseHttpsRedirection();
 app.UseRouting();

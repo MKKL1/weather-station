@@ -5,5 +5,5 @@ namespace WeatherStation.Application.Services;
 
 public interface IUserService
 {
-    Task<User> CreateUserIfNotExists(string email, string name, CancellationToken cancellation);
+    Task<User> GetOrCreateUser(string email, string name, CancellationToken cancellation);
 }
