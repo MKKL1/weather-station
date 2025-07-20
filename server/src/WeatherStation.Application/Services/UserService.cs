@@ -4,9 +4,10 @@ using WeatherStation.Domain.Repositories;
 
 namespace WeatherStation.Application.Services;
 
+/// <inheritdoc/>
 public class UserService(IUserRepository userRepository) : IUserService
 {
-    public async Task<User> CreateUserIfNotExists(string email, string name, CancellationToken cancellation)
+    public async Task<User> GetOrCreateUser(string email, string name, CancellationToken cancellation)
     {
         var existingUser = await userRepository.GetUserByEmail(email, cancellation);
         if (existingUser != null)

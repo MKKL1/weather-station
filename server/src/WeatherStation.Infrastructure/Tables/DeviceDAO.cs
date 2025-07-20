@@ -1,9 +1,14 @@
-﻿namespace WeatherStation.Infrastructure.Tables;
+﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
 
-public class DeviceDAO
+namespace WeatherStation.Infrastructure.Tables;
+
+//TODO should probably rename it to DeviceEntity
+public class DeviceDao
 {
-    public Guid Id { get; set; }
-    public string Name { get; set; } 
+    [Key]
+    [DatabaseGenerated(DatabaseGeneratedOption.None)]
+    public string Id { get; set; } //PK
     public Guid UserId { get; set; } //FK
-    public UserDAO UserDao { get; set; }
+    public UserDao UserDao { get; set; }
 }

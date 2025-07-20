@@ -30,7 +30,7 @@ public class UserServiceTests
         _userRepository.Setup(r => r.GetUserByEmail(email, CancellationToken.None))
             .ReturnsAsync(user);
 
-        var returnedUser = await _userService.CreateUserIfNotExists(email, "test2", CancellationToken.None);
+        var returnedUser = await _userService.GetOrCreateUser(email, "test2", CancellationToken.None);
         //TODO probably not the best way to compare objects
         Assert.Equal(user.Id, returnedUser.Id);
         Assert.Equal(user.Email, user.Email);
@@ -46,7 +46,7 @@ public class UserServiceTests
         _userRepository.Setup(r => r.GetUserByEmail(email, CancellationToken.None))
             .ReturnsAsync((User?)null);
 
-        var returnedUser = await _userService.CreateUserIfNotExists(email, name, CancellationToken.None);
+        var returnedUser = await _userService.GetOrCreateUser(email, name, CancellationToken.None);
         _userRepository.Verify(r => r.CreateUser(
                 It.Is<User>(u => u.Email == email && u.Name == name), 
                 CancellationToken.None

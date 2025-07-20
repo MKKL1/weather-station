@@ -30,7 +30,7 @@ public class UserRepositoryImpl(WeatherStationDbContext context, IMapper mapper)
     /// <inheritdoc />
     public async Task CreateUser(User user, CancellationToken cancellation)
     {
-        var dbUser = mapper.Map<UserDAO>(user); //TODO test
+        var dbUser = mapper.Map<UserDao>(user); //TODO test
         dbUser.Email = dbUser.Email.Trim().ToLowerInvariant(); //Not sure if it should be handled by application layer, probably should, but let's just make sure here.
         
         context.Users.Add(dbUser);
