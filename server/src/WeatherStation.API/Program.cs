@@ -88,8 +88,10 @@ builder.Services.AddAuthentication(options =>
                 
                 var userService = ctx.HttpContext.RequestServices.GetRequiredService<IUserService>();
                 var user = await userService.GetOrCreateUser(email, name, ctx.HttpContext.RequestAborted);
+                
+                //TODO remove magic value
                 //Inject user id for further use
-                var idIdentity = new ClaimsIdentity([new Claim("app_user_id", user.Id.ToString())]);
+                var idIdentity = new ClaimsIdentity([new Claim("app_user_id", user.Id.Value.ToString())]);
                 principal.AddIdentity(idIdentity);
             }
         };

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using WeatherStation.API.Responses;
 using WeatherStation.Application.Services;
 
 namespace WeatherStation.API.Controllers;
@@ -20,7 +21,15 @@ public class DeviceController(IDeviceService deviceService) : ControllerBase
         {
             return Unauthorized();
         }
-        //TODO map to response
-        return Ok(await deviceService.GetUserDevices(guid.Value, HttpContext.RequestAborted));
+
+        var devices = await deviceService.GetUserDevices(guid.Value, HttpContext.RequestAborted);
+        return Ok(devices.Select(d => new DeviceDto
+        {
+            Id = d.Id,
+            User = new UserDto
+            {
+                Id = d.Owner
+            }
+        }));
     }
 }
