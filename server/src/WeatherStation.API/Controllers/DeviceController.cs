@@ -28,7 +28,7 @@ public class DeviceController(IDeviceService deviceService) : ControllerBase
             Id = d.Id,
             User = new UserDto
             {
-                Id = d.Owner
+                Id = d.Owner.Value
             }
         }));
     }

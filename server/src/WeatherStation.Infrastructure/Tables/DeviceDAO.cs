@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 
 namespace WeatherStation.Infrastructure.Tables;
 
+//TODO should probably rename it to DeviceEntity
 public class DeviceDao
 {
     [Key]

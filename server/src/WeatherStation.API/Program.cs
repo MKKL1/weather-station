@@ -8,6 +8,7 @@ using WeatherStation.API.Options;
 using WeatherStation.Application.Services;
 using WeatherStation.Domain.Repositories;
 using WeatherStation.Infrastructure;
+using WeatherStation.Infrastructure.Mappers;
 using WeatherStation.Infrastructure.Repositories;
 
 DotNetEnv.Env.Load();
@@ -28,6 +29,7 @@ builder.Services.AddOpenApi();
 builder.Services.AddAutoMapper(_ => {}, typeof(UserMappingProfile));
 builder.Services.AddAutoMapper(_ => { }, typeof(DeviceMappingProfile));
 
+builder.Services.AddScoped<IDeviceMapper, DeviceMapper>();
 builder.Services.AddScoped<IDeviceService, DeviceService>();
 builder.Services.AddScoped<IDeviceRepository, DeviceRepositoryImpl>();
 builder.Services.AddScoped<IUserService, UserService>();
