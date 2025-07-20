@@ -4,6 +4,7 @@ using WeatherStation.Domain.Repositories;
 
 namespace WeatherStation.Application.Services;
 
+/// <inheritdoc/>
 public class UserService(IUserRepository userRepository) : IUserService
 {
     public async Task<User> GetOrCreateUser(string email, string name, CancellationToken cancellation)

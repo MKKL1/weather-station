@@ -4,12 +4,15 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 using WeatherStation.API.Options;
 using WeatherStation.Application.Services;
 using WeatherStation.Domain.Repositories;
 using WeatherStation.Infrastructure;
 using WeatherStation.Infrastructure.Mappers;
 using WeatherStation.Infrastructure.Repositories;
+
+//TODO program.cs is becoming polluted, it will be useful to split it into multiple files
 
 DotNetEnv.Env.Load();
 
@@ -25,7 +28,38 @@ builder.Services
 
 builder.Services.AddControllers();
 
-builder.Services.AddOpenApi();
+// builder.Services.AddOpenApi();
+
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo {
+        Title = "WeatherStation API",
+        Version = "v1"
+    });
+    
+    var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
+    var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
+    c.IncludeXmlComments(xmlPath);
+    
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme {
+        Type = SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT",
+        Description = "Enter ‘Bearer {token}’"
+    });
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement {
+        {
+            new OpenApiSecurityScheme {
+                Reference = new OpenApiReference {
+                    Type = ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
+    });
+});
+
 builder.Services.AddAutoMapper(_ => {}, typeof(UserMappingProfile));
 builder.Services.AddAutoMapper(_ => { }, typeof(DeviceMappingProfile));
 
@@ -104,7 +138,12 @@ var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
+    // app.MapOpenApi();
+    app.UseSwagger();                            // serve /swagger/v1/swagger.json
+    app.UseSwaggerUI(c => {
+        c.SwaggerEndpoint("/swagger/v1/swagger.json", "WeatherStation API v1");
+        c.RoutePrefix = "";                      // serve the UI at root (e.g. https://localhost:5001/)
+    });
 }
 
 app.UseHttpsRedirection();
