@@ -8,22 +8,14 @@ using WeatherStation.Domain.Entities;
 namespace WeatherStation.API.Controllers;
 
 [ApiController]
-[Route("api/v1/sensor")]
-public class SensorController : ControllerBase
+[Route("api/v1/sensor/{deviceId}/data")]
+public class MeasurementController : ControllerBase
 {
     private readonly IMeasurementQueryService _measurementQueryService;
-
-    public SensorController(IMeasurementQueryService measurementQueryService)
+    
+    public MeasurementController(IMeasurementQueryService measurementQueryService)
     {
         _measurementQueryService = measurementQueryService;
-    }
-
-    [Authorize]
-    [HttpGet("hello-world")] 
-    public IActionResult GetHelloWorld()
-    {
-        //var data = _dbService.QueryAsync()
-        return Ok("SIEMA ENIU");
     }
 
     //TODO openapi
@@ -31,7 +23,7 @@ public class SensorController : ControllerBase
     /// Endpoint that provides most recent data from device specified in url
     /// </summary>
     [Authorize]
-    [HttpGet("{deviceId}/data/now")]
+    [HttpGet("/now")]
     public async Task<IActionResult> GetDeviceSnapshot([FromRoute] string deviceId)
     {
         var snapshot = await _measurementQueryService.GetSnapshot(deviceId);
@@ -54,7 +46,7 @@ public class SensorController : ControllerBase
     /// Endpoint that allows user to filter data from given device by query parameters (not raw data)
     /// </summary>
     [Authorize]
-    [HttpGet("{deviceId}/data")]
+    [HttpGet("")]
     public async Task<IActionResult> GetMeasurementRange(
         [FromRoute] string deviceId,
         [FromQuery] DateTime startTime,
@@ -82,5 +74,5 @@ public class SensorController : ControllerBase
         return Ok(response);
     }
 
-
+    
 }

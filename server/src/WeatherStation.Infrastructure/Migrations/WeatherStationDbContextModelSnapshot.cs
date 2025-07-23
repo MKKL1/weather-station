@@ -22,14 +22,9 @@ namespace WeatherStation.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("WeatherStation.Infrastructure.Tables.DeviceDAO", b =>
+            modelBuilder.Entity("WeatherStation.Infrastructure.Tables.DeviceDao", b =>
                 {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
+                    b.Property<string>("Id")
                         .HasColumnType("text");
 
                     b.Property<Guid>("UserId")
@@ -37,7 +32,7 @@ namespace WeatherStation.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Name")
+                    b.HasIndex("Id")
                         .IsUnique();
 
                     b.HasIndex("UserId");
@@ -45,7 +40,7 @@ namespace WeatherStation.Infrastructure.Migrations
                     b.ToTable("Devices");
                 });
 
-            modelBuilder.Entity("WeatherStation.Infrastructure.Tables.UserDAO", b =>
+            modelBuilder.Entity("WeatherStation.Infrastructure.Tables.UserDao", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -70,9 +65,9 @@ namespace WeatherStation.Infrastructure.Migrations
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("WeatherStation.Infrastructure.Tables.DeviceDAO", b =>
+            modelBuilder.Entity("WeatherStation.Infrastructure.Tables.DeviceDao", b =>
                 {
-                    b.HasOne("WeatherStation.Infrastructure.Tables.UserDAO", "UserDao")
+                    b.HasOne("WeatherStation.Infrastructure.Tables.UserDao", "UserDao")
                         .WithMany("Devices")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
@@ -81,7 +76,7 @@ namespace WeatherStation.Infrastructure.Migrations
                     b.Navigation("UserDao");
                 });
 
-            modelBuilder.Entity("WeatherStation.Infrastructure.Tables.UserDAO", b =>
+            modelBuilder.Entity("WeatherStation.Infrastructure.Tables.UserDao", b =>
                 {
                     b.Navigation("Devices");
                 });

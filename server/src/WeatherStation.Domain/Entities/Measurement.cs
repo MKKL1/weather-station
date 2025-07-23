@@ -10,14 +10,14 @@ public enum MetricType
 
 public class Measurement
 {
-    public Measurement(string deviceId, DateTimeOffset timestamp, Dictionary<MetricType, float> values)
+    public Measurement(DeviceId deviceId, DateTimeOffset timestamp, Dictionary<MetricType, float> values)
     {
-        DeviceId = deviceId ?? throw new ArgumentNullException(nameof(deviceId));
+        DeviceId = deviceId;
         Timestamp = timestamp;
         Values = values ?? throw new ArgumentNullException(nameof(values));
     }
 
-    public string DeviceId { get; }
+    public DeviceId DeviceId { get; }
     public DateTimeOffset Timestamp { get; }
     public IReadOnlyDictionary<MetricType, float> Values { get; }
 }
