@@ -4,6 +4,10 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "=4.37.0"
     }
+    azapi = {
+      source  = "Azure/azapi"
+      version = "=2.5.0"
+    }
   }
 }
 
@@ -11,6 +15,8 @@ provider "azurerm" {
   subscription_id = var.subscription_id
   features {}
 }
+
+provider "azapi" {}
 
 resource "azurerm_resource_group" "rg" {
   name     = "rg-${var.project_name}-${var.environment}"
@@ -69,6 +75,17 @@ resource "azurerm_iothub_dps" "dps" {
     Environment = var.environment
     Project     = var.project_name
   }
+}
+
+module "enrollment-group" {
+  source            = "./modules/dps_enrollment_group"
+  subscription_id   = var.subscription_id
+  resource-group    = azurerm_resource_group.rg.name
+  iothub            = azurerm_iothub.iothub.name
+  iothub-hostname   = azurerm_iothub.iothub.hostname
+  dps               = azurerm_iothub_dps.dps.name
+  enrollment-name   = "${azurerm_iothub_dps.dps.name}-main"
+  initial-twin-tags = "[]"
 }
 
 output "resource_group_name" {
