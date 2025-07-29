@@ -21,11 +21,6 @@ provider "azapi" {}
 resource "azurerm_resource_group" "rg" {
   name     = "rg-${var.project_name}-${var.environment}"
   location = var.location
-
-  tags = {
-    Environment = var.environment
-    Project     = var.project_name
-  }
 }
 
 resource "azurerm_iothub" "iothub" {
@@ -36,13 +31,8 @@ resource "azurerm_iothub" "iothub" {
   event_hub_partition_count = 2
 
   sku {
-    name     = "S1"
+    name     = "F1"
     capacity = "1"
-  }
-
-  tags = {
-    Environment = var.environment
-    Project     = var.project_name
   }
 }
 
@@ -70,12 +60,53 @@ resource "azurerm_iothub_dps" "dps" {
     connection_string = azurerm_iothub_shared_access_policy.hub_access_policy.primary_connection_string
     location          = azurerm_resource_group.rg.location
   }
+}
 
-  tags = {
-    Environment = var.environment
-    Project     = var.project_name
+resource "azurerm_iothub_consumer_group" "cg" {
+  name                   = "cg-${var.project_name}-${var.environment}"
+  iothub_name            = azurerm_iothub.iothub.name
+  eventhub_endpoint_name = "events"
+  resource_group_name    = azurerm_resource_group.rg.name
+}
+
+resource "azurerm_storage_account" "sa" {
+  name                     = "weatherstationdevappsa" #unique name required
+  resource_group_name      = azurerm_resource_group.rg.name
+  location                 = var.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+}
+
+resource "azurerm_service_plan" "asp" {
+  name                = "asp-${var.project_name}-${var.environment}"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = var.location
+  os_type             = "Linux"
+  sku_name            = "B1"
+}
+
+resource "azurerm_linux_function_app" "function_app" {
+  name                       = "fn-${var.project_name}-${var.environment}"
+  resource_group_name        = azurerm_resource_group.rg.name
+  location                   = var.location
+  
+  storage_account_name       = azurerm_storage_account.sa.name
+  storage_account_access_key = azurerm_storage_account.sa.primary_access_key
+  service_plan_id            = azurerm_service_plan.asp.id
+
+  site_config {}
+
+  app_settings = {
+    FUNCTIONS_WORKER_RUNTIME = "custom" #golang
+    WEBSITE_RUN_FROM_PACKAGE = "1" #zip
+    AzureWebJobsStorage      = azurerm_storage_account.sa.primary_connection_string
+
+    EH_CONN_STRING    = azurerm_iothub_shared_access_policy.hub_access_policy.primary_connection_string
+    EH_NAME           = azurerm_iothub.iothub.name
+    EH_CONSUMER_GROUP = azurerm_iothub_consumer_group.cg.name
   }
 }
+
 
 module "enrollment-group" {
   source            = "./modules/dps_enrollment_group"
@@ -86,7 +117,14 @@ module "enrollment-group" {
   dps               = azurerm_iothub_dps.dps.name
   enrollment-name   = "${azurerm_iothub_dps.dps.name}-main"
   initial-twin-tags = "[]"
+
+  depends_on = [azurerm_iothub_dps.dps]
 }
+
+
+
+
+
 
 output "resource_group_name" {
   description = "Resource Group name"
