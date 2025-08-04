@@ -94,10 +94,13 @@ resource "azurerm_linux_function_app" "function_app" {
   storage_account_access_key = azurerm_storage_account.sa.primary_access_key
   service_plan_id            = azurerm_service_plan.asp.id
 
-  site_config {}
+  site_config {
+    application_stack {
+      dotnet_version = "8.0"
+    }
+  }
 
   app_settings = {
-    FUNCTIONS_WORKER_RUNTIME = "custom" #golang
     WEBSITE_RUN_FROM_PACKAGE = "1" #zip
     AzureWebJobsStorage      = azurerm_storage_account.sa.primary_connection_string
 
