@@ -14,8 +14,7 @@ namespace weatherstation.eventhandler
         public static async Task Run(
             [EventHubTrigger(
                 "%EH_NAME%", 
-                Connection = "EH_CONN_STRING", 
-                ConsumerGroup = "%EH_CONSUMER_GROUP%")] 
+                Connection = "EH_CONN_STRING")] 
             EventData[] events,
             ILogger log)
         {

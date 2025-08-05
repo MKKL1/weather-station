@@ -62,13 +62,6 @@ resource "azurerm_iothub_dps" "dps" {
   }
 }
 
-resource "azurerm_iothub_consumer_group" "cg" {
-  name                   = "cg-${var.project_name}-${var.environment}"
-  iothub_name            = azurerm_iothub.iothub.name
-  eventhub_endpoint_name = "events"
-  resource_group_name    = azurerm_resource_group.rg.name
-}
-
 resource "azurerm_storage_account" "sa" {
   name                     = "weatherstationdevappsa" #unique name required
   resource_group_name      = azurerm_resource_group.rg.name
@@ -104,9 +97,8 @@ resource "azurerm_linux_function_app" "function_app" {
     WEBSITE_RUN_FROM_PACKAGE = "1" #zip
     AzureWebJobsStorage      = azurerm_storage_account.sa.primary_connection_string
 
-    EH_CONN_STRING    = azurerm_iothub_shared_access_policy.hub_access_policy.primary_connection_string
-    EH_NAME           = azurerm_iothub.iothub.name
-    EH_CONSUMER_GROUP = azurerm_iothub_consumer_group.cg.name
+    EH_CONN_STRING = "Endpoint=${azurerm_iothub.iothub.event_hub_events_endpoint};SharedAccessKeyName=${azurerm_iothub_shared_access_policy.hub_access_policy.name};SharedAccessKey=${azurerm_iothub_shared_access_policy.hub_access_policy.primary_key};EntityPath=${azurerm_iothub.iothub.event_hub_events_path}"
+    EH_NAME        = azurerm_iothub.iothub.event_hub_events_path
   }
 }
 
