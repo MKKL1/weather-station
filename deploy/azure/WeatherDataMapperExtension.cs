@@ -1,0 +1,36 @@
+﻿using System;
+using Proto;
+using weatherstation.eventhandler.Entities;
+
+namespace weatherstation.eventhandler;
+
+public static class WeatherDataMapperExtension
+{
+    public static RawEventEntity ToRawEventEntity(this WeatherData wd, string eventType)
+    {
+        var eventTimestamp = DateTimeOffset.FromUnixTimeSeconds((long)wd.CreatedAt).DateTime;
+        var startTime = DateTimeOffset.FromUnixTimeSeconds((long)(wd.Tips?.StartTime ?? 0)).DateTime;
+        var dataBytes = wd.Tips?.Data?.ToByteArray() ?? [];
+
+        return new RawEventEntity
+        {
+            id = Guid.NewGuid().ToString(),
+            DeviceId = wd.Info?.Id ?? "",
+            EventType = eventType,
+            EventTimestamp = eventTimestamp,
+            Payload = new RawEventEntity.PayloadBody
+            {
+                Temperature = wd.Temperature,
+                Humidity = wd.Humidity,
+                Pressure = wd.Pressure,
+                Rain = new RawEventEntity.Histogram
+                {
+                    Data = Convert.ToBase64String(dataBytes),
+                    SlotCount = (byte)(wd.Tips?.Count ?? 0),
+                    SlotSecs = (ushort)(wd.Tips?.IntervalDuration ?? 0),
+                    StartTime = startTime
+                }
+            }
+        };
+    }
+}

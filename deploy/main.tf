@@ -75,7 +75,44 @@ resource "azurerm_service_plan" "asp" {
   resource_group_name = azurerm_resource_group.rg.name
   location            = var.location
   os_type             = "Linux"
-  sku_name            = "B1"
+  sku_name            = "Y1"
+}
+
+resource "azurerm_cosmosdb_account" "this" {
+  name                = "cosmos-${var.project_name}-${var.environment}"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  offer_type          = "Standard"
+  kind                = "GlobalDocumentDB"
+
+  consistency_policy {
+    consistency_level = "Session"
+  }
+
+  geo_location {
+    location          = "Germany West Central" #In my case, West Europe is not available
+    failover_priority = 0
+  }
+
+  capabilities {
+    name = "EnableServerless"
+  }
+}
+
+resource "azurerm_cosmosdb_sql_database" "this" {
+  name                = "${var.project_name}-db"
+  resource_group_name = azurerm_resource_group.rg.name
+  account_name        = azurerm_cosmosdb_account.this.name
+}
+
+resource "azurerm_cosmosdb_sql_container" "this" {
+  name                = "${var.project_name}-container"
+  resource_group_name = azurerm_resource_group.rg.name
+  account_name        = azurerm_cosmosdb_account.this.name
+  database_name       = azurerm_cosmosdb_sql_database.this.name
+
+  partition_key_paths = ["/eventType"]
+  #throughput          = 400
 }
 
 resource "azurerm_linux_function_app" "function_app" {
@@ -99,9 +136,12 @@ resource "azurerm_linux_function_app" "function_app" {
 
     EH_CONN_STRING = "Endpoint=${azurerm_iothub.iothub.event_hub_events_endpoint};SharedAccessKeyName=${azurerm_iothub_shared_access_policy.hub_access_policy.name};SharedAccessKey=${azurerm_iothub_shared_access_policy.hub_access_policy.primary_key};EntityPath=${azurerm_iothub.iothub.event_hub_events_path}"
     EH_NAME        = azurerm_iothub.iothub.event_hub_events_path
+
+    COSMOS_CONNECTION = azurerm_cosmosdb_account.this.primary_sql_connection_string
+    COSMOS_DATABASE   = azurerm_cosmosdb_sql_database.this.name
+    COSMOS_CONTAINER  = azurerm_cosmosdb_sql_container.this.name
   }
 }
-
 
 module "enrollment-group" {
   source            = "./modules/dps_enrollment_group"
@@ -154,4 +194,20 @@ output "service_connection_string" {
   description = "Service connection string"
   value       = azurerm_iothub_shared_access_policy.hub_access_policy.primary_connection_string
   sensitive   = true
+}
+
+output "cosmos_primary_connection_string" {
+  description = "Primary connection string for Cosmos DB"
+  value       = azurerm_cosmosdb_account.this.primary_sql_connection_string
+  sensitive   = true
+}
+
+output "cosmos_database_name" {
+  description = "Cosmos DB database name"
+  value       = azurerm_cosmosdb_sql_database.this.name
+}
+
+output "cosmos_container_name" {
+  description = "Cosmos DB container name"
+  value       = azurerm_cosmosdb_sql_container.this.name
 }
