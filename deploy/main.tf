@@ -75,7 +75,7 @@ resource "azurerm_service_plan" "asp" {
   resource_group_name = azurerm_resource_group.rg.name
   location            = var.location
   os_type             = "Linux"
-  sku_name            = "Y1"
+  sku_name            = "B1"
 }
 
 resource "azurerm_cosmosdb_account" "this" {
@@ -127,10 +127,12 @@ resource "azurerm_linux_function_app" "function_app" {
   site_config {
     application_stack {
       dotnet_version = "8.0"
+      use_dotnet_isolated_runtime = true
     }
   }
 
   app_settings = {
+    FUNCTIONS_WORKER_RUNTIME = "dotnet-isolated"
     WEBSITE_RUN_FROM_PACKAGE = "1" #zip
     AzureWebJobsStorage      = azurerm_storage_account.sa.primary_connection_string
 
