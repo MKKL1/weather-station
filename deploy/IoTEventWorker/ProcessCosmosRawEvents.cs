@@ -1,31 +1,20 @@
-﻿using System.Text.Json;
-using Microsoft.Azure.Cosmos;
+﻿using IoTEventWorker.Domain.Services;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 using weatherstation.eventhandler.Entities;
 
 namespace IoTEventWorker;
 
-public class ProcessCosmosRawEvents
+public class ProcessCosmosRawEvents(ILoggerFactory loggerFactory, IWeatherAggregationService weatherAggregationService)
 {
-    private readonly Container _viewContainer;
-    private readonly ILogger _logger;
-    private const int RainBucketSeconds = 300; // 5 minutes
-    private const int RainBucketsPerHour = 3600 / RainBucketSeconds; // 12
-    private readonly ViewDbIdBuilder _viewDbIdBuilder = new();
-
-    public ProcessCosmosRawEvents(Container viewContainer, ILoggerFactory loggerFactory)
-    {
-        _viewContainer = viewContainer;
-        _logger = loggerFactory.CreateLogger<ProcessCosmosRawEvents>();
-    }
+    private readonly ILogger _logger = loggerFactory.CreateLogger<ProcessCosmosRawEvents>();
 
     [Function(nameof(ProcessCosmosRawEvents))]
     public async Task Run([CosmosDBTrigger(
         databaseName: "%COSMOS_DATABASE%", 
         containerName: "%COSMOS_CONTAINER%", 
         Connection = "COSMOS_CONNECTION", 
-        LeaseContainerName = "%COSMOS_LEASE_CONTAINER%")] IReadOnlyCollection<RawEventEntity> input)
+        LeaseContainerName = "%COSMOS_LEASE_CONTAINER%")] IReadOnlyCollection<RawEventDocument> input)
     {
         foreach (var raw in input)
         {
@@ -41,29 +30,12 @@ public class ProcessCosmosRawEvents
     }
 
 
-    private async Task ProcessSingleRawEvent(RawEventEntity entity)
+    private async Task ProcessSingleRawEvent(RawEventDocument document)
     {
-        await UpsertLatestState(entity);
+        await weatherAggregationService.SaveLatestState(document);
     }
 
-    private async Task UpsertLatestState(RawEventEntity entity)
-    {
-        var id = entity.DeviceId;
-        var partitionKey = new PartitionKey(id);
-        
-        var doc = new
-        {
-            id = _viewDbIdBuilder.Build(entity, ViewType.Latest),
-            deviceId = entity.DeviceId,
-            docType = "LatestState",
-            lastEventTs = entity.EventTimestamp.ToString("O"),
-            lastRawId = entity.id,
-            payload = entity.Payload,
-            ttl = -1
-        };
-
-        await _viewContainer.UpsertItemAsync(doc, partitionKey);
-    }
+    
 
     // private async Task PatchHourlyAggregate(RawEventEntity entity)
     // {

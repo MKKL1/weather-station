@@ -18,17 +18,18 @@ public class OnIotHubEventSaveToComos
 
     [Function(nameof(OnIotHubEventSaveToComos))]
     [CosmosDBOutput("%COSMOS_DATABASE%", "%COSMOS_CONTAINER%", Connection = "COSMOS_CONNECTION")]
-    public RawEventEntity[] Run([EventHubTrigger("%EH_NAME%", Connection = "EH_CONN_STRING")] EventData[] events)
+    public RawEventDocument[] Run([EventHubTrigger("%EH_NAME%", Connection = "EH_CONN_STRING")] EventData[] events)
     {
         _logger.LogInformation("Processing batch of {EventsLength} events.", events.Length);
 
-        var successfulEntities = new List<RawEventEntity>();
+        var successfulEntities = new List<RawEventDocument>();
         var exceptions = new List<Exception>();
 
         foreach (var eventData in events)
         {
             try
             {
+                //Keeping it simple
                 var proto = WeatherData.Parser.ParseFrom(eventData.EventBody);
                 var entity = proto.ToRawEventEntity(EntityPartitionKey);
                 successfulEntities.Add(entity);

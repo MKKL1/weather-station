@@ -5,7 +5,7 @@ using Newtonsoft.Json;
 
 namespace weatherstation.eventhandler.Entities
 {
-    public class RawEventEntity
+    public class RawEventDocument
     {
         [JsonProperty("id")]
         [JsonPropertyName("id")]

@@ -1,3 +1,6 @@
+using IoTEventWorker.Domain.Repositories;
+using IoTEventWorker.Domain.Services;
+using IoTEventWorker.Repositories;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Builder;
@@ -19,10 +22,20 @@ var dbName = Environment.GetEnvironmentVariable("COSMOS_DATABASE")
 var containerName = Environment.GetEnvironmentVariable("COSMOS_VIEWS_CONTAINER")
            ?? throw new InvalidOperationException("COSMOS_VIEWS_CONTAINER is not set.");
 
-builder.Services.AddSingleton(sp => new CosmosClient(conn));
 
-builder.Services.AddSingleton(sp =>
-    sp.GetRequiredService<CosmosClient>().GetContainer(dbName, containerName)
-);
+builder.Services.AddSingleton<IViewRepository, CosmosDbViewRepository>(sp =>
+    new CosmosDbViewRepository(new CosmosClient(conn).GetContainer(dbName, containerName),
+        new CosmosDbModelMapper()));
+
+builder.Services.AddSingleton<IViewIdService, ViewIdService>(sp => new ViewIdService());
+builder.Services.AddSingleton<IHistogramConverter, HistogramConverter>(sp => new HistogramConverter());
+
+builder.Services.AddSingleton<IWeatherAggregationService, WeatherAggregationService>(sp =>
+    new WeatherAggregationService(
+        sp.GetRequiredService<IViewRepository>(), 
+        sp.GetRequiredService<IViewIdService>(), 
+        sp.GetRequiredService<IHistogramConverter>()));
+
+
 
 builder.Build().Run();
