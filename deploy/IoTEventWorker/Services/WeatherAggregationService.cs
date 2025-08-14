@@ -11,6 +11,7 @@ public class WeatherAggregationService(
 {
     public async Task SaveLatestState(RawEventDocument document)
     {
+        //TODO save only newer event
         var id = viewIdService.GenerateLatest(document.DeviceId);
         var model = new AggregateModel<LatestStatePayload>(
             id,
@@ -22,7 +23,8 @@ public class WeatherAggregationService(
                 document.Payload.Temperature,
                 document.Payload.Humidity,
                 document.Payload.Pressure,
-                histogramConverter.ToHistogramModel(document.Payload.Rain)));
+                histogramConverter.ToHistogramModel(document.Payload.Rain), 
+                document.Payload.RainfallMMPerTip));
         
         await viewRepository.UpdateLatestView(model);
     }

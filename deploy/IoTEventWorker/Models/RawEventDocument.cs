@@ -44,6 +44,10 @@ namespace weatherstation.eventhandler.Entities
             [JsonProperty("rain")]
             [JsonPropertyName("rain")]
             public Histogram Rain { get; set; }
+            
+            [JsonProperty("mmPerTip")]
+            [JsonPropertyName("mmPerTip")]
+            public float RainfallMMPerTip { get; set; }
         }
 
         public class Histogram
