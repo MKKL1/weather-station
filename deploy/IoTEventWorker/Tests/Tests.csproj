@@ -18,6 +18,7 @@
 
     <ItemGroup>
       <ProjectReference Include="..\IoTEventWorker.csproj" />
+      <ProjectReference Include="..\IoTEventWorker\IoTEventWorker.csproj" />
     </ItemGroup>
 
 </Project>

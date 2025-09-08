@@ -19,7 +19,7 @@ namespace weatherstation.eventhandler.Entities
 
         [JsonProperty("eventTimestamp")]
         [JsonPropertyName("eventTimestamp")]
-        public DateTime EventTimestamp { get; set; }
+        public DateTimeOffset EventTimestamp { get; set; }
 
         [JsonProperty("payload")]
         [JsonPropertyName("payload")]
@@ -64,7 +64,7 @@ namespace weatherstation.eventhandler.Entities
 
             [JsonProperty("startTime")]
             [JsonPropertyName("startTime")]
-            public DateTime StartTime { get; set; }
+            public DateTimeOffset StartTime { get; set; }
         }
     }
 }

@@ -4,9 +4,9 @@ using Newtonsoft.Json;
 
 namespace IoTEventWorker.Domain.Models;
 
-public class LatestStatePayload(DateTime lastEventTs, string lastRawId, float? temperature, float? humidity, float? pressure, Histogram<byte>? rain, float? rainfallMmPerTip)
+public class LatestStatePayload(DateTimeOffset lastEventTs, string lastRawId, float? temperature, float? humidity, float? pressure, Histogram<byte>? rain, float? rainfallMmPerTip)
 {
-    public DateTime LastEventTs { get; private set; } = lastEventTs;
+    public DateTimeOffset LastEventTs { get; private set; } = lastEventTs;
     public string LastRawId { get; private set; } = lastRawId;
     public float? Temperature { get; private set; } = temperature;
     public float? Humidity { get; private set; } = humidity;
