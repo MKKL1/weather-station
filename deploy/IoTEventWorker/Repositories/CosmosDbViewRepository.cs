@@ -12,8 +12,10 @@ public class CosmosDbViewRepository(Container viewContainer, CosmosDbModelMapper
         await viewContainer.UpsertItemAsync(mapper.ToDocument(latestStatePayload), new PartitionKey(latestStatePayload.DeviceId));
     }
 
-    public Task PatchHourlyView(AggregateModel<HourlyAggregatePayload> hourlyAggregate)
+    public async Task<AggregateModel<HourlyAggregatePayload>?> GetHourlyAggregate(string id, string deviceId)
     {
-        throw new NotImplementedException();
+        //Id should probably be constructed here
+        // return viewContainer.ReadItemAsync<>()
+        return null;
     }
 }

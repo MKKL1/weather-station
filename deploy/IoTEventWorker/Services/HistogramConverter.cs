@@ -1,15 +1,16 @@
 ﻿using IoTEventWorker.Domain.Models;
+using IoTEventWorker.Models;
 using weatherstation.eventhandler.Entities;
 
 namespace IoTEventWorker.Domain.Services;
 
 public class HistogramConverter: IHistogramConverter
 {
-    public Histogram ToHistogramModel(RawEventDocument.Histogram histogramDocument)
+    public Histogram<byte> ToHistogramModel(RawEventDocument.Histogram histogramDocument)
     {
         int slotCount = histogramDocument.SlotCount;
         var tips = DecodeTipsFromBase64(histogramDocument.Data, slotCount);
-        return new Histogram(tips, histogramDocument.SlotCount, histogramDocument.SlotSecs, histogramDocument.StartTime);
+        return new Histogram<byte>(tips, histogramDocument.SlotCount, histogramDocument.SlotSecs, histogramDocument.StartTime);
     }
 
     private static byte[] DecodeTipsFromBase64(string base64Data, int slotCount)

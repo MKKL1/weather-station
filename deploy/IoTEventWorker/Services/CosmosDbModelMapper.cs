@@ -1,4 +1,5 @@
 ﻿using IoTEventWorker.Domain.Models;
+using IoTEventWorker.Models;
 using weatherstation.eventhandler.Entities;
 
 namespace IoTEventWorker.Domain.Services;
@@ -25,7 +26,7 @@ public class CosmosDbModelMapper
         };
     }
 
-    public object ToDocument(Histogram histogram)
+    public object ToDocument(Histogram<byte> histogram)
     {
         return new
         {

@@ -28,4 +28,25 @@ public class WeatherAggregationService(
         
         await viewRepository.UpdateLatestView(model);
     }
+
+    public async Task UpdateHourlyAggregate(RawEventDocument document)
+    {
+        var eventTs = document.EventTimestamp;
+        var mainHourlyId = viewIdService.GenerateHourly(document.DeviceId, eventTs);
+        
+        
+    }
+
+
+    private async Task<AggregateModel<HourlyAggregatePayload>> GetOrCreateHourlyAggregate(string mainHourlyId, string deviceId)
+    {
+        var response = await viewRepository.GetHourlyAggregate(mainHourlyId, deviceId);
+        if (response == null)
+        {
+            // return new AggregateModel<HourlyAggregatePayload>(mainHourlyId, deviceId, "HourlyAggregate",
+            //     new HourlyAggregatePayload());
+        }
+
+        return response;
+    }
 }

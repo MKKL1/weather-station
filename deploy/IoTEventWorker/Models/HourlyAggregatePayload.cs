@@ -1,6 +1,8 @@
-﻿namespace IoTEventWorker.Domain.Models;
+﻿using IoTEventWorker.Models;
 
-public class HourlyAggregatePayload
+namespace IoTEventWorker.Domain.Models;
+
+public class HourlyAggregatePayload(Histogram<float>? rain)
 {
-    
+    public Histogram<float>? Rain { get; private set; } = rain;
 }

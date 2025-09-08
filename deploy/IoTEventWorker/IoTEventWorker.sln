@@ -4,6 +4,8 @@ VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IoTEventWorker", "IoTEventWorker.csproj", "{E1E22040-1B17-B48F-89A6-17B45160E4C4}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Tests", "Tests\Tests.csproj", "{960CFA99-3374-4641-B3FA-009B3815CFF6}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -14,6 +16,10 @@ Global
 		{E1E22040-1B17-B48F-89A6-17B45160E4C4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E1E22040-1B17-B48F-89A6-17B45160E4C4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E1E22040-1B17-B48F-89A6-17B45160E4C4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{960CFA99-3374-4641-B3FA-009B3815CFF6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{960CFA99-3374-4641-B3FA-009B3815CFF6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{960CFA99-3374-4641-B3FA-009B3815CFF6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{960CFA99-3374-4641-B3FA-009B3815CFF6}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
