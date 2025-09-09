@@ -1,4 +1,4 @@
-﻿namespace IoTEventWorker.Domain.Services;
+﻿namespace IoTEventWorker.Services;
 
 public interface IViewIdService
 {
