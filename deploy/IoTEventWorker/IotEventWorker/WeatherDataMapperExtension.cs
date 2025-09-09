@@ -1,7 +1,7 @@
-﻿using Proto;
-using weatherstation.eventhandler.Entities;
+﻿using IoTEventWorker.Documents;
+using Proto;
 
-namespace weatherstation.eventhandler
+namespace IoTEventWorker
 {
     public static class WeatherDataMapperExtension
     {

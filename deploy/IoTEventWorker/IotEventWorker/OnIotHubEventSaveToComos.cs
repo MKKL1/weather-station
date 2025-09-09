@@ -1,11 +1,10 @@
 using Azure.Messaging.EventHubs;
+using IoTEventWorker.Documents;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 using Proto;
-using weatherstation.eventhandler;
-using weatherstation.eventhandler.Entities;
 
-namespace weatherstation;
+namespace IoTEventWorker;
 public class OnIotHubEventSaveToComos
 {
     private const string EntityPartitionKey = "WeatherReport";

@@ -1,4 +1,4 @@
-﻿namespace IoTEventWorker.Domain.Models;
+﻿namespace IoTEventWorker.Models;
 
 //Not sure if it's worth to use composition with generics, instead I could use inheritance which would be easier to use
 public class AggregateModel<T>

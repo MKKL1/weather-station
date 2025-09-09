@@ -1,6 +1,6 @@
-using IoTEventWorker.Domain.Repositories;
-using IoTEventWorker.Domain.Services;
+using IoTEventWorker;
 using IoTEventWorker.Repositories;
+using IoTEventWorker.Services;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Builder;
@@ -29,12 +29,14 @@ builder.Services.AddSingleton<IViewRepository, CosmosDbViewRepository>(sp =>
 
 builder.Services.AddSingleton<IViewIdService, ViewIdService>(sp => new ViewIdService());
 builder.Services.AddSingleton<IHistogramConverter, HistogramConverter>(sp => new HistogramConverter());
+builder.Services.AddSingleton<IHistogramAggregator, HistogramAggregator>();
 
 builder.Services.AddSingleton<IWeatherAggregationService, WeatherAggregationService>(sp =>
     new WeatherAggregationService(
         sp.GetRequiredService<IViewRepository>(), 
         sp.GetRequiredService<IViewIdService>(), 
-        sp.GetRequiredService<IHistogramConverter>()));
+        sp.GetRequiredService<IHistogramConverter>(),
+        sp.GetRequiredService<IHistogramAggregator>()));
 
 
 

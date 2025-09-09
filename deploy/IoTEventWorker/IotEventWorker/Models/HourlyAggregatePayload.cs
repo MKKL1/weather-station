@@ -1,8 +1,9 @@
-﻿using IoTEventWorker.Models;
+﻿namespace IoTEventWorker.Models;
 
-namespace IoTEventWorker.Domain.Models;
-
-public class HourlyAggregatePayload(Histogram<float>? rain)
+public class HourlyAggregatePayload
 {
-    public Histogram<float>? Rain { get; private set; } = rain;
+    public MetricAggregate? Temperature { get; set; }
+    public MetricAggregate? Humidity { get; set; }
+    public MetricAggregate? Pressure { get; set; }
+    public Histogram<float>? Rain { get; set; }
 }

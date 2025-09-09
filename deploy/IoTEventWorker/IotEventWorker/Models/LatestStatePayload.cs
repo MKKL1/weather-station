@@ -1,16 +1,11 @@
-﻿using System.Text.Json.Serialization;
-using IoTEventWorker.Models;
-using Newtonsoft.Json;
+﻿namespace IoTEventWorker.Models;
 
-namespace IoTEventWorker.Domain.Models;
-
-public class LatestStatePayload(DateTimeOffset lastEventTs, string lastRawId, float? temperature, float? humidity, float? pressure, Histogram<byte>? rain, float? rainfallMmPerTip)
+public class LatestStatePayload
 {
-    public DateTimeOffset LastEventTs { get; private set; } = lastEventTs;
-    public string LastRawId { get; private set; } = lastRawId;
-    public float? Temperature { get; private set; } = temperature;
-    public float? Humidity { get; private set; } = humidity;
-    public float? Pressure { get; private set; } = pressure;
-    public Histogram<byte>? Rain { get; private set; } = rain;
-    public float? RainfallMMPerTip { get; private set; } = rainfallMmPerTip;
+    public required DateTimeOffset LastEventTs { get; set; }
+    public required string LastRawId { get; set; }
+    public float? Temperature { get; set; }
+    public float? Humidity { get; set; }
+    public float? Pressure { get; set; }
+    public Histogram<float>? Rain { get; set; }
 }

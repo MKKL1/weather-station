@@ -1,14 +1,20 @@
 ﻿using System.Numerics;
-using IoTEventWorker.Domain.Models;
 using IoTEventWorker.Models;
 
 namespace IoTEventWorker;
 
-public class HistogramAggregator
+public class HistogramAggregator: IHistogramAggregator
 {
     public Dictionary<DateTimeOffset, float> ResampleHistogram<T>(Histogram<T> hist, float mmPerTip, int targetSlotSeconds) 
         where T : IBinaryInteger<T>
     {
+        if (hist.SlotSecs > targetSlotSeconds)
+        {
+            throw new ArgumentException(
+                $"Histogram slot size ({hist.SlotSecs}) cannot be greater than target slot size ({targetSlotSeconds}). " +
+                $"Resampling to smaller histogram is not supported",
+                nameof(targetSlotSeconds));
+        }
         var tipData = hist.Tips;
         var startTimeUnix = hist.StartTime.ToUnixTimeSeconds();
         var slotSeconds = hist.SlotSecs;
@@ -56,6 +62,7 @@ public class HistogramAggregator
                     bins[secondIndex] = secondPortion;
             }
         }
+        //Doesn't support splitting over multiple bins
         
         var result = new Dictionary<DateTimeOffset, float>(bins.Count);
         foreach (var kv in bins)
@@ -64,5 +71,31 @@ public class HistogramAggregator
         }
         
         return result;
+    }
+
+    public void AddToHistogram(Histogram<float> hist, Dictionary<DateTimeOffset, float> rainfallBuckets)
+    {
+        foreach (var (t, rainfall) in rainfallBuckets)
+        {
+            if (hist.StartTime < t) 
+                continue;
+            
+            var slotIdx = (int)Math.Floor((t - hist.StartTime).TotalSeconds)/hist.SlotSecs;
+            if(slotIdx < 0 || slotIdx >= hist.SlotCount) 
+                continue;
+            
+            hist.Tips[slotIdx] = Math.Max(hist.Tips[slotIdx], rainfall);
+        }
+    }
+
+    public HashSet<DateTimeOffset> GetUniqueHours(Dictionary<DateTimeOffset, float> rainfallBuckets)
+    {
+        var set = new HashSet<DateTimeOffset>();
+        foreach (var (t, _) in rainfallBuckets)
+        {
+            set.Add(new DateTimeOffset(t.Year, t.Month, t.Day, t.Hour, 0, 0, t.Offset));
+        }
+
+        return set;
     }
 }

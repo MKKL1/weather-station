@@ -1,6 +1,7 @@
-﻿using IoTEventWorker.Domain.Models;
-using IoTEventWorker.Domain.Repositories;
-using IoTEventWorker.Domain.Services;
+﻿using System.Net;
+using IoTEventWorker.Documents;
+using IoTEventWorker.Models;
+using IoTEventWorker.Services;
 using Microsoft.Azure.Cosmos;
 
 namespace IoTEventWorker.Repositories;
@@ -14,8 +15,20 @@ public class CosmosDbViewRepository(Container viewContainer, CosmosDbModelMapper
 
     public async Task<AggregateModel<HourlyAggregatePayload>?> GetHourlyAggregate(string id, string deviceId)
     {
-        //Id should probably be constructed here
-        // return viewContainer.ReadItemAsync<>()
-        return null;
+        try
+        {
+            var response = await viewContainer.ReadItemAsync<AggregateDocument<HourlyAggregatePayloadDocument>>(id, new PartitionKey(deviceId));
+            return mapper.FromDocument(response.Resource);
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+    }
+
+    public async Task UpdateHourlyView(AggregateModel<HourlyAggregatePayload> hourlyAggregatePayload)
+    {
+        await viewContainer.UpsertItemAsync(mapper.ToDocument(hourlyAggregatePayload),
+            new PartitionKey(hourlyAggregatePayload.DeviceId));
     }
 }

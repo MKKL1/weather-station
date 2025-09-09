@@ -1,7 +1,7 @@
-﻿using IoTEventWorker.Domain.Services;
+﻿using IoTEventWorker.Documents;
+using IoTEventWorker.Services;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
-using weatherstation.eventhandler.Entities;
 
 namespace IoTEventWorker;
 
@@ -29,17 +29,9 @@ public class ProcessCosmosRawEvents(ILoggerFactory loggerFactory, IWeatherAggreg
         }
     }
 
-
     private async Task ProcessSingleRawEvent(RawEventDocument document)
     {
-        await weatherAggregationService.SaveLatestState(document);
+        await Task.WhenAll(weatherAggregationService.SaveLatestState(document),
+            weatherAggregationService.UpdateHourlyAggregate(document));
     }
-
-    
-
-    // private async Task PatchHourlyAggregate(RawEventEntity entity)
-    // {
-    //     var id = _viewDbIdBuilder.Build(entity, ViewType.Hourly);
-    //     var partitionKey = new PartitionKey(entity.DeviceId);
-    // }
 }

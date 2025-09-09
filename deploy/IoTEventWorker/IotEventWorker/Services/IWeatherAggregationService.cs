@@ -1,8 +1,9 @@
-﻿using weatherstation.eventhandler.Entities;
+﻿using IoTEventWorker.Documents;
 
-namespace IoTEventWorker.Domain.Services;
+namespace IoTEventWorker.Services;
 
 public interface IWeatherAggregationService
 {
     public Task SaveLatestState(RawEventDocument document);
+    public Task UpdateHourlyAggregate(RawEventDocument document);
 }

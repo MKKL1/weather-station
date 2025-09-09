@@ -1,8 +1,7 @@
-﻿using IoTEventWorker.Domain.Models;
+﻿using IoTEventWorker.Documents;
 using IoTEventWorker.Models;
-using weatherstation.eventhandler.Entities;
 
-namespace IoTEventWorker.Domain.Services;
+namespace IoTEventWorker.Services;
 
 //TODO move somewhere else, that's not a business service
 public interface IHistogramConverter
