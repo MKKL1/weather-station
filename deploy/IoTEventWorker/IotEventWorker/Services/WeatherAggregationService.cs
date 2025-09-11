@@ -60,16 +60,26 @@ public class WeatherAggregationService(
                 ? mainAggregate
                 : await GetOrCreateHourlyAggregate(id, document.DeviceId);
 
-            hourlyAggregate.Payload.Rain ??= new Histogram<float>([], 12, 300, h);
+            hourlyAggregate.Payload.Rain ??= new Histogram<float>(new float[12], 12, 300, h);
             histogramAggregator.AddToHistogram(hourlyAggregate.Payload.Rain, resampledRainHistogram);
             models.Add(hourlyAggregate);
         }
         
-        mainAggregate.Payload.Temperature?.Increment(document.Payload.Temperature);
-        mainAggregate.Payload.Pressure?.Increment(document.Payload.Pressure);
-        mainAggregate.Payload.Humidity?.Increment(document.Payload.Humidity);
+        mainAggregate.Payload.Temperature = IncrementOrSet(mainAggregate.Payload.Temperature, document.Payload.Temperature);
+        mainAggregate.Payload.Pressure = IncrementOrSet(mainAggregate.Payload.Pressure, document.Payload.Pressure);
+        mainAggregate.Payload.Humidity = IncrementOrSet(mainAggregate.Payload.Humidity, document.Payload.Humidity);
 
         await Task.WhenAll(models.Select(viewRepository.UpdateHourlyView).ToArray());
+    }
+
+    private static MetricAggregate IncrementOrSet(MetricAggregate? metricAggregate, float value)
+    {
+        if (metricAggregate == null)
+        {
+            return new MetricAggregate(value);
+        }
+        metricAggregate.Increment(value);
+        return metricAggregate;
     }
 
     private async Task<AggregateModel<HourlyAggregatePayload>> GetOrCreateHourlyAggregate(string mainHourlyId, string deviceId)

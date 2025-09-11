@@ -23,7 +23,7 @@ public class HistogramAggregator: IHistogramAggregator
         
         for (int i = 0; i < hist.SlotCount; i++)
         {
-            var tipCount = (int)(object)tipData[i]; // Direct cast, assuming valid data
+            var tipCount = int.CreateChecked(tipData[i]);
             if (tipCount == 0) continue;
             
             var totalRainfall = tipCount * mmPerTip;
