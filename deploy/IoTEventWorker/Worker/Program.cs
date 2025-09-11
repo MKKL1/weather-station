@@ -23,13 +23,14 @@ var containerName = Environment.GetEnvironmentVariable("COSMOS_VIEWS_CONTAINER")
            ?? throw new InvalidOperationException("COSMOS_VIEWS_CONTAINER is not set.");
 
 
-builder.Services.AddSingleton<IViewRepository, CosmosDbViewRepository>(sp =>
+builder.Services.AddSingleton<IViewRepository, CosmosDbViewRepository>(_ =>
     new CosmosDbViewRepository(new CosmosClient(conn).GetContainer(dbName, containerName),
         new CosmosDbModelMapper()));
 
-builder.Services.AddSingleton<IViewIdService, ViewIdService>(sp => new ViewIdService());
-builder.Services.AddSingleton<IHistogramConverter, HistogramConverter>(sp => new HistogramConverter());
+builder.Services.AddSingleton<IViewIdService, ViewIdService>(_ => new ViewIdService());
+builder.Services.AddSingleton<IHistogramConverter, HistogramConverter>(_ => new HistogramConverter());
 builder.Services.AddSingleton<IHistogramAggregator, HistogramAggregator>();
+builder.Services.AddSingleton<IProtoModelMapper, ProtoModelMapper>();
 
 builder.Services.AddSingleton<IWeatherAggregationService, WeatherAggregationService>(sp =>
     new WeatherAggregationService(

@@ -1,4 +1,5 @@
-﻿using Worker.Documents;
+﻿using Proto;
+using Worker.Documents;
 using Worker.Models;
 
 namespace Worker.Services;

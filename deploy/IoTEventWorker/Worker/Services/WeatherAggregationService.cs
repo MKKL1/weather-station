@@ -17,10 +17,10 @@ public class WeatherAggregationService(
         var id = viewIdService.GenerateLatest(document.DeviceId);
         
         var resampledRainHistogram = histogramAggregator.ResampleHistogram( 
-            histogramConverter.ToHistogramModel(document.Payload.Rain),  
+            histogramConverter.ToHistogramModel(document.Payload.Rain),
             document.Payload.RainfallMMPerTip, 
             HourlyAggregateBucketSeconds);
-        var histogram = new Histogram<float>([], 12, 300, document.Payload.Rain.StartTime);
+        var histogram = new Histogram<float>(new float[12], 12, HourlyAggregateBucketSeconds, document.Payload.Rain.StartTime);
         histogramAggregator.AddToHistogram(histogram, resampledRainHistogram);
         
         var model = new AggregateModel<LatestStatePayload>(

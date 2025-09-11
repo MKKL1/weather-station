@@ -3,7 +3,6 @@ using Worker.Models;
 
 namespace Worker.Services;
 
-//TODO move to model mapper but for proto
 public class HistogramConverter: IHistogramConverter
 {
     public Histogram<byte> ToHistogramModel(RawEventDocument.Histogram histogramDocument)

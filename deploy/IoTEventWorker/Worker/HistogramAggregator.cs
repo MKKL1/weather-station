@@ -1,11 +1,20 @@
 ﻿using System.Numerics;
-using IoTEventWorker;
 using Worker.Models;
 
 namespace Worker;
 
 public class HistogramAggregator: IHistogramAggregator
 {
+    /// <summary>
+    /// Converts tip counts in a source histogram into rainfall (mm) and aggregates them into larger time slots.
+    /// </summary>
+    /// <typeparam name="T">Numeric type of histogram tips.</typeparam>
+    /// <param name="hist">Source histogram</param>
+    /// <param name="mmPerTip">Millimetres of rain represented by one tip.</param>
+    /// <param name="targetSlotSeconds">Desired output slot size in seconds (must be >= hist.SlotSecs).</param>
+    /// <returns>
+    /// A dictionary mapping each target-slot start time (DateTimeOffset) to total rainfall (mm)
+    /// </returns>
     public Dictionary<DateTimeOffset, float> ResampleHistogram<T>(Histogram<T> hist, float mmPerTip, int targetSlotSeconds) 
         where T : IBinaryInteger<T>
     {

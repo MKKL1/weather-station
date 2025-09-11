@@ -9,16 +9,19 @@ public class ViewIdService : IViewIdService
 
     public string GenerateHourly(string deviceId, DateTimeOffset eventTs)
     {
-        return $"{deviceId}|hourly|{new DateTime(eventTs.Year, eventTs.Month, eventTs.Day, eventTs.Hour, 0, 0, DateTimeKind.Utc):yyyy-MM-ddThh}";
+        var utc = eventTs.ToUniversalTime();
+        return $"{deviceId}|hourly|{utc:yyyy-MM-ddTHH}";
     }
 
     public string GenerateDaily(string deviceId, DateTimeOffset eventTs)
     {
-        return $"{deviceId}|daily|{new DateTime(eventTs.Year, eventTs.Month, eventTs.Day, 0, 0, 0, DateTimeKind.Utc):yyyy-MM-dd}";
+        var utc = eventTs.ToUniversalTime();
+        return $"{deviceId}|daily|{utc:yyyy-MM-dd}";
     }
 
     public string GenerateMonthly(string deviceId, DateTimeOffset eventTs)
     {
-        return $"{deviceId}|monthly|{new DateTime(eventTs.Year, eventTs.Month, 0, 0, 0, 0, DateTimeKind.Utc):yyyy-MM}";
+        var utc = eventTs.ToUniversalTime();
+        return $"{deviceId}|monthly|{utc:yyyy-MM}";
     }
 }
