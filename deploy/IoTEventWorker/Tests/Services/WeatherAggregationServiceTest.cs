@@ -46,11 +46,13 @@ public class WeatherAggregationServiceTest
             }
         };
 
-        var viewId = "view-id";
+        var viewId = new Id("view-id");
+        var dateId = new DateId("latest");
         var histogram = new Histogram<byte>(new byte[4], 150, DateTimeOffset.Now);
         var resampledData = new Dictionary<DateTimeOffset, float>();
 
-        _viewIdService.Setup(s => s.GenerateLatest(document.DeviceId)).Returns(viewId);
+        _viewIdService.Setup(s => s.GenerateIdLatest(document.DeviceId)).Returns(viewId);
+        _viewIdService.Setup(s => s.GenerateDateIdLatest()).Returns(dateId);
         _histogramConverter.Setup(c => c.ToHistogramModel(document.Payload.Rain)).Returns(histogram);
         _histogramAggregator.Setup(a => a.ResampleHistogram(histogram, 0.25f, 300)).Returns(resampledData);
         
@@ -58,7 +60,8 @@ public class WeatherAggregationServiceTest
         await _service.SaveLatestState(document);
         
         
-        _viewIdService.Verify(s => s.GenerateLatest("device-42"), Times.Once);
+        _viewIdService.Verify(s => s.GenerateIdLatest("device-42"), Times.Once);
+        _viewIdService.Verify(s => s.GenerateDateIdLatest(), Times.Once);
         _histogramConverter.Verify(c => c.ToHistogramModel(document.Payload.Rain), Times.Once);
         _histogramAggregator.Verify(a => a.ResampleHistogram(histogram, 0.25f, 300), Times.Once);
         _histogramAggregator.Verify(a => a.AddToHistogram(It.IsAny<Histogram<float>>(), resampledData), Times.Once);
@@ -83,7 +86,8 @@ public class WeatherAggregationServiceTest
             }
         };
 
-        _viewIdService.Setup(s => s.GenerateLatest(It.IsAny<string>())).Returns("view-id");
+        _viewIdService.Setup(s => s.GenerateIdLatest(It.IsAny<string>())).Returns(new Id("view-id"));
+        _viewIdService.Setup(s => s.GenerateDateIdLatest()).Returns(new DateId("latest"));
         _histogramConverter.Setup(c => c.ToHistogramModel(It.IsAny<RawEventDocument.Histogram>()))
             .Returns(new Histogram<byte>(new byte[4], 150, DateTimeOffset.Now));
         _histogramAggregator.Setup(a => a.ResampleHistogram(It.IsAny<Histogram<byte>>(), It.IsAny<float>(), It.IsAny<int>()))
@@ -98,7 +102,7 @@ public class WeatherAggregationServiceTest
 
 
         Assert.NotNull(savedModel);
-        Assert.Equal(document.DeviceId, savedModel.DeviceId);
+        Assert.Equal(document.DeviceId, savedModel.DeviceId.Value);
         Assert.Equal(document.EventTimestamp, savedModel.Payload.LastEventTs);
         Assert.Equal(document.id, savedModel.Payload.LastRawId);
         Assert.Equal(25.5f, savedModel.Payload.Temperature);
@@ -123,8 +127,9 @@ public class WeatherAggregationServiceTest
         _histogramConverter.Setup(c => c.ToHistogramModel(document.Payload.Rain)).Returns(histogram);
         _histogramAggregator.Setup(a => a.ResampleHistogram(histogram, 0.25f, 300)).Returns(resampledData);
         _histogramAggregator.Setup(a => a.GetUniqueHours(resampledData)).Returns(uniqueHours);
-        _viewIdService.Setup(s => s.GenerateHourly(It.IsAny<string>(), It.IsAny<DateTimeOffset>())).Returns("hourly-id");
-        _viewRepository.Setup(r => r.GetHourlyAggregate(It.IsAny<string>(), It.IsAny<string>()))
+        _viewIdService.Setup(s => s.GenerateId(It.IsAny<string>(), It.IsAny<DateTimeOffset>(), DocType.Hourly)).Returns(new Id("hourly-id"));
+        _viewIdService.Setup(s => s.GenerateDateId(It.IsAny<DateTimeOffset>(), DocType.Hourly)).Returns(new DateId("H2025-01-01T10"));
+        _viewRepository.Setup(r => r.GetHourlyAggregate(It.IsAny<Id>(), It.IsAny<DeviceId>()))
             .ReturnsAsync((AggregateModel<HourlyAggregatePayload>?)null);
 
 
@@ -154,13 +159,19 @@ public class WeatherAggregationServiceTest
             }
         };
 
-        var existingAggregate = new AggregateModel<HourlyAggregatePayload>("hourly-id", "device-42", "dateId", "HourlyAggregate",
-            new HourlyAggregatePayload
+        var existingAggregate = new AggregateModel<HourlyAggregatePayload>
+        {
+            Id = new Id("hourly-id"),
+            DeviceId = new DeviceId("device-42"),
+            DateId = new DateId("H2025-01-01T10"),
+            DocType = DocType.Hourly,
+            Payload = new HourlyAggregatePayload
             {
                 Temperature = new MetricAggregate(10.0f), // sum=10, count=1
                 Humidity = new MetricAggregate(50.0f),
                 Pressure = new MetricAggregate(1000.0f)
-            });
+            }
+        };
 
         _histogramConverter.Setup(c => c.ToHistogramModel(It.IsAny<RawEventDocument.Histogram>()))
             .Returns(new Histogram<byte>(new byte[4], 150, DateTimeOffset.Now));
@@ -168,8 +179,9 @@ public class WeatherAggregationServiceTest
             .Returns(new Dictionary<DateTimeOffset, float>());
         _histogramAggregator.Setup(a => a.GetUniqueHours(It.IsAny<Dictionary<DateTimeOffset, float>>()))
             .Returns(new HashSet<DateTimeOffset> { DateTimeOffset.Now });
-        _viewIdService.Setup(s => s.GenerateHourly(It.IsAny<string>(), It.IsAny<DateTimeOffset>())).Returns("hourly-id");
-        _viewRepository.Setup(r => r.GetHourlyAggregate("hourly-id", "device-42")).ReturnsAsync(existingAggregate);
+        _viewIdService.Setup(s => s.GenerateId(It.IsAny<string>(), It.IsAny<DateTimeOffset>(), DocType.Hourly)).Returns(new Id("hourly-id"));
+        _viewIdService.Setup(s => s.GenerateDateId(It.IsAny<DateTimeOffset>(), DocType.Hourly)).Returns(new DateId("H2025-01-01T10"));
+        _viewRepository.Setup(r => r.GetHourlyAggregate(It.IsAny<Id>(), It.IsAny<DeviceId>())).ReturnsAsync(existingAggregate);
 
         AggregateModel<HourlyAggregatePayload>? savedModel = null;
         _viewRepository.Setup(r => r.UpdateHourlyView(It.IsAny<AggregateModel<HourlyAggregatePayload>>()))
@@ -204,8 +216,9 @@ public class WeatherAggregationServiceTest
             .Returns(new Dictionary<DateTimeOffset, float>());
         _histogramAggregator.Setup(a => a.GetUniqueHours(It.IsAny<Dictionary<DateTimeOffset, float>>()))
             .Returns(new HashSet<DateTimeOffset> { hour1, hour2 });
-        _viewIdService.Setup(s => s.GenerateHourly(It.IsAny<string>(), It.IsAny<DateTimeOffset>())).Returns("hourly-id");
-        _viewRepository.Setup(r => r.GetHourlyAggregate(It.IsAny<string>(), It.IsAny<string>()))
+        _viewIdService.Setup(s => s.GenerateId(It.IsAny<string>(), It.IsAny<DateTimeOffset>(), DocType.Hourly)).Returns(new Id("hourly-id"));
+        _viewIdService.Setup(s => s.GenerateDateId(It.IsAny<DateTimeOffset>(), DocType.Hourly)).Returns(new DateId("H2025-01-01T10"));
+        _viewRepository.Setup(r => r.GetHourlyAggregate(It.IsAny<Id>(), It.IsAny<DeviceId>()))
             .ReturnsAsync((AggregateModel<HourlyAggregatePayload>?)null);
 
 

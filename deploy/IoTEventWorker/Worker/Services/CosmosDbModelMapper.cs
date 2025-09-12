@@ -14,7 +14,7 @@ public class CosmosDbModelMapper
         {
             id = model.Id,
             DeviceId = model.DeviceId,
-            DocType = model.DocType,
+            DocType = ToString(model.DocType),
             DateId = model.DateId,
             Payload = documentPayload,
             Ttl = -1,
@@ -74,12 +74,38 @@ public class CosmosDbModelMapper
         AggregateDocument<TDocPayload> document, 
         TDomainPayload domainPayload)
     {
-        return new AggregateModel<TDomainPayload>(
-            document.id,
-            document.DeviceId,
-            document.DateId,
-            document.DocType,
-            domainPayload);
+        return new AggregateModel<TDomainPayload>
+        {
+            Id = new Id(document.id),
+            DeviceId = new DeviceId(document.DeviceId),
+            DateId = new DateId(document.DateId),
+            DocType = ParseString(document.DocType),
+            Payload = domainPayload
+        };
+    }
+
+    public string ToString(DocType docType)
+    {
+        return docType switch
+        {
+            DocType.Latest => "LatestState",
+            DocType.Hourly => "HourlyAggregate",
+            DocType.Daily => "DailyAggregate",
+            DocType.Monthly => "MonthlyAggregate",
+            _ => throw new ArgumentOutOfRangeException(nameof(docType), docType, null)
+        };
+    }
+
+    public DocType ParseString(string s)
+    {
+        return s switch
+        {
+            "LatestState" => DocType.Latest,
+            "HourlyAggregate" => DocType.Hourly,
+            "DailyAggregate" => DocType.Daily,
+            "MonthlyAggregate" => DocType.Monthly,
+            _ => throw new ArgumentOutOfRangeException(nameof(s), s, null)
+        };
     }
     
     public AggregateModel<HourlyAggregatePayload> FromDocument(AggregateDocument<HourlyAggregatePayloadDocument> doc)

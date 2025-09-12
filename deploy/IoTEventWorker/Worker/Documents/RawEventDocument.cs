@@ -3,6 +3,7 @@ using Newtonsoft.Json;
 
 namespace Worker.Documents;
 
+//TODO make domain object
 public class RawEventDocument
 {
     [JsonProperty("id")]

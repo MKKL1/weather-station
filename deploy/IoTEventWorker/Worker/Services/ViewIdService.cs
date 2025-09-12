@@ -1,50 +1,42 @@
-﻿namespace Worker.Services;
+﻿using Worker.Models;
+
+namespace Worker.Services;
 
 public class ViewIdService : IViewIdService
 {
-    public string GenerateLatest(string deviceId)
+    public Id GenerateIdLatest(string deviceId)
     {
-        return $"{deviceId}|latest";
+        return new Id($"{deviceId}|latest");
     }
 
-    public string GenerateHourly(string deviceId, DateTimeOffset eventTs)
+    public Id GenerateId(string deviceId, DateTimeOffset eventTs, DocType docType)
     {
         var utc = eventTs.ToUniversalTime();
-        return $"{deviceId}|hourly|{utc:yyyy-MM-ddTHH}";
+        return docType switch
+        {
+            DocType.Latest => GenerateIdLatest(deviceId),
+            DocType.Hourly => new Id($"{deviceId}|hourly|{utc:yyyy-MM-ddTHH}"),
+            DocType.Daily => new Id($"{deviceId}|daily|{utc:yyyy-MM-dd}"),
+            DocType.Monthly => new Id($"{deviceId}|monthly|{utc:yyyy-MM}"),
+            _ => throw new ArgumentOutOfRangeException(nameof(docType), docType, null)
+        };
     }
 
-    public string GenerateDaily(string deviceId, DateTimeOffset eventTs)
+    public DateId GenerateDateIdLatest()
+    {
+        return new DateId("latest");
+    }
+
+    public DateId GenerateDateId(DateTimeOffset eventTs, DocType docType)
     {
         var utc = eventTs.ToUniversalTime();
-        return $"{deviceId}|daily|{utc:yyyy-MM-dd}";
-    }
-
-    public string GenerateMonthly(string deviceId, DateTimeOffset eventTs)
-    {
-        var utc = eventTs.ToUniversalTime();
-        return $"{deviceId}|monthly|{utc:yyyy-MM}";
-    }
-
-    public string GenerateDateIdLatest()
-    {
-        return "latest";
-    }
-
-    public string GenerateDateIdHourly(DateTimeOffset eventTs)
-    {
-        var utc = eventTs.ToUniversalTime();
-        return $"H{utc:yyyy-MM-ddTHH}";
-    }
-
-    public string GenerateDateIdDaily(DateTimeOffset eventTs)
-    {
-        var utc = eventTs.ToUniversalTime();
-        return $"D{utc:yyyy-MM-dd}";
-    }
-
-    public string GenerateDateIdMonthly(DateTimeOffset eventTs)
-    {
-        var utc = eventTs.ToUniversalTime();
-        return $"M{utc:yyyy-MM}";
+        return docType switch
+        {
+            DocType.Latest => GenerateDateIdLatest(),
+            DocType.Hourly => new DateId($"H{utc:yyyy-MM-ddTHH}"),
+            DocType.Daily => new DateId($"D{utc:yyyy-MM-dd}"),
+            DocType.Monthly => new DateId($"M{utc:yyyy-MM}"),
+            _ => throw new ArgumentOutOfRangeException(nameof(docType), docType, null)
+        };
     }
 }
