@@ -87,7 +87,7 @@ public class HistogramAggregator: IHistogramAggregator
     {
         foreach (var (t, rainfall) in rainfallBuckets)
         {
-            if (hist.StartTime < t) 
+            if (t < hist.StartTime) 
                 continue;
             
             var slotIdx = (int)Math.Floor((t - hist.StartTime).TotalSeconds)/hist.SlotSecs;

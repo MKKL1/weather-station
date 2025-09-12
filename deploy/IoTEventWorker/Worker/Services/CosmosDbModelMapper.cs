@@ -15,8 +15,9 @@ public class CosmosDbModelMapper
             id = model.Id,
             DeviceId = model.DeviceId,
             DocType = model.DocType,
+            DateId = model.DateId,
             Payload = documentPayload,
-            Ttl = -1
+            Ttl = -1,
         };
     }
     
@@ -77,6 +78,7 @@ public class CosmosDbModelMapper
         return new AggregateModel<TDomainPayload>(
             document.id,
             document.DeviceId,
+            document.DateId,
             document.DocType,
             domainPayload);
     }

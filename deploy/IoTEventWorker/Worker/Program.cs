@@ -29,8 +29,8 @@ builder.Services.AddSingleton<IViewRepository, CosmosDbViewRepository>(_ =>
 
 builder.Services.AddSingleton<IViewIdService, ViewIdService>(_ => new ViewIdService());
 builder.Services.AddSingleton<IHistogramConverter, HistogramConverter>(_ => new HistogramConverter());
-builder.Services.AddSingleton<IHistogramAggregator, HistogramAggregator>();
-builder.Services.AddSingleton<IProtoModelMapper, ProtoModelMapper>();
+builder.Services.AddSingleton<IHistogramAggregator, HistogramAggregator>(_ => new HistogramAggregator());
+builder.Services.AddSingleton<IProtoModelMapper, ProtoModelMapper>(_ => new ProtoModelMapper());
 
 builder.Services.AddSingleton<IWeatherAggregationService, WeatherAggregationService>(sp =>
     new WeatherAggregationService(

@@ -5,7 +5,7 @@ using Proto;
 using Worker.Documents;
 
 namespace Worker;
-public class OnIotHubEventSaveToComos(ILogger<OnIotHubEventSaveToComos> logger, ProtoModelMapper protoModelMapper)
+public class OnIotHubEventSaveToComos(ILogger<OnIotHubEventSaveToComos> logger, IProtoModelMapper protoModelMapper)
 {
     private const string EntityPartitionKey = "WeatherReport";
 
@@ -25,6 +25,7 @@ public class OnIotHubEventSaveToComos(ILogger<OnIotHubEventSaveToComos> logger, 
                 //Keeping it simple
                 var proto = WeatherData.Parser.ParseFrom(eventData.EventBody);
                 var entity = protoModelMapper.ToDocument(proto, EntityPartitionKey);
+                //TODO if event ts > 24h, ignore
                 successfulEntities.Add(entity);
             }
             catch (Exception e)

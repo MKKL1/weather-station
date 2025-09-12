@@ -14,6 +14,10 @@ public class AggregateDocument<T>
     [JsonProperty("docType")]
     [JsonPropertyName("docType")]
     public required string DocType { get; set; }
+    [JsonProperty("dateId")]
+    [JsonPropertyName("dateId")]
+    public required string DateId { get; set; }
+    
     [JsonProperty("payload")]
     [JsonPropertyName("payload")]
     public required T Payload { get; set; }

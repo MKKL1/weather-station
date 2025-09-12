@@ -15,6 +15,7 @@ public class WeatherAggregationService(
     {
         //TODO save only newer event (if events come out of order)
         var id = viewIdService.GenerateLatest(document.DeviceId);
+        var dateId = viewIdService.GenerateDateIdLatest();
         
         var resampledRainHistogram = histogramAggregator.ResampleHistogram( 
             histogramConverter.ToHistogramModel(document.Payload.Rain),
@@ -26,6 +27,7 @@ public class WeatherAggregationService(
         var model = new AggregateModel<LatestStatePayload>(
             id,
             document.DeviceId,
+            dateId,
             "LatestState",
             new LatestStatePayload
             {
@@ -49,16 +51,18 @@ public class WeatherAggregationService(
             HourlyAggregateBucketSeconds); 
     
         var mainId = viewIdService.GenerateHourly(document.DeviceId, document.EventTimestamp);
-        var mainAggregate = await GetOrCreateHourlyAggregate(mainId, document.DeviceId);
+        var mainDateId = viewIdService.GenerateDateIdHourly(document.EventTimestamp);
+        var mainAggregate = await GetOrCreateHourlyAggregate(mainId, mainDateId, document.DeviceId);
 
         var models = new List<AggregateModel<HourlyAggregatePayload>>();
         foreach (var h in histogramAggregator.GetUniqueHours(resampledRainHistogram))
         {
             var id = viewIdService.GenerateHourly(document.DeviceId, h);
+            var dateId = viewIdService.GenerateDateIdHourly(document.EventTimestamp);
             
             var hourlyAggregate = id == mainId
                 ? mainAggregate
-                : await GetOrCreateHourlyAggregate(id, document.DeviceId);
+                : await GetOrCreateHourlyAggregate(id, dateId, document.DeviceId);
 
             hourlyAggregate.Payload.Rain ??= new Histogram<float>(new float[12], 12, 300, h);
             histogramAggregator.AddToHistogram(hourlyAggregate.Payload.Rain, resampledRainHistogram);
@@ -82,13 +86,12 @@ public class WeatherAggregationService(
         return metricAggregate;
     }
 
-    private async Task<AggregateModel<HourlyAggregatePayload>> GetOrCreateHourlyAggregate(string mainHourlyId, string deviceId)
+    private async Task<AggregateModel<HourlyAggregatePayload>> GetOrCreateHourlyAggregate(string mainHourlyId, string dateId, string deviceId)
     {
         var response = await viewRepository.GetHourlyAggregate(mainHourlyId, deviceId);
         if (response != null) return response;
         
-        return new AggregateModel<HourlyAggregatePayload>(mainHourlyId, deviceId, "HourlyAggregate",
-            new HourlyAggregatePayload());
+        return new AggregateModel<HourlyAggregatePayload>(mainHourlyId, deviceId, dateId, "HourlyAggregate", new HourlyAggregatePayload());
 
     }
 }

@@ -1,4 +1,5 @@
-﻿using Worker;
+﻿using System.Reflection;
+using Worker;
 using Worker.Models;
 using Xunit;
 
@@ -46,13 +47,210 @@ public class HistogramAggregatorTest
 
         var expected = new Dictionary<DateTimeOffset, float>
         {
-            [CreateForConstDay(15, 16, 0)] = 5f,
+            [CreateForConstDay(15, 15, 0)] = 5f,
             [CreateForConstDay(15, 20, 0)] = 15f,
-            [CreateForConstDay(15, 24, 0)] = 15f
+            [CreateForConstDay(15, 25, 0)] = 15f
         };
 
         Assert.Equal(expected, actual);
     }
     
+    [Fact]
+    public void ResampleHistogram_WhenEmptyBuckets_ReturnEmptyDictionary()
+    {
+        var histogram = new Histogram<int>([0,0,0,0,0,0], 6, 120, 
+            CreateForConstDay(15, 18, 0));
+        const float mmPerTip = 5f;
+        const int target = 300; //5 minutes
+        
+        var actual = _aggregator.ResampleHistogram(histogram, mmPerTip, target);
+
+        var expected = new Dictionary<DateTimeOffset, float>();
+
+        Assert.Equal(expected, actual);
+    }
     
+    [Fact]
+    public void ResampleHistogram_WhenSlotSecsGreaterThanTarget_ThrowException()
+    {
+        var histogram = new Histogram<int>([1,1,0,5,0,0], 6, 120, 
+            CreateForConstDay(15, 18, 0));
+        const float mmPerTip = 5f;
+        const int target = 100; //Less than 120
+        
+        Assert.Throws<ArgumentException>(() => _aggregator.ResampleHistogram(histogram, mmPerTip, target));
+    }
+    
+    [Theory]
+    [InlineData(typeof(byte))]
+    [InlineData(typeof(ushort))]
+    public void ResampleHistogram_ForDifferentHistogramTypes_ReturnCorrectBuckets(Type t)
+    {
+        var ints = new[] { 1, 0, 1, 2, 1, 0 };
+        var arr = Array.CreateInstance(t, ints.Length);
+        for (int i = 0; i < ints.Length; i++)
+        {
+            arr.SetValue(Convert.ChangeType(ints[i], t), i);
+        }
+        
+        var histogramType = typeof(Histogram<>).MakeGenericType(t);
+        var histogram = Activator.CreateInstance(
+            histogramType, arr, 6, 120, CreateForConstDay(15, 18, 0));
+
+        const float mmPerTip = 5f;
+        const int target = 240;
+        
+        var method = _aggregator.GetType()
+            .GetMethods(BindingFlags.Instance | BindingFlags.Public)
+            .First(m => m.Name == "ResampleHistogram" && m.IsGenericMethodDefinition);
+
+        var generic = method.MakeGenericMethod(t);
+        var actualObj = generic.Invoke(_aggregator, [histogram, mmPerTip, target]);
+
+        var actual = (IDictionary<DateTimeOffset, float>)actualObj;
+
+        var expected = new Dictionary<DateTimeOffset, float>
+        {
+            [CreateForConstDay(15,16,0)] = 5f,
+            [CreateForConstDay(15,20,0)] = 5f,
+            [CreateForConstDay(15,24,0)] = 15f
+        };
+
+        Assert.Equal(expected, actual);
+    }
+    
+    [Fact]
+    public void ResampleHistogram_WhenHistogramPassesMultipleHours_ReturnCorrectBuckets()
+    {
+        var ints = new int[32];
+        ints[0] = 1;
+        ints[8] = 2;
+        ints[12] = 1;
+        ints[30] = 2;
+        
+        var histogram = new Histogram<int>(ints, 32, 160, 
+            CreateForConstDay(15, 45, 4));
+        const float mmPerTip = 5f;
+        const int target = 300; //5 minutes
+        
+        var actual = _aggregator.ResampleHistogram(histogram, mmPerTip, target);
+
+        var expected = new Dictionary<DateTimeOffset, float>
+        {
+            [CreateForConstDay(15,45,0)] = 5f,
+            [CreateForConstDay(16,05,0)] = 10f,
+            [CreateForConstDay(16,15,0)] = 5f,
+            [CreateForConstDay(17,05,0)] = 10f,
+        };
+        Assert.Equal(expected, actual);
+    }
+    
+    [Fact]
+    public void AddToHistogram_WhenRainfallTimeBeforeHistogramStart_ThenSkipEntry()
+    {
+        var startTime = CreateForConstDay(15, 10, 0);
+        var hist = new Histogram<float>(new float[3], 3, 60, startTime);
+        var rainfallBuckets = new Dictionary<DateTimeOffset, float>
+        {
+            [CreateForConstDay(15, 9, 0)] = 5.0f, //Before start
+            [CreateForConstDay(15, 10, 0)] = 4.0f,
+            [CreateForConstDay(15, 11, 0)] = 3.0f
+        };
+        
+        _aggregator.AddToHistogram(hist, rainfallBuckets);
+        
+        Assert.Equal(4.0f, hist.Tips[0]);
+        Assert.Equal(3.0f, hist.Tips[1]);
+    }
+    
+    [Fact]
+    public void AddToHistogram_WhenRainfallTimeAfterHistogramEnd_ThenSkipEntry()
+    {
+        // Arrange
+        var startTime = CreateForConstDay(15, 10, 0);
+        var hist = new Histogram<float>(new float[3], 3, 60, startTime);
+        var rainfallBuckets = new Dictionary<DateTimeOffset, float>
+        {
+            [CreateForConstDay(15, 10, 30)] = 3.0f,
+            [CreateForConstDay(15, 13, 30)] = 5.0f // Beyond histogram end
+        };
+        
+        _aggregator.AddToHistogram(hist, rainfallBuckets);
+        
+        Assert.Equal([3.0f, 0f, 0f], hist.Tips);
+    }
+    
+    [Fact]
+    public void AddToHistogram_WhenBucketsFit_ReturnCorrectHistogram()
+    {
+        var startTime = CreateForConstDay(15, 10, 0);
+        var hist = new Histogram<float>(new float[3], 3, 60, startTime);
+        var rainfallBuckets = new Dictionary<DateTimeOffset, float>
+        {
+            [CreateForConstDay(15, 10, 30)] = 2.0f,
+            [CreateForConstDay(15, 11, 15)] = 4.0f,
+            [CreateForConstDay(15, 12, 45)] = 1.0f
+        };
+        
+        _aggregator.AddToHistogram(hist, rainfallBuckets);
+
+        Assert.Equal([2.0f, 4.0f, 1.0f], hist.Tips);
+    }
+    
+    [Fact]
+    public void AddToHistogram_WhenMultipleRainfallInSameSlot_ThenUseMaximum()
+    {
+        var startTime = CreateForConstDay(15, 10, 0);
+        var hist = new Histogram<float>(new float[2], 2, 60, startTime);
+        var rainfallBuckets = new Dictionary<DateTimeOffset, float>
+        {
+            [CreateForConstDay(15, 10, 10)] = 2.0f,
+            [CreateForConstDay(15, 10, 30)] = 5.0f,
+            [CreateForConstDay(15, 10, 50)] = 3.0f
+        };
+        
+        _aggregator.AddToHistogram(hist, rainfallBuckets);
+        
+        Assert.Equal([5f, 0f], hist.Tips);
+    }
+    
+    [Fact]
+    public void AddToHistogram_WhenHistogramAlreadyHasValues_ThenUseMaximumWithExisting()
+    {
+        var startTime = CreateForConstDay(15, 10, 0);
+        var hist = new Histogram<float>([3.0f, 1.0f], 2, 60, startTime);
+        var rainfallBuckets = new Dictionary<DateTimeOffset, float>
+        {
+            [CreateForConstDay(15, 10, 30)] = 2.0f,
+            [CreateForConstDay(15, 11, 30)] = 4.0f
+        };
+        
+        _aggregator.AddToHistogram(hist, rainfallBuckets);
+        
+        Assert.Equal([3f, 4f], hist.Tips);
+    }
+
+    [Fact]
+    public void GetUniqueHours_WhenRepeatingHours_ReturnUnique()
+    {
+        var rainfallBuckets = new Dictionary<DateTimeOffset, float>
+        {
+            [CreateForConstDay(15, 10, 30)] = 2.0f,
+            [CreateForConstDay(15, 15, 30)] = 4.0f,
+            [CreateForConstDay(16, 25, 30)] = 4.0f,
+            [CreateForConstDay(17, 11, 30)] = 4.0f,
+            [CreateForConstDay(17, 31, 30)] = 4.0f,
+            [CreateForConstDay(16, 15, 30)] = 4.0f,
+            [CreateForConstDay(15, 21, 30)] = 4.0f,
+            [CreateForConstDay(16, 15, 30)] = 4.0f,
+            [CreateForConstDay(16, 21, 30)] = 4.0f,
+            [CreateForConstDay(16, 14, 30)] = 4.0f,
+        };
+
+        var actual = _aggregator.GetUniqueHours(rainfallBuckets);
+        var t = CreateForConstDay(15, 10, 30);
+        Assert.Equal([new DateTimeOffset(t.Year, t.Month, t.Day, 15, 0, 0, t.Offset), 
+            new DateTimeOffset(t.Year, t.Month, t.Day, 16, 0, 0, t.Offset),
+            new DateTimeOffset(t.Year, t.Month, t.Day, 17, 0, 0, t.Offset)], actual);
+    }
 }
