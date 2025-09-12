@@ -18,7 +18,7 @@ public class HistogramAggregatorTest
     [Fact]
     public void ResampleHistogram_WhenBucketsAligned_ReturnCorrectBuckets()
     {
-        var histogram = new Histogram<int>([1, 0, 1, 2, 1, 0], 6, 120, 
+        var histogram = new Histogram<int>([1, 0, 1, 2, 1, 0], 120, 
             CreateForConstDay(15, 18, 0));
         const float mmPerTip = 5f;
         const int target = 240; //4 minutes
@@ -38,7 +38,7 @@ public class HistogramAggregatorTest
     [Fact]
     public void ResampleHistogram_WhenBucketsNotAligned_ReturnCorrectBuckets()
     {
-        var histogram = new Histogram<int>([1, 0, 1, 4, 1, 0], 6, 120, 
+        var histogram = new Histogram<int>([1, 0, 1, 4, 1, 0], 120, 
             CreateForConstDay(15, 18, 0));
         const float mmPerTip = 5f;
         const int target = 300; //5 minutes
@@ -58,7 +58,7 @@ public class HistogramAggregatorTest
     [Fact]
     public void ResampleHistogram_WhenEmptyBuckets_ReturnEmptyDictionary()
     {
-        var histogram = new Histogram<int>([0,0,0,0,0,0], 6, 120, 
+        var histogram = new Histogram<int>([0,0,0,0,0,0], 120, 
             CreateForConstDay(15, 18, 0));
         const float mmPerTip = 5f;
         const int target = 300; //5 minutes
@@ -73,7 +73,7 @@ public class HistogramAggregatorTest
     [Fact]
     public void ResampleHistogram_WhenSlotSecsGreaterThanTarget_ThrowException()
     {
-        var histogram = new Histogram<int>([1,1,0,5,0,0], 6, 120, 
+        var histogram = new Histogram<int>([1,1,0,5,0,0], 120, 
             CreateForConstDay(15, 18, 0));
         const float mmPerTip = 5f;
         const int target = 100; //Less than 120
@@ -81,6 +81,8 @@ public class HistogramAggregatorTest
         Assert.Throws<ArgumentException>(() => _aggregator.ResampleHistogram(histogram, mmPerTip, target));
     }
     
+    //I am not sure if checking different types is good for unit testing
+    //It also uses generics which may not be the best idea
     [Theory]
     [InlineData(typeof(byte))]
     [InlineData(typeof(ushort))]
@@ -95,7 +97,7 @@ public class HistogramAggregatorTest
         
         var histogramType = typeof(Histogram<>).MakeGenericType(t);
         var histogram = Activator.CreateInstance(
-            histogramType, arr, 6, 120, CreateForConstDay(15, 18, 0));
+            histogramType, arr, 120, CreateForConstDay(15, 18, 0));
 
         const float mmPerTip = 5f;
         const int target = 240;
@@ -128,7 +130,7 @@ public class HistogramAggregatorTest
         ints[12] = 1;
         ints[30] = 2;
         
-        var histogram = new Histogram<int>(ints, 32, 160, 
+        var histogram = new Histogram<int>(ints, 160, 
             CreateForConstDay(15, 45, 4));
         const float mmPerTip = 5f;
         const int target = 300; //5 minutes
@@ -149,7 +151,7 @@ public class HistogramAggregatorTest
     public void AddToHistogram_WhenRainfallTimeBeforeHistogramStart_ThenSkipEntry()
     {
         var startTime = CreateForConstDay(15, 10, 0);
-        var hist = new Histogram<float>(new float[3], 3, 60, startTime);
+        var hist = new Histogram<float>(new float[3], 60, startTime);
         var rainfallBuckets = new Dictionary<DateTimeOffset, float>
         {
             [CreateForConstDay(15, 9, 0)] = 5.0f, //Before start
@@ -159,8 +161,8 @@ public class HistogramAggregatorTest
         
         _aggregator.AddToHistogram(hist, rainfallBuckets);
         
-        Assert.Equal(4.0f, hist.Tips[0]);
-        Assert.Equal(3.0f, hist.Tips[1]);
+        Assert.Equal(4.0f, hist.Data[0]);
+        Assert.Equal(3.0f, hist.Data[1]);
     }
     
     [Fact]
@@ -168,7 +170,7 @@ public class HistogramAggregatorTest
     {
         // Arrange
         var startTime = CreateForConstDay(15, 10, 0);
-        var hist = new Histogram<float>(new float[3], 3, 60, startTime);
+        var hist = new Histogram<float>(new float[3], 60, startTime);
         var rainfallBuckets = new Dictionary<DateTimeOffset, float>
         {
             [CreateForConstDay(15, 10, 30)] = 3.0f,
@@ -177,14 +179,14 @@ public class HistogramAggregatorTest
         
         _aggregator.AddToHistogram(hist, rainfallBuckets);
         
-        Assert.Equal([3.0f, 0f, 0f], hist.Tips);
+        Assert.Equal([3.0f, 0f, 0f], hist.Data);
     }
     
     [Fact]
     public void AddToHistogram_WhenBucketsFit_ReturnCorrectHistogram()
     {
         var startTime = CreateForConstDay(15, 10, 0);
-        var hist = new Histogram<float>(new float[3], 3, 60, startTime);
+        var hist = new Histogram<float>(new float[3], 60, startTime);
         var rainfallBuckets = new Dictionary<DateTimeOffset, float>
         {
             [CreateForConstDay(15, 10, 30)] = 2.0f,
@@ -194,14 +196,14 @@ public class HistogramAggregatorTest
         
         _aggregator.AddToHistogram(hist, rainfallBuckets);
 
-        Assert.Equal([2.0f, 4.0f, 1.0f], hist.Tips);
+        Assert.Equal([2.0f, 4.0f, 1.0f], hist.Data);
     }
     
     [Fact]
     public void AddToHistogram_WhenMultipleRainfallInSameSlot_ThenUseMaximum()
     {
         var startTime = CreateForConstDay(15, 10, 0);
-        var hist = new Histogram<float>(new float[2], 2, 60, startTime);
+        var hist = new Histogram<float>(new float[2], 60, startTime);
         var rainfallBuckets = new Dictionary<DateTimeOffset, float>
         {
             [CreateForConstDay(15, 10, 10)] = 2.0f,
@@ -211,14 +213,14 @@ public class HistogramAggregatorTest
         
         _aggregator.AddToHistogram(hist, rainfallBuckets);
         
-        Assert.Equal([5f, 0f], hist.Tips);
+        Assert.Equal([5f, 0f], hist.Data);
     }
     
     [Fact]
     public void AddToHistogram_WhenHistogramAlreadyHasValues_ThenUseMaximumWithExisting()
     {
         var startTime = CreateForConstDay(15, 10, 0);
-        var hist = new Histogram<float>([3.0f, 1.0f], 2, 60, startTime);
+        var hist = new Histogram<float>([3.0f, 1.0f], 60, startTime);
         var rainfallBuckets = new Dictionary<DateTimeOffset, float>
         {
             [CreateForConstDay(15, 10, 30)] = 2.0f,
@@ -227,7 +229,7 @@ public class HistogramAggregatorTest
         
         _aggregator.AddToHistogram(hist, rainfallBuckets);
         
-        Assert.Equal([3f, 4f], hist.Tips);
+        Assert.Equal([3f, 4f], hist.Data);
     }
 
     [Fact]

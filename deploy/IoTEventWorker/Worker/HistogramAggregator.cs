@@ -18,16 +18,16 @@ public class HistogramAggregator: IHistogramAggregator
     public Dictionary<DateTimeOffset, float> ResampleHistogram<T>(Histogram<T> hist, float mmPerTip, int targetSlotSeconds) 
         where T : IBinaryInteger<T>
     {
-        if (hist.SlotSecs > targetSlotSeconds)
+        if (hist.IntervalSeconds > targetSlotSeconds)
         {
             throw new ArgumentException(
-                $"Histogram slot size ({hist.SlotSecs}) cannot be greater than target slot size ({targetSlotSeconds}). " +
+                $"Histogram slot size ({hist.IntervalSeconds}) cannot be greater than target slot size ({targetSlotSeconds}). " +
                 $"Resampling to smaller histogram is not supported",
                 nameof(targetSlotSeconds));
         }
-        var tipData = hist.Tips;
+        var tipData = hist.Data;
         var startTimeUnix = hist.StartTime.ToUnixTimeSeconds();
-        var slotSeconds = hist.SlotSecs;
+        var slotSeconds = hist.IntervalSeconds;
 
         var bins = new Dictionary<long, float>();
         
@@ -90,11 +90,11 @@ public class HistogramAggregator: IHistogramAggregator
             if (t < hist.StartTime) 
                 continue;
             
-            var slotIdx = (int)Math.Floor((t - hist.StartTime).TotalSeconds)/hist.SlotSecs;
+            var slotIdx = (int)Math.Floor((t - hist.StartTime).TotalSeconds)/hist.IntervalSeconds;
             if(slotIdx < 0 || slotIdx >= hist.SlotCount) 
                 continue;
             
-            hist.Tips[slotIdx] = Math.Max(hist.Tips[slotIdx], rainfall);
+            hist.Data[slotIdx] = Math.Max(hist.Data[slotIdx], rainfall);
         }
     }
 

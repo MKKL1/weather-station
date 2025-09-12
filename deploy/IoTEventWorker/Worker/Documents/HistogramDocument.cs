@@ -9,10 +9,6 @@ public class HistogramDocument<T>
     [JsonPropertyName("data")]
     public List<T> Data { get; set; }
 
-    [JsonProperty("slotCount")]
-    [JsonPropertyName("slotCount")]
-    public int SlotCount { get; set; }
-
     [JsonProperty("slotSecs")]
     [JsonPropertyName("slotSecs")]
     public int SlotSecs { get; set; }

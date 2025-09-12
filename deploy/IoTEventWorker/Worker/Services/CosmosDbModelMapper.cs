@@ -53,9 +53,8 @@ public class CosmosDbModelMapper
     {
         return new HistogramDocument<T>
         {
-            Data = histogram.Tips.ToList(),
-            SlotCount = histogram.SlotCount,
-            SlotSecs = histogram.SlotSecs,
+            Data = histogram.Data.ToList(),
+            SlotSecs = histogram.IntervalSeconds,
             StartTime = histogram.StartTime
         };
     }
@@ -118,6 +117,6 @@ public class CosmosDbModelMapper
 
     public Histogram<T> FromDocument<T>(HistogramDocument<T> doc)
     {
-        return new Histogram<T>(doc.Data.ToArray(), doc.SlotCount, doc.SlotSecs, doc.StartTime);
+        return new Histogram<T>(doc.Data.ToArray(), doc.SlotSecs, doc.StartTime);
     }
 }

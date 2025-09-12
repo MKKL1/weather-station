@@ -47,7 +47,7 @@ public class WeatherAggregationServiceTest
         };
 
         var viewId = "view-id";
-        var histogram = new Histogram<byte>(new byte[4], 4, 150, DateTimeOffset.Now);
+        var histogram = new Histogram<byte>(new byte[4], 150, DateTimeOffset.Now);
         var resampledData = new Dictionary<DateTimeOffset, float>();
 
         _viewIdService.Setup(s => s.GenerateLatest(document.DeviceId)).Returns(viewId);
@@ -85,7 +85,7 @@ public class WeatherAggregationServiceTest
 
         _viewIdService.Setup(s => s.GenerateLatest(It.IsAny<string>())).Returns("view-id");
         _histogramConverter.Setup(c => c.ToHistogramModel(It.IsAny<RawEventDocument.Histogram>()))
-            .Returns(new Histogram<byte>(new byte[4], 4, 150, DateTimeOffset.Now));
+            .Returns(new Histogram<byte>(new byte[4], 150, DateTimeOffset.Now));
         _histogramAggregator.Setup(a => a.ResampleHistogram(It.IsAny<Histogram<byte>>(), It.IsAny<float>(), It.IsAny<int>()))
             .Returns(new Dictionary<DateTimeOffset, float>());
 
@@ -116,7 +116,7 @@ public class WeatherAggregationServiceTest
             Payload = new RawEventDocument.PayloadBody { RainfallMMPerTip = 0.25f, Rain = new RawEventDocument.Histogram() }
         };
 
-        var histogram = new Histogram<byte>(new byte[4], 4, 150, DateTimeOffset.Now);
+        var histogram = new Histogram<byte>(new byte[4], 150, DateTimeOffset.Now);
         var resampledData = new Dictionary<DateTimeOffset, float>();
         var uniqueHours = new HashSet<DateTimeOffset> { DateTimeOffset.Now };
 
@@ -163,7 +163,7 @@ public class WeatherAggregationServiceTest
             });
 
         _histogramConverter.Setup(c => c.ToHistogramModel(It.IsAny<RawEventDocument.Histogram>()))
-            .Returns(new Histogram<byte>(new byte[4], 4, 150, DateTimeOffset.Now));
+            .Returns(new Histogram<byte>(new byte[4], 150, DateTimeOffset.Now));
         _histogramAggregator.Setup(a => a.ResampleHistogram(It.IsAny<Histogram<byte>>(), It.IsAny<float>(), It.IsAny<int>()))
             .Returns(new Dictionary<DateTimeOffset, float>());
         _histogramAggregator.Setup(a => a.GetUniqueHours(It.IsAny<Dictionary<DateTimeOffset, float>>()))
@@ -199,7 +199,7 @@ public class WeatherAggregationServiceTest
         var hour2 = new DateTimeOffset(2025, 1, 1, 11, 0, 0, TimeSpan.Zero);
 
         _histogramConverter.Setup(c => c.ToHistogramModel(It.IsAny<RawEventDocument.Histogram>()))
-            .Returns(new Histogram<byte>(new byte[4], 4, 150, DateTimeOffset.Now));
+            .Returns(new Histogram<byte>(new byte[4], 150, DateTimeOffset.Now));
         _histogramAggregator.Setup(a => a.ResampleHistogram(It.IsAny<Histogram<byte>>(), It.IsAny<float>(), It.IsAny<int>()))
             .Returns(new Dictionary<DateTimeOffset, float>());
         _histogramAggregator.Setup(a => a.GetUniqueHours(It.IsAny<Dictionary<DateTimeOffset, float>>()))

@@ -1,9 +1,9 @@
 ﻿namespace Worker.Models;
 
-public class Histogram<T>(T[] tips, int slotCount, int slotSecs, DateTimeOffset startTime)
+public class Histogram<T>(T[] data, int intervalSeconds, DateTimeOffset startTime)
 {
-    public T[] Tips { get; } = tips;
-    public int SlotCount { get; } = slotCount;//TODO slot count not really needed here, as it can be taken from Tips.Length
-    public int SlotSecs { get; } = slotSecs;
+    public T[] Data { get; } = data;
+    public int SlotCount => Data.Length;
+    public int IntervalSeconds { get; } = intervalSeconds;
     public DateTimeOffset StartTime { get; } = startTime;
 }

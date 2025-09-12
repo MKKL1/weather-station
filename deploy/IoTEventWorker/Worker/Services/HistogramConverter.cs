@@ -9,7 +9,7 @@ public class HistogramConverter: IHistogramConverter
     {
         int slotCount = histogramDocument.SlotCount;
         var tips = DecodeTipsFromBase64(histogramDocument.Data, slotCount);
-        return new Histogram<byte>(tips, histogramDocument.SlotCount, histogramDocument.SlotSecs, histogramDocument.StartTime);
+        return new Histogram<byte>(tips, histogramDocument.SlotSecs, histogramDocument.StartTime);
     }
 
     private static byte[] DecodeTipsFromBase64(string base64Data, int slotCount)

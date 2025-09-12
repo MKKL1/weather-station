@@ -24,9 +24,9 @@ public class HistogramConverterTest
 
         Assert.NotNull(model);
         Assert.Equal(4, model.SlotCount);
-        Assert.Equal(5, model.SlotSecs);
+        Assert.Equal(5, model.IntervalSeconds);
         Assert.Equal(doc.StartTime, model.StartTime);
         
-        Assert.Equal(new byte[] { 1, 2, 3, 4 }, model.Tips);
+        Assert.Equal(new byte[] { 1, 2, 3, 4 }, model.Data);
     }
 }
