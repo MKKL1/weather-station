@@ -75,7 +75,7 @@ resource "azurerm_service_plan" "asp" {
   resource_group_name = azurerm_resource_group.rg.name
   location            = var.location
   os_type             = "Linux"
-  sku_name            = "B1"
+  sku_name            = "Y1"
 }
 
 resource "azurerm_cosmosdb_account" "this" {
@@ -111,8 +111,25 @@ resource "azurerm_cosmosdb_sql_container" "this" {
   account_name        = azurerm_cosmosdb_account.this.name
   database_name       = azurerm_cosmosdb_sql_database.this.name
 
-  partition_key_paths = ["/eventType"]
-  #throughput          = 400
+  partition_key_paths = ["/deviceId"]
+}
+
+resource "azurerm_cosmosdb_sql_container" "views" {
+  name                = "${var.project_name}-views"
+  resource_group_name = azurerm_resource_group.rg.name
+  account_name        = azurerm_cosmosdb_account.this.name
+  database_name       = azurerm_cosmosdb_sql_database.this.name
+
+  partition_key_paths = ["/deviceId"]
+}
+
+resource "azurerm_cosmosdb_sql_container" "leases" {
+  name                = "${var.project_name}-leases"
+  resource_group_name = azurerm_resource_group.rg.name
+  account_name        = azurerm_cosmosdb_account.this.name
+  database_name       = azurerm_cosmosdb_sql_database.this.name
+
+  partition_key_paths = ["/id"]
 }
 
 resource "azurerm_linux_function_app" "function_app" {
@@ -142,6 +159,8 @@ resource "azurerm_linux_function_app" "function_app" {
     COSMOS_CONNECTION = azurerm_cosmosdb_account.this.primary_sql_connection_string
     COSMOS_DATABASE   = azurerm_cosmosdb_sql_database.this.name
     COSMOS_CONTAINER  = azurerm_cosmosdb_sql_container.this.name
+    COSMOS_VIEWS_CONTAINER  = azurerm_cosmosdb_sql_container.views.name
+    COSMOS_LEASE_CONTAINER = azurerm_cosmosdb_sql_container.leases.name
   }
 }
 

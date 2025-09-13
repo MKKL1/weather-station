@@ -1,0 +1,108 @@
+﻿using Worker.Infrastructure.Documents;
+using Worker.Mappers;
+using Worker.Models;
+using Worker.Repositories;
+
+namespace Worker.Services;
+
+/// <inheritdoc cref="IWeatherAggregationService"/>
+public class WeatherAggregationService(
+    IViewRepository viewRepository,
+    IViewIdService viewIdService,
+    IHistogramConverter histogramConverter,
+    IHistogramProcessor histogramProcessor): IWeatherAggregationService
+{
+    private const int HourlyAggregateBucketSeconds = 300;
+    public async Task SaveLatestState(RawEventDocument document)
+    {
+        //TODO save only newer event (if events come out of order)
+        var id = viewIdService.GenerateIdLatest(document.DeviceId);
+        var dateId = viewIdService.GenerateDateIdLatest();
+        
+        var resampledRainHistogram = histogramProcessor.ResampleHistogram( 
+            histogramConverter.ToHistogramModel(document.Payload.Rain),
+            document.Payload.RainfallMMPerTip, 
+            HourlyAggregateBucketSeconds);
+        var histogram = new Histogram<float>(new float[12], HourlyAggregateBucketSeconds, document.Payload.Rain.StartTime);
+        histogramProcessor.AddToHistogram(histogram, resampledRainHistogram);
+
+        var model = new AggregateModel<LatestStatePayload>
+        {
+            Id = id,
+            DeviceId = new DeviceId(document.DeviceId),
+            DateId = dateId,
+            DocType = DocType.Latest,
+            Payload = new LatestStatePayload
+            {
+                LastEventTs = document.EventTimestamp,
+                LastRawId = document.id,
+                Temperature = document.Payload.Temperature,
+                Humidity = document.Payload.Humidity,
+                Pressure = document.Payload.Pressure,
+                Rain = histogram
+            }
+        };
+
+        await viewRepository.UpdateLatestView(model);
+    }
+
+    public async Task UpdateHourlyAggregate(RawEventDocument document)
+    {
+        var histogram = histogramConverter.ToHistogramModel(document.Payload.Rain); 
+        var resampledRainHistogram = histogramProcessor.ResampleHistogram( 
+            histogram,  
+            document.Payload.RainfallMMPerTip, 
+            HourlyAggregateBucketSeconds); 
+    
+        var mainId = viewIdService.GenerateId(document.DeviceId, document.EventTimestamp, DocType.Hourly);
+        var mainDateId = viewIdService.GenerateDateId(document.EventTimestamp, DocType.Hourly);
+        var mainAggregate = await GetOrCreateHourlyAggregate(mainId, mainDateId, new DeviceId(document.DeviceId));
+
+        var models = new List<AggregateModel<HourlyAggregatePayload>>();
+        foreach (var h in histogramProcessor.GetUniqueHours(resampledRainHistogram))
+        {
+            var id = viewIdService.GenerateId(document.DeviceId, h, DocType.Hourly);
+            var dateId = viewIdService.GenerateDateId(document.EventTimestamp, DocType.Hourly);
+            
+            var hourlyAggregate = id == mainId
+                ? mainAggregate
+                : await GetOrCreateHourlyAggregate(id, dateId, new DeviceId(document.DeviceId));
+
+            hourlyAggregate.Payload.Rain ??= new Histogram<float>(new float[12], 300, h);
+            histogramProcessor.AddToHistogram(hourlyAggregate.Payload.Rain, resampledRainHistogram);
+            models.Add(hourlyAggregate);
+        }
+        
+        mainAggregate.Payload.Temperature = IncrementOrSet(mainAggregate.Payload.Temperature, document.Payload.Temperature);
+        mainAggregate.Payload.Pressure = IncrementOrSet(mainAggregate.Payload.Pressure, document.Payload.Pressure);
+        mainAggregate.Payload.Humidity = IncrementOrSet(mainAggregate.Payload.Humidity, document.Payload.Humidity);
+
+        await Task.WhenAll(models.Select(viewRepository.UpdateHourlyView).ToArray());
+    }
+
+    private static MetricAggregate IncrementOrSet(MetricAggregate? metricAggregate, float value)
+    {
+        if (metricAggregate == null)
+        {
+            return new MetricAggregate(value);
+        }
+        metricAggregate.Increment(value);
+        return metricAggregate;
+    }
+
+    private async Task<AggregateModel<HourlyAggregatePayload>> GetOrCreateHourlyAggregate(Id mainHourlyId, DateId dateId, DeviceId deviceId)
+    {
+        var response = await viewRepository.GetHourlyAggregate(mainHourlyId, deviceId);
+        if (response != null) return response;
+        
+        return new AggregateModel<HourlyAggregatePayload>
+        {
+            Id = mainHourlyId,
+            DeviceId = deviceId,
+            DateId = dateId,
+            DocType = DocType.Hourly,
+            Payload = new HourlyAggregatePayload()
+        };
+
+    }
+}

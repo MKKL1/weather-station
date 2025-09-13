@@ -2,45 +2,41 @@ using Azure.Messaging.EventHubs;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 using Proto;
-using weatherstation.eventhandler;
-using weatherstation.eventhandler.Entities;
+using Worker.Infrastructure.Documents;
+using Worker.Mappers;
 
-namespace weatherstation;
-public class OnIotHubEventSaveToComos
+namespace Worker;
+public class OnIotHubEventSaveToComos(ILogger<OnIotHubEventSaveToComos> logger, IProtoModelMapper protoModelMapper)
 {
     private const string EntityPartitionKey = "WeatherReport";
-    private readonly ILogger<OnIotHubEventSaveToComos> _logger;
-
-    public OnIotHubEventSaveToComos(ILogger<OnIotHubEventSaveToComos> logger)
-    {
-        _logger = logger;
-    }
 
     [Function(nameof(OnIotHubEventSaveToComos))]
     [CosmosDBOutput("%COSMOS_DATABASE%", "%COSMOS_CONTAINER%", Connection = "COSMOS_CONNECTION")]
-    public RawEventEntity[] Run([EventHubTrigger("%EH_NAME%", Connection = "EH_CONN_STRING")] EventData[] events)
+    public RawEventDocument[] Run([EventHubTrigger("%EH_NAME%", Connection = "EH_CONN_STRING")] EventData[] events)
     {
-        _logger.LogInformation("Processing batch of {EventsLength} events.", events.Length);
+        logger.LogInformation("Processing batch of {EventsLength} events.", events.Length);
 
-        var successfulEntities = new List<RawEventEntity>();
+        var successfulEntities = new List<RawEventDocument>();
         var exceptions = new List<Exception>();
 
         foreach (var eventData in events)
         {
             try
             {
+                //Keeping it simple
                 var proto = WeatherData.Parser.ParseFrom(eventData.EventBody);
-                var entity = proto.ToRawEventEntity(EntityPartitionKey);
+                var entity = protoModelMapper.ToDocument(proto, EntityPartitionKey);
+                //TODO if event ts > 24h, ignore
                 successfulEntities.Add(entity);
             }
             catch (Exception e)
             {
-                _logger.LogError(e, "Failed to process event with offset {Offset}", eventData.Offset);
+                logger.LogError(e, "Failed to process event with offset {Offset}", eventData.Offset);
                 exceptions.Add(e);
             }
         }
             
-        _logger.LogInformation("Successfully processed {SuccessCount} out of {TotalCount} events.", successfulEntities.Count, events.Length);
+        logger.LogInformation("Successfully processed {SuccessCount} out of {TotalCount} events.", successfulEntities.Count, events.Length);
             
         if (exceptions.Count > 0 && successfulEntities.Count == 0)
         {
