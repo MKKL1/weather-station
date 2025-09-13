@@ -1,6 +1,6 @@
 ﻿using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
-using Worker.Documents;
+using Worker.Infrastructure.Documents;
 using Worker.Services;
 
 namespace Worker;

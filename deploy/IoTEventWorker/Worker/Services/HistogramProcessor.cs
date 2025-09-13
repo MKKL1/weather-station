@@ -1,20 +1,11 @@
 ﻿using System.Numerics;
 using Worker.Models;
 
-namespace Worker;
+namespace Worker.Services;
 
-public class HistogramAggregator: IHistogramAggregator
+/// <inheritdoc cref="IHistogramProcessor"/>
+public class HistogramProcessor: IHistogramProcessor
 {
-    /// <summary>
-    /// Converts tip counts in a source histogram into rainfall (mm) and aggregates them into larger time slots.
-    /// </summary>
-    /// <typeparam name="T">Numeric type of histogram tips.</typeparam>
-    /// <param name="hist">Source histogram</param>
-    /// <param name="mmPerTip">Millimetres of rain represented by one tip.</param>
-    /// <param name="targetSlotSeconds">Desired output slot size in seconds (must be >= hist.SlotSecs).</param>
-    /// <returns>
-    /// A dictionary mapping each target-slot start time (DateTimeOffset) to total rainfall (mm)
-    /// </returns>
     public Dictionary<DateTimeOffset, float> ResampleHistogram<T>(Histogram<T> hist, float mmPerTip, int targetSlotSeconds) 
         where T : IBinaryInteger<T>
     {
@@ -82,7 +73,7 @@ public class HistogramAggregator: IHistogramAggregator
         
         return result;
     }
-
+    
     public void AddToHistogram(Histogram<float> hist, Dictionary<DateTimeOffset, float> rainfallBuckets)
     {
         foreach (var (t, rainfall) in rainfallBuckets)
@@ -97,7 +88,7 @@ public class HistogramAggregator: IHistogramAggregator
             hist.Data[slotIdx] = Math.Max(hist.Data[slotIdx], rainfall);
         }
     }
-
+    
     public HashSet<DateTimeOffset> GetUniqueHours(Dictionary<DateTimeOffset, float> rainfallBuckets)
     {
         var set = new HashSet<DateTimeOffset>();

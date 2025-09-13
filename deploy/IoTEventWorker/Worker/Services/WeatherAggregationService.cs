@@ -1,14 +1,16 @@
-﻿using Worker.Documents;
+﻿using Worker.Infrastructure.Documents;
+using Worker.Mappers;
 using Worker.Models;
 using Worker.Repositories;
 
 namespace Worker.Services;
 
+/// <inheritdoc cref="IWeatherAggregationService"/>
 public class WeatherAggregationService(
     IViewRepository viewRepository,
     IViewIdService viewIdService,
     IHistogramConverter histogramConverter,
-    IHistogramAggregator histogramAggregator): IWeatherAggregationService
+    IHistogramProcessor histogramProcessor): IWeatherAggregationService
 {
     private const int HourlyAggregateBucketSeconds = 300;
     public async Task SaveLatestState(RawEventDocument document)
@@ -17,12 +19,12 @@ public class WeatherAggregationService(
         var id = viewIdService.GenerateIdLatest(document.DeviceId);
         var dateId = viewIdService.GenerateDateIdLatest();
         
-        var resampledRainHistogram = histogramAggregator.ResampleHistogram( 
+        var resampledRainHistogram = histogramProcessor.ResampleHistogram( 
             histogramConverter.ToHistogramModel(document.Payload.Rain),
             document.Payload.RainfallMMPerTip, 
             HourlyAggregateBucketSeconds);
         var histogram = new Histogram<float>(new float[12], HourlyAggregateBucketSeconds, document.Payload.Rain.StartTime);
-        histogramAggregator.AddToHistogram(histogram, resampledRainHistogram);
+        histogramProcessor.AddToHistogram(histogram, resampledRainHistogram);
 
         var model = new AggregateModel<LatestStatePayload>
         {
@@ -47,7 +49,7 @@ public class WeatherAggregationService(
     public async Task UpdateHourlyAggregate(RawEventDocument document)
     {
         var histogram = histogramConverter.ToHistogramModel(document.Payload.Rain); 
-        var resampledRainHistogram = histogramAggregator.ResampleHistogram( 
+        var resampledRainHistogram = histogramProcessor.ResampleHistogram( 
             histogram,  
             document.Payload.RainfallMMPerTip, 
             HourlyAggregateBucketSeconds); 
@@ -57,7 +59,7 @@ public class WeatherAggregationService(
         var mainAggregate = await GetOrCreateHourlyAggregate(mainId, mainDateId, new DeviceId(document.DeviceId));
 
         var models = new List<AggregateModel<HourlyAggregatePayload>>();
-        foreach (var h in histogramAggregator.GetUniqueHours(resampledRainHistogram))
+        foreach (var h in histogramProcessor.GetUniqueHours(resampledRainHistogram))
         {
             var id = viewIdService.GenerateId(document.DeviceId, h, DocType.Hourly);
             var dateId = viewIdService.GenerateDateId(document.EventTimestamp, DocType.Hourly);
@@ -67,7 +69,7 @@ public class WeatherAggregationService(
                 : await GetOrCreateHourlyAggregate(id, dateId, new DeviceId(document.DeviceId));
 
             hourlyAggregate.Payload.Rain ??= new Histogram<float>(new float[12], 300, h);
-            histogramAggregator.AddToHistogram(hourlyAggregate.Payload.Rain, resampledRainHistogram);
+            histogramProcessor.AddToHistogram(hourlyAggregate.Payload.Rain, resampledRainHistogram);
             models.Add(hourlyAggregate);
         }
         

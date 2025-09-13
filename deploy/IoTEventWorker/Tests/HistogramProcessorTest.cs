@@ -1,13 +1,14 @@
 ﻿using System.Reflection;
 using Worker;
 using Worker.Models;
+using Worker.Services;
 using Xunit;
 
 namespace Tests;
 
-public class HistogramAggregatorTest
+public class HistogramProcessorTest
 {
-    private readonly HistogramAggregator _aggregator = new();
+    private readonly HistogramProcessor _processor = new();
     private readonly DateOnly _date = new DateOnly(2025, 8, 14);
     
     private DateTimeOffset CreateForConstDay(int hour, int minute, int second)
@@ -23,7 +24,7 @@ public class HistogramAggregatorTest
         const float mmPerTip = 5f;
         const int target = 240; //4 minutes
         
-        var actual = _aggregator.ResampleHistogram(histogram, mmPerTip, target);
+        var actual = _processor.ResampleHistogram(histogram, mmPerTip, target);
 
         var expected = new Dictionary<DateTimeOffset, float>
         {
@@ -43,7 +44,7 @@ public class HistogramAggregatorTest
         const float mmPerTip = 5f;
         const int target = 300; //5 minutes
         
-        var actual = _aggregator.ResampleHistogram(histogram, mmPerTip, target);
+        var actual = _processor.ResampleHistogram(histogram, mmPerTip, target);
 
         var expected = new Dictionary<DateTimeOffset, float>
         {
@@ -63,7 +64,7 @@ public class HistogramAggregatorTest
         const float mmPerTip = 5f;
         const int target = 300; //5 minutes
         
-        var actual = _aggregator.ResampleHistogram(histogram, mmPerTip, target);
+        var actual = _processor.ResampleHistogram(histogram, mmPerTip, target);
 
         var expected = new Dictionary<DateTimeOffset, float>();
 
@@ -78,7 +79,7 @@ public class HistogramAggregatorTest
         const float mmPerTip = 5f;
         const int target = 100; //Less than 120
         
-        Assert.Throws<ArgumentException>(() => _aggregator.ResampleHistogram(histogram, mmPerTip, target));
+        Assert.Throws<ArgumentException>(() => _processor.ResampleHistogram(histogram, mmPerTip, target));
     }
     
     //I am not sure if checking different types is good for unit testing
@@ -102,12 +103,12 @@ public class HistogramAggregatorTest
         const float mmPerTip = 5f;
         const int target = 240;
         
-        var method = _aggregator.GetType()
+        var method = _processor.GetType()
             .GetMethods(BindingFlags.Instance | BindingFlags.Public)
             .First(m => m.Name == "ResampleHistogram" && m.IsGenericMethodDefinition);
 
         var generic = method.MakeGenericMethod(t);
-        var actualObj = generic.Invoke(_aggregator, [histogram, mmPerTip, target]);
+        var actualObj = generic.Invoke(_processor, [histogram, mmPerTip, target]);
 
         var actual = (IDictionary<DateTimeOffset, float>)actualObj;
 
@@ -135,7 +136,7 @@ public class HistogramAggregatorTest
         const float mmPerTip = 5f;
         const int target = 300; //5 minutes
         
-        var actual = _aggregator.ResampleHistogram(histogram, mmPerTip, target);
+        var actual = _processor.ResampleHistogram(histogram, mmPerTip, target);
 
         var expected = new Dictionary<DateTimeOffset, float>
         {
@@ -159,7 +160,7 @@ public class HistogramAggregatorTest
             [CreateForConstDay(15, 11, 0)] = 3.0f
         };
         
-        _aggregator.AddToHistogram(hist, rainfallBuckets);
+        _processor.AddToHistogram(hist, rainfallBuckets);
         
         Assert.Equal(4.0f, hist.Data[0]);
         Assert.Equal(3.0f, hist.Data[1]);
@@ -177,7 +178,7 @@ public class HistogramAggregatorTest
             [CreateForConstDay(15, 13, 30)] = 5.0f // Beyond histogram end
         };
         
-        _aggregator.AddToHistogram(hist, rainfallBuckets);
+        _processor.AddToHistogram(hist, rainfallBuckets);
         
         Assert.Equal([3.0f, 0f, 0f], hist.Data);
     }
@@ -194,7 +195,7 @@ public class HistogramAggregatorTest
             [CreateForConstDay(15, 12, 45)] = 1.0f
         };
         
-        _aggregator.AddToHistogram(hist, rainfallBuckets);
+        _processor.AddToHistogram(hist, rainfallBuckets);
 
         Assert.Equal([2.0f, 4.0f, 1.0f], hist.Data);
     }
@@ -211,7 +212,7 @@ public class HistogramAggregatorTest
             [CreateForConstDay(15, 10, 50)] = 3.0f
         };
         
-        _aggregator.AddToHistogram(hist, rainfallBuckets);
+        _processor.AddToHistogram(hist, rainfallBuckets);
         
         Assert.Equal([5f, 0f], hist.Data);
     }
@@ -227,7 +228,7 @@ public class HistogramAggregatorTest
             [CreateForConstDay(15, 11, 30)] = 4.0f
         };
         
-        _aggregator.AddToHistogram(hist, rainfallBuckets);
+        _processor.AddToHistogram(hist, rainfallBuckets);
         
         Assert.Equal([3f, 4f], hist.Data);
     }
@@ -249,7 +250,7 @@ public class HistogramAggregatorTest
             [CreateForConstDay(16, 14, 30)] = 4.0f,
         };
 
-        var actual = _aggregator.GetUniqueHours(rainfallBuckets);
+        var actual = _processor.GetUniqueHours(rainfallBuckets);
         var t = CreateForConstDay(15, 10, 30);
         Assert.Equal([new DateTimeOffset(t.Year, t.Month, t.Day, 15, 0, 0, t.Offset), 
             new DateTimeOffset(t.Year, t.Month, t.Day, 16, 0, 0, t.Offset),

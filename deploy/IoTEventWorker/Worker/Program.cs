@@ -4,6 +4,8 @@ using Microsoft.Azure.Functions.Worker.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Worker;
+using Worker.Infrastructure;
+using Worker.Mappers;
 using Worker.Repositories;
 using Worker.Services;
 
@@ -29,7 +31,7 @@ builder.Services.AddSingleton<IViewRepository, CosmosDbViewRepository>(_ =>
 
 builder.Services.AddSingleton<IViewIdService, ViewIdService>(_ => new ViewIdService());
 builder.Services.AddSingleton<IHistogramConverter, HistogramConverter>(_ => new HistogramConverter());
-builder.Services.AddSingleton<IHistogramAggregator, HistogramAggregator>(_ => new HistogramAggregator());
+builder.Services.AddSingleton<IHistogramProcessor, HistogramProcessor>(_ => new HistogramProcessor());
 builder.Services.AddSingleton<IProtoModelMapper, ProtoModelMapper>(_ => new ProtoModelMapper());
 
 builder.Services.AddSingleton<IWeatherAggregationService, WeatherAggregationService>(sp =>
@@ -37,7 +39,7 @@ builder.Services.AddSingleton<IWeatherAggregationService, WeatherAggregationServ
         sp.GetRequiredService<IViewRepository>(), 
         sp.GetRequiredService<IViewIdService>(), 
         sp.GetRequiredService<IHistogramConverter>(),
-        sp.GetRequiredService<IHistogramAggregator>()));
+        sp.GetRequiredService<IHistogramProcessor>()));
 
 
 

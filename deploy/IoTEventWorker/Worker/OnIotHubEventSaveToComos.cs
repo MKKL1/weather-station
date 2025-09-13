@@ -2,7 +2,8 @@ using Azure.Messaging.EventHubs;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Extensions.Logging;
 using Proto;
-using Worker.Documents;
+using Worker.Infrastructure.Documents;
+using Worker.Mappers;
 
 namespace Worker;
 public class OnIotHubEventSaveToComos(ILogger<OnIotHubEventSaveToComos> logger, IProtoModelMapper protoModelMapper)

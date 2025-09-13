@@ -1,4 +1,5 @@
-﻿using Worker.Documents;
+﻿using Worker.Infrastructure.Documents;
+using Worker.Mappers;
 using Worker.Services;
 using Xunit;
 

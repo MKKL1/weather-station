@@ -2,6 +2,7 @@
 
 namespace Worker.Services;
 
+/// <inheritdoc cref="IViewIdService"/>
 public class ViewIdService : IViewIdService
 {
     public Id GenerateIdLatest(string deviceId)

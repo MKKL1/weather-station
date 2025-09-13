@@ -1,10 +1,11 @@
 ﻿using System.Net;
 using Microsoft.Azure.Cosmos;
-using Worker.Documents;
+using Worker.Infrastructure.Documents;
 using Worker.Models;
+using Worker.Repositories;
 using Worker.Services;
 
-namespace Worker.Repositories;
+namespace Worker.Infrastructure;
 
 public class CosmosDbViewRepository(Container viewContainer, CosmosDbModelMapper mapper) : IViewRepository
 {

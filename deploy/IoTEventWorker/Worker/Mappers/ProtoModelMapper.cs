@@ -1,7 +1,7 @@
 ﻿using Proto;
-using Worker.Documents;
+using Worker.Infrastructure.Documents;
 
-namespace Worker;
+namespace Worker.Mappers;
 
 public class ProtoModelMapper: IProtoModelMapper
 {

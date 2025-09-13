@@ -1,5 +1,5 @@
 ﻿using Proto;
-using Worker.Documents;
+using Worker.Infrastructure.Documents;
 using Worker.Models;
 
 namespace Worker.Services;

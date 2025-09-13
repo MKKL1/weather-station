@@ -1,7 +1,7 @@
 ﻿using System.Text.Json.Serialization;
 using Newtonsoft.Json;
 
-namespace Worker.Documents;
+namespace Worker.Infrastructure.Documents;
 
 //TODO make domain object
 public class RawEventDocument

@@ -1,6 +1,7 @@
 ﻿using Moq;
 using Worker;
-using Worker.Documents;
+using Worker.Infrastructure.Documents;
+using Worker.Mappers;
 using Worker.Models;
 using Worker.Repositories;
 using Worker.Services;
@@ -13,7 +14,7 @@ public class WeatherAggregationServiceTest
     private readonly Mock<IViewRepository> _viewRepository;
     private readonly Mock<IViewIdService> _viewIdService;
     private readonly Mock<IHistogramConverter> _histogramConverter;
-    private readonly Mock<IHistogramAggregator> _histogramAggregator;
+    private readonly Mock<IHistogramProcessor> _histogramAggregator;
     private readonly WeatherAggregationService _service;
 
     public WeatherAggregationServiceTest()
@@ -21,7 +22,7 @@ public class WeatherAggregationServiceTest
         _viewRepository = new Mock<IViewRepository>();
         _viewIdService = new Mock<IViewIdService>();
         _histogramConverter = new Mock<IHistogramConverter>();
-        _histogramAggregator = new Mock<IHistogramAggregator>();
+        _histogramAggregator = new Mock<IHistogramProcessor>();
         _service = new WeatherAggregationService(_viewRepository.Object, 
             _viewIdService.Object, 
             _histogramConverter.Object,
