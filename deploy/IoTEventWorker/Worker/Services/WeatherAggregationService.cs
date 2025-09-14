@@ -55,14 +55,14 @@ public class WeatherAggregationService(
             HourlyAggregateBucketSeconds); 
     
         var mainId = viewIdService.GenerateId(document.DeviceId, document.EventTimestamp, DocType.Hourly);
-        var mainDateId = viewIdService.GenerateDateId(document.EventTimestamp, DocType.Hourly);
+        var mainDateId = viewIdService.GenerateDateId(document.EventTimestamp, DocType.Daily);
         var mainAggregate = await GetOrCreateHourlyAggregate(mainId, mainDateId, new DeviceId(document.DeviceId));
 
         var models = new List<AggregateModel<HourlyAggregatePayload>>();
         foreach (var h in histogramProcessor.GetUniqueHours(resampledRainHistogram))
         {
             var id = viewIdService.GenerateId(document.DeviceId, h, DocType.Hourly);
-            var dateId = viewIdService.GenerateDateId(document.EventTimestamp, DocType.Hourly);
+            var dateId = viewIdService.GenerateDateId(document.EventTimestamp, DocType.Daily);
             
             var hourlyAggregate = id == mainId
                 ? mainAggregate
