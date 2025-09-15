@@ -1,43 +1,41 @@
 import asyncio
-import random
-from datetime import datetime
-
-from ws_cli.core.interfaces import WeatherDataGenerator
-from ws_cli.models import WeatherData, Device
+from ws_cli.core.interfaces import TelemetryTransmitter
 from ws_cli.utils.console import print_info, print_success
+from ws_cli.utils.telemetry_format import print_telemetry
 
 
-class DummyDataGenerator(WeatherDataGenerator):
-    """Generates simple, random weather data."""
-
-    def generate(self, device: Device) -> WeatherData:
-        return WeatherData(
-            timestamp=datetime.now(),
-            temperature=round(random.uniform(15.0, 25.0), 2),
-            humidity=round(random.uniform(40.0, 70.0), 2),
-            pressure=round(random.uniform(1010.0, 1025.0), 2),
-            rain_tips=random.randint(0, 5),
-            device_id=device.device_id,
-        )
-
-
-class ConsoleTelemetryTransmitter:
+class ConsoleTelemetryTransmitter(TelemetryTransmitter):
     """A transmitter that prints telemetry to the console instead of sending it."""
 
-    async def connect(self) -> None:
-        print_info("Establishing (dummy) connection...")
-        await asyncio.sleep(0.1)  # Simulate connection time
-        print_success("Connection established.")
+    def __init__(self, progress=None, task_id=None):
+        self.progress = progress
+        self.task_id = task_id
 
-    async def send(self, data: WeatherData) -> None:
-        print_info(f"Sending telemetry for device '{data.device_id}':")
-        print(data.to_dict())
-        await asyncio.sleep(0.2)  # Simulate send time
+    def _update_progress(self, description: str):
+        """Update progress bar if available, otherwise print to console."""
+        if self.progress and self.task_id is not None:
+            self.progress.update(self.task_id, description=description)
+        else:
+            # Fallback to console printing when no progress bar
+            print_info(description)
+
+    async def connect(self) -> None:
+        self._update_progress("Establishing (dummy) connection...")
+        await asyncio.sleep(0.1)  # Simulate connection time
+
+        # Only print success if no progress bar (backward compatibility)
+        if not self.progress:
+            print_success("Connection established.")
+
+    async def send(self, data) -> None:
+        self._update_progress("Sending telemetry...")
+        await asyncio.sleep(0.2)
+        print_telemetry("SENT", data)
 
     async def disconnect(self) -> None:
-        print_info("Closing (dummy) connection...")
+        self._update_progress("Closing (dummy) connection...")
         await asyncio.sleep(0.1)
-        print_success("Connection closed.")
 
-# TODO: Add AzureIoTTransmitter that implements the TelemetryTransmitter protocol
-# It will contain the logic from your old project's azure_client.py
+        # Only print success if no progress bar (backward compatibility)
+        if not self.progress:
+            print_success("Connection closed.")

@@ -98,25 +98,78 @@ class Device:
 
 
 @dataclass
+class Histogram:
+    """Histogram for rain tips."""
+    data: bytes
+    count: int
+    interval_duration: int
+    start_time: int
+
+
+@dataclass
+class DeviceInfo:
+    """Device information embedded in telemetry."""
+    id: str
+    mm_per_tip: float
+    instance_id: int
+
+
+@dataclass
 class WeatherData:
-    """Weather telemetry data."""
-    timestamp: datetime
+    """Weather telemetry data matching protobuf structure."""
+    created_at: int  # Unix timestamp
     temperature: float  # Celsius
-    humidity: float  # Percentage
     pressure: float  # hPa
-    rain_tips: int  # Number of rain gauge tips
-    device_id: str
+    humidity: float  # Percentage
+    tips: Histogram
+    info: DeviceInfo
 
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary."""
+        """Convert to dictionary for serialization."""
         return {
-            "timestamp": self.timestamp.isoformat(),
+            "created_at": self.created_at,
             "temperature": self.temperature,
-            "humidity": self.humidity,
             "pressure": self.pressure,
-            "rain_tips": self.rain_tips,
-            "device_id": self.device_id,
+            "humidity": self.humidity,
+            "tips": {
+                "data": self.tips.data,
+                "count": self.tips.count,
+                "interval_duration": self.tips.interval_duration,
+                "start_time": self.tips.start_time,
+            },
+            "info": {
+                "id": self.info.id,
+                "mm_per_tip": self.info.mm_per_tip,
+                "instance_id": self.info.instance_id,
+            },
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "WeatherData":
+        """Create from dictionary."""
+        tips_data = data["tips"]
+        tips = Histogram(
+            data=tips_data["data"],
+            count=tips_data["count"],
+            interval_duration=tips_data["interval_duration"],
+            start_time=tips_data["start_time"],
+        )
+
+        info_data = data["info"]
+        info = DeviceInfo(
+            id=info_data["id"],
+            mm_per_tip=info_data["mm_per_tip"],
+            instance_id=info_data["instance_id"],
+        )
+
+        return cls(
+            created_at=data["created_at"],
+            temperature=data["temperature"],
+            pressure=data["pressure"],
+            humidity=data["humidity"],
+            tips=tips,
+            info=info,
+        )
 
 
 @dataclass

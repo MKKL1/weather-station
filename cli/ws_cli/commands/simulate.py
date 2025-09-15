@@ -1,8 +1,35 @@
-import typer
-from typing import Optional
+import asyncio
+import random
 from pathlib import Path
+from typing import Optional
+
+import typer
+from rich.progress import Progress, SpinnerColumn, TextColumn
+
+from ws_cli.core.azure_telemetry import AzureTelemetryTransmitter
+from ws_cli.core.device_manager import DeviceManager
+from ws_cli.core.interfaces import TelemetryTransmitter
+from ws_cli.core.sim_data_gen import SimulatedDataGenerator
+from ws_cli.core.telemetry import ConsoleTelemetryTransmitter
+from ws_cli.utils.console import print_info, print_success, print_error, print_warning
 
 app = typer.Typer(help="Simulation commands")
+
+
+def _create_transmitter(device, dry_run: bool, progress=None, task_id=None) -> TelemetryTransmitter:
+    """Factory function to create the appropriate transmitter based on dry_run flag."""
+    if dry_run:
+        return ConsoleTelemetryTransmitter(progress=progress, task_id=task_id)
+    else:
+        # Assuming device has dps_config - you may need to handle missing config
+        if not device.dps_config:
+            raise ValueError("Device missing DPS configuration for Azure transmission")
+        return AzureTelemetryTransmitter(
+            device_cfg=device,
+            dps_cfg=device.dps_config,
+            progress=progress,
+            task_id=task_id
+        )
 
 
 @app.command("once")
@@ -12,7 +39,7 @@ def simulate_once(
             "--device-id",
             "-d",
             help="Device ID to use (defaults to configured default device)",
-            autocompletion=lambda: ["sim-001", "sim-002", "dev-001"],  # TODO: Dynamic completion
+            autocompletion=lambda: ["sim-001", "sim-002", "dev-001"],
         ),
         config: Optional[Path] = typer.Option(
             None,
@@ -36,13 +63,24 @@ def simulate_once(
         ws-cli simulate once
         ws-cli simulate once --device-id sim-001 --dry-run
     """
-    from ws_cli.utils.console import print_info, print_success, print_error, print_warning
-    from rich.progress import Progress, SpinnerColumn, TextColumn
-    from rich.table import Table
-    from rich import print
-    from ws_cli.core.device_manager import DeviceManager
-    from ws_cli.core.interfaces import TelemetryTransmitter, WeatherDataGenerator
-    from ws_cli.models import Device
+
+    async def send_telemetry(progress_, task_id):
+        """Async function to handle the telemetry sending process."""
+        # Create transmitter based on dry_run flag with progress support
+        transmitter = _create_transmitter(device, dry_run, progress=progress_, task_id=task_id)
+
+        try:
+            # Connect to the transmitter
+            await transmitter.connect()
+
+            # Generate and send data
+            generator = SimulatedDataGenerator()
+            data = generator.generate(device)
+            await transmitter.send(data)
+
+        finally:
+            # Always disconnect
+            await transmitter.disconnect()
 
     try:
         # Get device
@@ -64,29 +102,12 @@ def simulate_once(
                 TextColumn("[progress.description]{task.description}"),
                 transient=True,
         ) as progress:
-            progress.add_task(description="Generating weather data...", total=None)
+            task = progress.add_task(description="Initializing...", total=None)
 
-            # TODO: Implement actual telemetry generation and transmission
-            # generator = WeatherDataGenerator(device)
-            # data = generator.generate()
-
-            if not dry_run:
-                progress.update(task_id=0, description="Sending telemetry...")
-                # TODO: transmitter = TelemetryTransmitter(device)
-                # asyncio.run(transmitter.send(data))
+            # Run the async telemetry sending with progress updates
+            asyncio.run(send_telemetry(progress, task))
 
         print_success("✓ Telemetry sent successfully")
-
-        if dry_run:
-            # TODO: Display generated data
-            table = Table(title="Generated Weather Data (DRY RUN)")
-            table.add_column("Metric", style="cyan")
-            table.add_column("Value", style="green")
-            table.add_row("Temperature", "22.5°C")
-            table.add_row("Humidity", "65%")
-            table.add_row("Pressure", "1013.25 hPa")
-            table.add_row("Rain", "0.2 mm")
-            print(table)
 
     except KeyboardInterrupt:
         print_warning("\nOperation cancelled by user")
@@ -146,10 +167,6 @@ def simulate_continuous(
         ws-cli simulate continuous --interval 60 --max-messages 10
         ws-cli simulate continuous --device-id sim-001 --seed 42
     """
-    from ws_cli.utils.console import print_info, print_success, print_error, print_warning
-    from ws_cli.core.device_manager import DeviceManager
-    from ws_cli.models import Device
-    import asyncio
 
     try:
         # Get device
@@ -170,7 +187,7 @@ def simulate_continuous(
 
         if seed is not None:
             print_info(f"Using random seed: {seed}")
-            # TODO: Set random seed
+            random.seed(seed)
 
         if dry_run:
             print_warning("DRY RUN MODE - No data will be sent")
@@ -203,7 +220,13 @@ async def _simulation_loop(
     """Run the continuous simulation loop."""
     from rich import print
     import asyncio
+    import random
+
     messages_sent = 0
+    generator = SimulatedDataGenerator()
+
+    # Create transmitter once and reuse connection
+    transmitter = _create_transmitter(device, dry_run)
 
     # Set up signal handlers for graceful shutdown
     stop_event = asyncio.Event()
@@ -215,26 +238,38 @@ async def _simulation_loop(
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
 
-    import asyncio
     try:
+        # Connect once at the start
+        await transmitter.connect()
+
         while not stop_event.is_set():
             # Check message limit
             if max_messages and messages_sent >= max_messages:
                 print(f"\n✓ Sent {messages_sent} messages (limit reached)")
                 break
 
-            # TODO: Generate and send telemetry
-            messages_sent += 1
+            try:
+                # Generate and send telemetry
+                data = generator.generate(device)
+                await transmitter.send(data)
+                messages_sent += 1
 
-            if dry_run:
-                print(f"[dim]Message {messages_sent}: Generated (DRY RUN)[/dim]")
-            else:
-                print(f"[green]Message {messages_sent}: Sent successfully[/green]")
+                if dry_run:
+                    print(f"[dim]Message {messages_sent}: Generated (DRY RUN)[/dim]")
+                else:
+                    print(f"[green]Message {messages_sent}: Sent successfully[/green]")
+
+            except Exception as e:
+                print(f"[red]Error sending message {messages_sent + 1}: {e}[/red]")
+                # Continue with next message rather than failing completely
+                continue
 
             # Wait for next interval
             if max_messages is None or messages_sent < max_messages:
-                wait_time = interval  # TODO: Add jitter
-                print(f"[dim]Next message in {wait_time}s...[/dim]")
+                # Apply jitter to interval
+                jitter_amount = random.uniform(-jitter, jitter) if jitter > 0 else 0
+                wait_time = max(1, interval + jitter_amount)  # Ensure minimum 1 second
+                print(f"[dim]Next message in {wait_time:.1f}s...[/dim]")
 
                 try:
                     await asyncio.wait_for(stop_event.wait(), timeout=wait_time)
@@ -245,6 +280,12 @@ async def _simulation_loop(
     except Exception as e:
         print(f"\nError in simulation loop: {e}")
         raise
+    finally:
+        # Always disconnect
+        try:
+            await transmitter.disconnect()
+        except Exception as e:
+            print(f"[yellow]Warning: Error during disconnect: {e}[/yellow]")
 
 
 def _get_device(device_manager, device_id: Optional[str]):

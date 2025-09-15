@@ -76,17 +76,13 @@ def add_device(
 
     Examples:
         # X.509 authentication
-        ws-cli devices add sim-001 --auth-type x509 \
-            --cert-file /secrets/cert.pem \
-            --key-file /secrets/key.pem
+        ws-cli devices add sim-001 --auth-type x509 --cert-file /secrets/cert.pem --key-file /secrets/key.pem
 
         # Symmetric key authentication
-        ws-cli devices add sim-002 --auth-type symmetric_key \
-            --primary-key "AbCd...=="
+        ws-cli devices add sim-002 --auth-type symmetric_key --primary-key "AbCd...=="
 
         # Symmetric key + DPS
-        ws-cli devices add dev-device-92fc2ca1 --auth-type symmetric_key \
-            --primary-key "h9...=" --dps-id-scope "0ne00FD4B37"
+        ws-cli devices add dev-device-92fc2ca1 --auth-type symmetric_key --primary-key "h9...=" --dps-id-scope "0ne00FD4B37"
     """
     from ws_cli.utils.console import print_info, print_success, print_error, print_warning
     from rich.prompt import Confirm
@@ -190,10 +186,10 @@ def list_devices(
         # Create table
         table = Table(title="Configured Devices", show_lines=verbose)
         table.add_column("ID", style="cyan", no_wrap=True)
-        table.add_column("Device ID", style="green")
-        table.add_column("Auth Type", style="yellow")
-        table.add_column("Default", style="magenta")
-        table.add_column("DPS", style="blue")
+        table.add_column("Device ID", style="dim")
+        table.add_column("Auth Type", style="dim")
+        table.add_column("DPS Scope", style="dim")
+        table.add_column("Default", style="green")
 
         if verbose:
             table.add_column("Created", style="dim")
@@ -203,14 +199,13 @@ def list_devices(
 
         for idx, device in enumerate(devices):
             is_default = "✓" if device.device_id == default_device_id else ""
-            has_dps = "✓" if device.dps_config else ""
 
             row = [
                 str(idx),
                 device.device_id,
                 device.auth.type.value,
+                device.dps_config.id_scope,
                 is_default,
-                has_dps,
             ]
 
             if verbose:
