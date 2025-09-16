@@ -9,7 +9,7 @@ from pathlib import Path
 if any(arg == "?" for arg in sys.argv[1:]):
     sys.argv = [sys.argv[0]] + ["--help" if arg == "?" else arg for arg in sys.argv[1:]]
 
-from ws_cli.commands import simulate, devices, config as config_cmd
+from ws_cli.commands import simulate, devices, config as config_cmd, enrollment
 from ws_cli.commands.cache import cache_app
 
 app = typer.Typer(
@@ -25,6 +25,7 @@ app.add_typer(simulate.app, name="simulate", help="Simulation commands")
 app.add_typer(devices.app, name="devices", help="Device management commands")
 app.add_typer(config_cmd.app, name="config", help="Config management commands")
 app.add_typer(cache_app, name="cache", help="Cache management commands")
+app.add_typer(enrollment.app, name="enrollment", help="Enrollment management commands")
 
 def _configure_logging(verbose: bool) -> None:
     """Set up the root logger (safe to call multiple times)."""
