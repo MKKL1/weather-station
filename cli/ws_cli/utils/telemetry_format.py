@@ -1,9 +1,11 @@
 from datetime import datetime
-from ws_cli.models import WeatherData
 from rich import print
 from rich.text import Text
 
 from datetime import datetime
+
+from ws_cli.core.models.models import WeatherData
+
 
 def print_telemetry(msg: str, data: WeatherData, timezone: str = "CEST") -> None:
     created_at = datetime.fromtimestamp(data.created_at).strftime("%Y-%m-%d %H:%M:%S") + f" {timezone}"

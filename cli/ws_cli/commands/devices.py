@@ -3,7 +3,9 @@ from typing import Optional
 
 import typer
 
-from ws_cli.models import AuthType
+
+from ws_cli.core.device_manager import DeviceManager
+from ws_cli.core.models.models import AuthConfig, DPSConfig, Device, AuthType
 
 app = typer.Typer(help="Device management commands")
 
@@ -86,8 +88,6 @@ def add_device(
     """
     from ws_cli.utils.console import print_info, print_success, print_error, print_warning
     from rich.prompt import Confirm
-    from ws_cli.core.device_manager import DeviceManager
-    from ws_cli.models import Device, AuthConfig, DPSConfig
 
     try:
         device_manager = DeviceManager()
@@ -173,7 +173,6 @@ def list_devices(
     from ws_cli.utils.console import print_error, print_warning
     from rich.table import Table
     from rich import print
-    from ws_cli.core.device_manager import DeviceManager
 
     try:
         device_manager = DeviceManager()
@@ -241,7 +240,6 @@ def set_default_device(
         ws-cli devices set-default 0
     """
     from ws_cli.utils.console import print_info, print_success, print_error
-    from ws_cli.core.device_manager import DeviceManager
 
     try:
         device_manager = DeviceManager()
@@ -296,7 +294,6 @@ def remove_device(
     """
     from ws_cli.utils.console import print_info, print_success, print_error
     from rich.prompt import Confirm
-    from ws_cli.core.device_manager import DeviceManager
 
     try:
         device_manager = DeviceManager()
@@ -350,7 +347,6 @@ def show_device(
     """
     from ws_cli.utils.console import print_error
     from rich import print
-    from ws_cli.core.device_manager import DeviceManager
 
     try:
         device_manager = DeviceManager()

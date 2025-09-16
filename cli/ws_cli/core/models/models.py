@@ -33,6 +33,7 @@ class DPSConfig:
     id_scope: str
     provisioning_host: str = "global.azure-devices-provisioning.net"
     registration_id: Optional[str] = None
+    ttl: Optional[int] = None
 
 
 @dataclass
@@ -60,6 +61,7 @@ class Device:
                 "id_scope": self.dps_config.id_scope,
                 "provisioning_host": self.dps_config.provisioning_host,
                 "registration_id": self.dps_config.registration_id,
+                "ttl": self.dps_config.ttl,
             } if self.dps_config else None,
             "mm_per_tip": self.mm_per_tip,
             "metadata": self.metadata,

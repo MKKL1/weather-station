@@ -1,10 +1,11 @@
 import asyncio
-from ws_cli.core.interfaces import TelemetryTransmitter
+
+from ws_cli.core.publisher.data_publisher import DataPublisher
 from ws_cli.utils.console import print_info, print_success
 from ws_cli.utils.telemetry_format import print_telemetry
 
 
-class ConsoleTelemetryTransmitter(TelemetryTransmitter):
+class FakeDataPublisher(DataPublisher):
     """A transmitter that prints telemetry to the console instead of sending it."""
 
     def __init__(self, progress=None, task_id=None):

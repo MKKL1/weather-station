@@ -1,19 +1,9 @@
-from abc import ABC, abstractmethod
 from typing import Protocol
 
-from ws_cli.models import WeatherData, Device
+from ws_cli.core.models.models import WeatherData
 
 
-class WeatherDataGenerator(ABC):
-    """Abstract interface for weather data generation."""
-
-    @abstractmethod
-    def generate(self, device: Device) -> WeatherData:
-        """Generates a single weather data point."""
-        raise NotImplementedError
-
-
-class TelemetryTransmitter(Protocol):
+class DataPublisher(Protocol):
     """Protocol for sending telemetry data asynchronously."""
 
     async def connect(self) -> None:

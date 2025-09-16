@@ -1,8 +1,16 @@
+import logging
+import sys
+
 import typer
+from typer import Context
 from typing import Optional
 from pathlib import Path
 
+if any(arg == "?" for arg in sys.argv[1:]):
+    sys.argv = [sys.argv[0]] + ["--help" if arg == "?" else arg for arg in sys.argv[1:]]
+
 from ws_cli.commands import simulate, devices, config as config_cmd
+from ws_cli.commands.cache import cache_app
 
 app = typer.Typer(
     name="ws-cli",
@@ -15,7 +23,32 @@ app = typer.Typer(
 
 app.add_typer(simulate.app, name="simulate", help="Simulation commands")
 app.add_typer(devices.app, name="devices", help="Device management commands")
-app.add_typer(config_cmd.app, name="config", help="Config commands")
+app.add_typer(config_cmd.app, name="config", help="Config management commands")
+app.add_typer(cache_app, name="cache", help="Cache management commands")
+
+def _configure_logging(verbose: bool) -> None:
+    """Set up the root logger (safe to call multiple times)."""
+    root = logging.getLogger()
+    # If no handlers exist, create a basic console handler.
+    if not root.handlers:
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter(
+            "%(asctime)s %(levelname)-8s [%(name)s] %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        )
+        handler.setFormatter(formatter)
+        root.addHandler(handler)
+    # Default to WARNING when not verbose to avoid library INFO spam.
+    root.setLevel(logging.DEBUG if verbose else logging.WARNING)
+
+def verbose_callback(ctx: typer.Context, param, value: bool):
+    # Click/Typer often supplies `ctx.resilient_parsing` while
+    # building shell completion or showing help; ignore in that case.
+    if ctx.resilient_parsing:
+        return value
+    _configure_logging(value)
+    # keep the value so we can save it into ctx.obj in the main callback
+    return value
 
 def version_callback(value: bool):
     if value:
@@ -25,6 +58,7 @@ def version_callback(value: bool):
 
 @app.callback()
 def main(
+        ctx: Context,
         version: Optional[bool] = typer.Option(
             None,
             "--version",
@@ -44,12 +78,18 @@ def main(
             False,
             "--verbose",
             help="Enable verbose output",
+            callback=verbose_callback,
+            is_eager=True,
         ),
 ):
     """
     Weather Station CLI - Simulate weather telemetry for Azure IoT Hub
     """
     from ws_cli.utils.console import print_info
+    if ctx.obj is None:
+        ctx.obj = {}
+    ctx.obj["verbose"] = verbose
+    _configure_logging(verbose)
 
     if config:
         print_info(f"Using config file: {config}")
