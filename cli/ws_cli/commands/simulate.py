@@ -4,7 +4,7 @@ import random
 import signal
 import sys
 import threading
-import time  # Added for timing stats
+import time
 from pathlib import Path
 from typing import Optional, Dict
 
@@ -12,9 +12,7 @@ import typer
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from ws_cli.core.device_manager import DeviceManager
-from ws_cli.core.identity.azure_dps_provisioner import AzureDPSProvisioner
 from ws_cli.core.publisher.azure_publisher import AzureDataPublisher
-from ws_cli.core.publisher.data_publisher import DataPublisher
 from ws_cli.core.publisher.fake_data_publisher import FakeDataPublisher
 from ws_cli.core.simulation.sim_data_gen import SimulatedDataGenerator
 from ws_cli.utils.console import print_info, print_success, print_error, print_warning
@@ -22,25 +20,20 @@ from ws_cli.utils.console import print_info, print_success, print_error, print_w
 app = typer.Typer(help="Simulation commands")
 
 
-def _create_transmitter(device, dry_run: bool, force_provision: bool = False,
-                        progress=None, task_id=None) -> DataPublisher:
-    """Factory function to create the appropriate transmitter based on dry_run flag."""
+def create_publisher(device, dry_run: bool, force_provision: bool = False,
+                     progress=None, task_id=None):
+    """Create appropriate publisher based on dry_run flag."""
     if dry_run:
         return FakeDataPublisher(progress=progress, task_id=task_id)
     else:
-        # Create Azure transmitter with DPS provisioner
         if not device.dps_config:
             raise ValueError("Device missing DPS configuration for Azure transmission")
 
-        # Create shared provisioner for potential reuse
-        provisioner = AzureDPSProvisioner()
-
         return AzureDataPublisher(
             device_cfg=device,
-            provisioner=provisioner,
+            force_provision=force_provision,
             progress=progress,
-            task_id=task_id,
-            force_provision=force_provision
+            task_id=task_id
         )
 
 
@@ -51,7 +44,6 @@ def simulate_once(
             "--device-id",
             "-d",
             help="Device ID to use (defaults to configured default device)",
-            autocompletion=lambda: ["sim-001", "sim-002", "dev-001"],
         ),
         config: Optional[Path] = typer.Option(
             None,
@@ -82,78 +74,57 @@ def simulate_once(
         ws-cli simulate once --force-provision  # Ignore DPS cache
     """
 
-    async def send_telemetry_with_timeout(progress_, task_id):
-        """Async function to handle the telemetry sending process with timeout."""
-        # Create transmitter based on dry_run flag with progress support
-        transmitter = _create_transmitter(device, dry_run, force_provision,
-                                          progress=progress_, task_id=task_id)
+    async def send_once(progress_, task_id):
+        """Send a single telemetry message."""
+        publisher = create_publisher(device, dry_run, force_provision, progress_, task_id)
+        generator = SimulatedDataGenerator()
 
         try:
-            # Connect to the transmitter with timeout
-            await asyncio.wait_for(transmitter.connect(), timeout=30.0)
-
-            # Generate and send data with timeout
-            generator = SimulatedDataGenerator()
+            await asyncio.wait_for(publisher.connect(), timeout=30.0)
             data = generator.generate(device)
-            await asyncio.wait_for(transmitter.send(data), timeout=30.0)
-
+            await asyncio.wait_for(publisher.send(data), timeout=30.0)
         except asyncio.TimeoutError:
             print_error("Operation timed out")
             raise
         except Exception as e:
-            # If Azure transmission fails, it might be due to stale cache
-            if not dry_run and hasattr(transmitter, 'invalidate_cache_and_reconnect'):
+            # Try cache invalidation for Azure failures
+            if not dry_run and hasattr(publisher, 'invalidate_cache_and_reconnect'):
                 try:
                     print_warning("Transmission failed, attempting cache invalidation and retry...")
-                    await asyncio.wait_for(transmitter.invalidate_cache_and_reconnect(), timeout=30.0)
-                    # Retry once
+                    await asyncio.wait_for(publisher.invalidate_cache_and_reconnect(), timeout=30.0)
                     data = generator.generate(device)
-                    await asyncio.wait_for(transmitter.send(data), timeout=30.0)
+                    await asyncio.wait_for(publisher.send(data), timeout=30.0)
                 except Exception as retry_e:
-                    print_error(f"Retry after cache invalidation also failed: {retry_e}")
+                    print_error(f"Retry after cache invalidation failed: {retry_e}")
                     raise retry_e
             else:
                 raise e
         finally:
-            # Always disconnect with timeout
             try:
-                await asyncio.wait_for(transmitter.disconnect(), timeout=10.0)
+                await asyncio.wait_for(publisher.disconnect(), timeout=10.0)
             except asyncio.TimeoutError:
                 print_warning("Disconnect timed out")
 
     try:
         # Get device
         device_manager = DeviceManager()
-        if device_id:
-            device = device_manager.get_device(device_id)
-            if not device:
-                print_error(f"Device '{device_id}' not found")
-                print_info("Run 'ws-cli devices list' to see available devices")
-                raise typer.Exit(1)
-        else:
-            device = device_manager.get_default_device()
-            if not device:
-                print_error("No default device is set. Use --device-id or 'ws-cli devices set-default'")
-                raise typer.Exit(1)
+        device = get_device(device_manager, device_id)
 
         print_info(f"Using device: [bold]{device.device_id}[/bold]")
 
         if dry_run:
             print_warning("DRY RUN MODE - No data will be sent")
-
         if force_provision:
             print_info("Force provisioning enabled - will ignore DPS cache")
 
-        # Generate and send telemetry
+        # Send telemetry with progress
         with Progress(
                 SpinnerColumn(),
                 TextColumn("[progress.description]{task.description}"),
                 transient=True,
         ) as progress:
             task = progress.add_task(description="Initializing...", total=None)
-
-            # Run the async telemetry sending with progress updates
-            asyncio.run(send_telemetry_with_timeout(progress, task))
+            asyncio.run(send_once(progress, task))
 
         print_success("✓ Telemetry sent successfully")
 
@@ -165,20 +136,6 @@ def simulate_once(
         raise typer.Exit(1)
 
 
-def format_elapsed(seconds: float) -> str:
-    """Format elapsed time in a human-readable way."""
-    if seconds < 60:
-        return f"{int(seconds)}s"
-    elif seconds < 3600:
-        mins = int(seconds / 60)
-        secs = int(seconds % 60)
-        return f"{mins}m {secs}s"
-    else:
-        hours = int(seconds / 3600)
-        mins = int((seconds % 3600) / 60)
-        return f"{hours}h {mins}m"
-
-
 @app.command("loop")
 def simulate_continuous(
         device_id: Optional[str] = typer.Option(
@@ -186,7 +143,6 @@ def simulate_continuous(
             "--device-id",
             "-d",
             help="Device ID to use",
-            autocompletion=lambda: ["0", "1", "2"],
         ),
         interval: int = typer.Option(
             1800,
@@ -230,25 +186,16 @@ def simulate_continuous(
     Run continuous simulation until stopped or limit reached.
 
     Examples:
-        ws-cli simulate continuous
-        ws-cli simulate continuous --interval 60 --max-messages 10
-        ws-cli simulate continuous --device-id sim-001 --seed 42
-        ws-cli simulate continuous --force-provision  # Ignore DPS cache
+        ws-cli simulate loop
+        ws-cli simulate loop --interval 60 --max-messages 10
+        ws-cli simulate loop --device-id sim-001 --seed 42
+        ws-cli simulate loop --force-provision  # Ignore DPS cache
     """
 
     try:
-        # Get device
+        # Get device and setup
         device_manager = DeviceManager()
-        if device_id:
-            device = device_manager.get_device(device_id)
-            if not device:
-                print_error(f"Device '{device_id}' not found")
-                raise typer.Exit(1)
-        else:
-            device = device_manager.get_default_device()
-            if not device:
-                print_error("No default device is set")
-                raise typer.Exit(1)
+        device = get_device(device_manager, device_id)
 
         print_info(f"Starting continuous simulation for device: [bold]{device.device_id}[/bold]")
         print_info(f"Interval: {interval}s, Jitter: ±{jitter}s")
@@ -264,16 +211,15 @@ def simulate_continuous(
 
         if dry_run:
             print_warning("DRY RUN MODE - No data will be sent")
-
         if force_provision:
             print_info("Force provisioning enabled - will ignore DPS cache")
 
         # Stats tracking
-        stats: Dict[str, float] = {'messages': 0, 'start_time': 0.0, 'elapsed': None}
+        stats = {'messages': 0, 'start_time': 0.0, 'elapsed': None}
 
         # Run simulation loop
         try:
-            asyncio.run(_simulation_loop_with_cancellation(
+            asyncio.run(run_simulation_loop(
                 device=device,
                 interval=interval,
                 jitter=jitter,
@@ -282,11 +228,9 @@ def simulate_continuous(
                 force_provision=force_provision,
                 stats=stats,
             ))
-            # Normal exit (max messages or 'q')
             print_info("Simulation completed!")
             print_info(f"Sent {int(stats['messages'])} messages in {format_elapsed(stats['elapsed'])}")
         except KeyboardInterrupt:
-            # Cancellation (Ctrl+C)
             if stats['elapsed'] is None:
                 stats['elapsed'] = time.time() - stats['start_time']
             print_info("Simulation canceled!")
@@ -298,34 +242,102 @@ def simulate_continuous(
         raise typer.Exit(1)
 
 
-async def _simulation_loop_with_cancellation(
-        device,
-        interval: int,
-        jitter: float,
-        max_messages: Optional[int],
-        dry_run: bool,
-        force_provision: bool = False,
-        stats: Optional[Dict[str, float]] = None,  # New param for stats
-):
-    """Run the continuous simulation loop with proper cancellation handling."""
+async def run_simulation_loop(device, interval: int, jitter: float,
+                              max_messages: Optional[int], dry_run: bool,
+                              force_provision: bool, stats: Dict):
+    """Main simulation loop with cancellation handling."""
     from rich import print
-    import asyncio
-    import random
     import threading
     import sys
 
     messages_sent = 0
     generator = SimulatedDataGenerator()
-    transmitter = None
+    publisher = None
     shutdown_event = asyncio.Event()
 
-    # Set start time early
-    if stats is not None:
-        stats['start_time'] = time.time()
+    stats['start_time'] = time.time()
 
-    # Key monitoring for 'q' key - Windows compatible
+    # Key monitoring thread
+    key_thread = start_key_monitor(shutdown_event)
+
+    try:
+        # Create publisher and connect
+        publisher = create_publisher(device, dry_run, force_provision)
+        await asyncio.wait_for(publisher.connect(), timeout=30.0)
+
+        while not shutdown_event.is_set():
+            # Check message limit
+            if max_messages and messages_sent >= max_messages:
+                print(f"✓ Sent {messages_sent} messages (limit reached)")
+                break
+
+            try:
+                # Generate and send
+                data = generator.generate(device)
+                await asyncio.wait_for(publisher.send(data), timeout=30.0)
+                messages_sent += 1
+                stats['messages'] = float(messages_sent)
+
+                status = "Generated (DRY RUN)" if dry_run else "Sent successfully"
+                print(f"Message {messages_sent}: {status}")
+
+            except asyncio.TimeoutError:
+                print(f"Message {messages_sent + 1}: Timeout during send")
+                continue
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                print(f"Error sending message {messages_sent + 1}: {e}")
+
+                # Try cache invalidation for Azure failures
+                if not dry_run and hasattr(publisher, 'invalidate_cache_and_reconnect'):
+                    try:
+                        await asyncio.wait_for(publisher.invalidate_cache_and_reconnect(), timeout=30.0)
+                        continue
+                    except:
+                        pass
+
+            # Wait for next interval with cancellation check
+            if (max_messages is None or messages_sent < max_messages) and not shutdown_event.is_set():
+                jitter_amount = random.uniform(-jitter, jitter) if jitter > 0 else 0
+                wait_time = max(1, interval + jitter_amount)
+
+                # Sleep in chunks to be responsive to cancellation
+                remaining = wait_time
+                while remaining > 0 and not shutdown_event.is_set():
+                    sleep_chunk = min(0.1, remaining)
+                    await asyncio.sleep(sleep_chunk)
+                    remaining -= sleep_chunk
+
+        stats['elapsed'] = time.time() - stats['start_time']
+
+    except asyncio.CancelledError:
+        stats['elapsed'] = time.time() - stats['start_time']
+        raise
+    except Exception as e:
+        print(f"Error in simulation loop: {e}")
+        raise
+    finally:
+        # Cleanup
+        cleanup_tasks = asyncio.all_tasks() - {asyncio.current_task()}
+        for task in cleanup_tasks:
+            task.cancel()
+        if cleanup_tasks:
+            await asyncio.gather(*cleanup_tasks, return_exceptions=True)
+
+        if publisher:
+            try:
+                await asyncio.wait_for(publisher.disconnect(), timeout=10.0)
+            except Exception:
+                pass
+
+        shutdown_event.set()
+
+
+def start_key_monitor(shutdown_event):
+    """Start key monitoring thread for 'q' key press."""
+
     def key_monitor():
-        """Monitor for 'q' key press in a separate thread."""
         try:
             if sys.platform == "win32":
                 import msvcrt
@@ -335,13 +347,9 @@ async def _simulation_loop_with_cancellation(
                         if key.lower() == 'q':
                             shutdown_event.set()
                             break
-                    threading.Event().wait(0.1)  # Small delay to prevent busy waiting
+                    threading.Event().wait(0.1)
             else:
-                # Unix-like systems
-                import termios
-                import tty
-                import select
-
+                import termios, tty, select
                 old_settings = termios.tcgetattr(sys.stdin)
                 tty.setraw(sys.stdin.fileno())
 
@@ -353,108 +361,43 @@ async def _simulation_loop_with_cancellation(
                             break
 
                 termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+        except:
+            pass  # Continue without key monitoring if it fails
 
-        except (ImportError, OSError, Exception):
-            # Fall back to no key monitoring if anything fails
-            pass
-
-    # Start key monitoring thread
-    key_thread = None
     try:
-        key_thread = threading.Thread(target=key_monitor, daemon=True)
-        key_thread.start()
+        thread = threading.Thread(target=key_monitor, daemon=True)
+        thread.start()
+        return thread
     except:
-        pass  # Continue without key monitoring if it fails
-
-    try:
-        # Create transmitter and connect
-        transmitter = _create_transmitter(device, dry_run, force_provision)
-        await asyncio.wait_for(transmitter.connect(), timeout=30.0)
-
-        while not shutdown_event.is_set():
-            # Check message limit
-            if max_messages and messages_sent >= max_messages:
-                print(f"✓ Sent {messages_sent} messages (limit reached)")
-                break
-
-            try:
-                # Generate and send telemetry
-                data = generator.generate(device)
-                await asyncio.wait_for(transmitter.send(data), timeout=30.0)
-                messages_sent += 1
-                if stats is not None:
-                    stats['messages'] = float(messages_sent)  # Update stats
-
-                if dry_run:
-                    print(f"Message {messages_sent}: Generated (DRY RUN)")
-                else:
-                    print(f"Message {messages_sent}: Sent successfully")
-
-            except asyncio.TimeoutError:
-                print(f"Message {messages_sent + 1}: Timeout during send")
-                continue
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                print(f"Error sending message {messages_sent + 1}: {e}")
-
-                # Try cache invalidation and reconnect for Azure
-                if not dry_run and hasattr(transmitter, 'invalidate_cache_and_reconnect'):
-                    try:
-                        await asyncio.wait_for(
-                            transmitter.invalidate_cache_and_reconnect(),
-                            timeout=30.0
-                        )
-                        continue
-                    except:
-                        pass  # Continue with next message
-
-            # Wait for next interval with cancellation check
-            if (max_messages is None or messages_sent < max_messages) and not shutdown_event.is_set():
-                jitter_amount = random.uniform(-jitter, jitter) if jitter > 0 else 0
-                wait_time = max(1, interval + jitter_amount)
-
-                # Sleep in small chunks to be responsive to cancellation
-                remaining_time = wait_time
-                while remaining_time > 0 and not shutdown_event.is_set():
-                    sleep_chunk = min(0.1, remaining_time)  # Reduced for faster response (<0.1s max delay)
-                    await asyncio.sleep(sleep_chunk)
-                    remaining_time -= sleep_chunk
-
-        # Normal exit: set elapsed
-        if stats is not None:
-            stats['elapsed'] = time.time() - stats['start_time']
-
-    except asyncio.CancelledError:
-        # Cancellation: set elapsed and re-raise to propagate
-        if stats is not None:
-            stats['elapsed'] = time.time() - stats['start_time']
-        raise
-    except Exception as e:
-        print(f"Error in simulation loop: {e}")
-        raise
-    finally:
-        # Cancel and await all pending tasks to retrieve any unhandled exceptions (e.g., from Azure SDK internals)
-        loop = asyncio.get_running_loop()
-        pending_tasks = asyncio.all_tasks(loop) - {asyncio.current_task(loop)}
-        for task in pending_tasks:
-            task.cancel()
-        if pending_tasks:
-            await asyncio.gather(*pending_tasks, return_exceptions=True)
-
-        # Clean disconnect
-        if transmitter:
-            try:
-                await asyncio.wait_for(transmitter.disconnect(), timeout=10.0)
-            except Exception:
-                pass  # Silent cleanup - suppress any disconnect errors
-
-        shutdown_event.set()  # Ensure key monitoring thread stops
+        return None
 
 
-def _get_device(device_manager, device_id: Optional[str]):
+def get_device(device_manager, device_id: Optional[str]):
     """Get device by ID or return default device."""
     if device_id:
-        return device_manager.get_device(device_id)
+        device = device_manager.get_device(device_id)
+        if not device:
+            print_error(f"Device '{device_id}' not found")
+            print_info("Run 'ws-cli devices list' to see available devices")
+            raise typer.Exit(1)
     else:
-        return device_manager.get_default_device()
+        device = device_manager.get_default_device()
+        if not device:
+            print_error("No default device is set. Use --device-id or 'ws-cli devices set-default'")
+            raise typer.Exit(1)
+
+    return device
+
+
+def format_elapsed(seconds: float) -> str:
+    """Format elapsed time in a human-readable way."""
+    if seconds < 60:
+        return f"{int(seconds)}s"
+    elif seconds < 3600:
+        mins = int(seconds / 60)
+        secs = int(seconds % 60)
+        return f"{mins}m {secs}s"
+    else:
+        hours = int(seconds / 3600)
+        mins = int((seconds % 3600) / 60)
+        return f"{hours}h {mins}m"

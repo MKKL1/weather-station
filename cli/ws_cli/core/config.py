@@ -1,144 +1,232 @@
-from pathlib import Path
-import typer
 import json
-from typing import Dict, Any, Optional, TypeVar, Generic
+import logging
+from pathlib import Path
+from typing import Dict, Any, Optional, Union
+from dataclasses import dataclass, asdict, field
 
-APP_NAME = "ws-cli"
-APP_DIR = Path(typer.get_app_dir(APP_NAME))
-CONFIG_FILE_PATH = APP_DIR / "config.json"
+from ws_cli.core.storage import APP_DIR
 
-T = TypeVar('T')
+logger = logging.getLogger(__name__)
 
 
-def ensure_config_dir_exists():
-    APP_DIR.mkdir(parents=True, exist_ok=True)
+@dataclass
+class SimulationDefaults:
+    """Default simulation configuration."""
+    interval_seconds: int = 1800
+    jitter_seconds: float = 5.0
+    max_messages: Optional[int] = None
+    seed: Optional[int] = None
+    dry_run: bool = False
+
+
+@dataclass
+class DPSDefaults:
+    """Default DPS configuration."""
+    provisioning_host: str = "global.azure-devices-provisioning.net"
+    cache_ttl: int = 3600
+    connection_timeout: int = 30
+    max_retry_attempts: int = 3
+
+
+@dataclass
+class LoggingConfig:
+    """Logging configuration."""
+    level: str = "INFO"
+    format: str = "%(asctime)s %(levelname)-8s [%(name)s] %(message)s"
+    date_format: str = "%Y-%m-%d %H:%M:%S"
+
+
+@dataclass
+class AppConfig:
+    """Main application configuration."""
+    # Global settings
+    verbose: bool = False
+
+    # Default values for various components
+    simulation: SimulationDefaults = field(default_factory=SimulationDefaults)
+    dps: DPSDefaults = field(default_factory=DPSDefaults)
+    logging: LoggingConfig = field(default_factory=LoggingConfig)
+
+    # Custom user settings
+    custom: Dict[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "AppConfig":
+        """Create config from dictionary."""
+        # Handle nested dataclass conversion
+        simulation_data = data.get("simulation", {})
+        dps_data = data.get("dps", {})
+        logging_data = data.get("logging", {})
+
+        return cls(
+            verbose=data.get("verbose", False),
+            simulation=SimulationDefaults(**simulation_data),
+            dps=DPSDefaults(**dps_data),
+            logging=LoggingConfig(**logging_data),
+            custom=data.get("custom", {})
+        )
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization."""
+        return {
+            "verbose": self.verbose,
+            "simulation": asdict(self.simulation),
+            "dps": asdict(self.dps),
+            "logging": asdict(self.logging),
+            "custom": self.custom
+        }
+
+    def update_from_dict(self, updates: Dict[str, Any]) -> None:
+        """Update configuration from dictionary (for partial updates)."""
+        if "verbose" in updates:
+            self.verbose = updates["verbose"]
+
+        if "simulation" in updates:
+            sim_updates = updates["simulation"]
+            for key, value in sim_updates.items():
+                if hasattr(self.simulation, key):
+                    setattr(self.simulation, key, value)
+
+        if "dps" in updates:
+            dps_updates = updates["dps"]
+            for key, value in dps_updates.items():
+                if hasattr(self.dps, key):
+                    setattr(self.dps, key, value)
+
+        if "logging" in updates:
+            log_updates = updates["logging"]
+            for key, value in log_updates.items():
+                if hasattr(self.logging, key):
+                    setattr(self.logging, key, value)
+
+        if "custom" in updates:
+            self.custom.update(updates["custom"])
 
 
 class ConfigManager:
-    """Generic configuration manager with key-value storage."""
+    """Manages application configuration loading and saving."""
+
+    DEFAULT_CONFIG_NAME = "config.json"
 
     def __init__(self):
-        ensure_config_dir_exists()
-        self._config_path = CONFIG_FILE_PATH
-        self._config: Optional[Dict[str, Any]] = None
+        self._config: Optional[AppConfig] = None
+        self._config_path: Optional[Path] = None
 
-    def _load_config(self) -> Dict[str, Any]:
-        """Load the configuration file from disk."""
-        if not self._config_path.exists():
-            return {}
-        try:
-            with self._config_path.open("r") as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError):
-            # On corruption, start with a fresh config
-            return {}
+    def load_config(self, config_path: Optional[Union[str, Path]] = None) -> AppConfig:
+        """
+        Load configuration from file.
 
-    def _save_config(self, config: Dict[str, Any]) -> None:
-        """Save the configuration to disk."""
-        with self._config_path.open("w") as f:
-            json.dump(config, f, indent=4)
+        Args:
+            config_path: Optional path to config file. If None, uses default config.json
 
-    def get_config_path(self) -> str:
-        """Get the path to the configuration file."""
-        return str(self._config_path.resolve())
-
-    def get(self, key: str, default: Any = None) -> Any:
-        """Get a value from the configuration."""
-        if self._config is None:
-            self._config = self._load_config()
-        return self._config.get(key, default)
-
-    def set(self, key: str, value: Any) -> None:
-        """Set a value in the configuration and save to disk."""
-        if self._config is None:
-            self._config = self._load_config()
-        self._config[key] = value
-        self._save_config(self._config)
-
-    def delete(self, key: str) -> bool:
-        """Delete a key from the configuration and save to disk."""
-        if self._config is None:
-            self._config = self._load_config()
-        if key in self._config:
-            del self._config[key]
-            self._save_config(self._config)
-            return True
-        return False
-
-    def update(self, updates: Dict[str, Any]) -> None:
-        """Update multiple values in the configuration and save to disk."""
-        if self._config is None:
-            self._config = self._load_config()
-        self._config.update(updates)
-        self._save_config(self._config)
-
-    def get_all(self) -> Dict[str, Any]:
-        """Get the entire configuration dictionary."""
-        if self._config is None:
-            self._config = self._load_config()
-        return self._config.copy()
-
-    def reload(self) -> None:
-        """Force reload configuration from disk."""
-        self._config = None
-
-    def exists(self, key: str) -> bool:
-        """Check if a key exists in the configuration."""
-        if self._config is None:
-            self._config = self._load_config()
-        return key in self._config
-
-
-class ConfigSection:
-    """Helper class for managing a specific section of the configuration."""
-
-    def __init__(self, config_manager: ConfigManager, section_key: str, default_value: Any = None):
-        self.config_manager = config_manager
-        self.section_key = section_key
-        self.default_value = default_value or {}
-
-    def get(self) -> Any:
-        """Get the entire section."""
-        return self.config_manager.get(self.section_key, self.default_value)
-
-    def set(self, value: Any) -> None:
-        """Set the entire section."""
-        self.config_manager.set(self.section_key, value)
-
-    def update(self, updates: Dict[str, Any]) -> None:
-        """Update part of the section."""
-        current = self.get()
-        if isinstance(current, dict) and isinstance(updates, dict):
-            current.update(updates)
-            self.set(current)
+        Returns:
+            AppConfig instance
+        """
+        if config_path:
+            # Use explicitly provided config file
+            self._config_path = Path(config_path).resolve()
+            if not self._config_path.exists():
+                logger.warning(f"Config file not found: {self._config_path}")
+                logger.info("Using default configuration")
+                self._config = AppConfig()
+                return self._config
         else:
-            raise ValueError(f"Cannot update non-dict section '{self.section_key}'")
+            # Use default config.json in app directory
+            self._config_path = APP_DIR / self.DEFAULT_CONFIG_NAME
 
-    def get_item(self, item_key: str, default: Any = None) -> Any:
-        """Get a specific item from the section."""
-        section = self.get()
-        if isinstance(section, dict):
-            return section.get(item_key, default)
-        raise ValueError(f"Section '{self.section_key}' is not a dict")
+        if self._config_path.exists():
+            try:
+                with self._config_path.open("r", encoding="utf-8") as f:
+                    config_data = json.load(f)
 
-    def set_item(self, item_key: str, value: Any) -> None:
-        """Set a specific item in the section."""
-        section = self.get()
-        if not isinstance(section, dict):
-            section = {}
-        section[item_key] = value
-        self.set(section)
+                self._config = AppConfig.from_dict(config_data)
+                logger.debug(f"Loaded configuration from: {self._config_path}")
 
-    def delete_item(self, item_key: str) -> bool:
-        """Delete a specific item from the section."""
-        section = self.get()
-        if isinstance(section, dict) and item_key in section:
-            del section[item_key]
-            self.set(section)
-            return True
-        return False
+            except (json.JSONDecodeError, KeyError, TypeError) as e:
+                logger.error(f"Failed to load config from {self._config_path}: {e}")
+                logger.info("Using default configuration")
+                self._config = AppConfig()
+        else:
+            logger.debug(f"Config file not found: {self._config_path}")
+            logger.debug("Using default configuration")
+            self._config = AppConfig()
 
-    def exists(self, item_key: str) -> bool:
-        """Check if an item exists in the section."""
-        section = self.get()
-        return isinstance(section, dict) and item_key in section
+        return self._config
+
+    def save_config(self, config_path: Optional[Union[str, Path]] = None) -> None:
+        """
+        Save current configuration to file.
+
+        Args:
+            config_path: Optional path to save config. If None, uses loaded path or default.
+        """
+        if not self._config:
+            raise ValueError("No configuration loaded")
+
+        save_path = Path(config_path) if config_path else self._config_path
+        if not save_path:
+            save_path = APP_DIR / self.DEFAULT_CONFIG_NAME
+
+        # Ensure directory exists
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+
+        try:
+            with save_path.open("w", encoding="utf-8") as f:
+                json.dump(self._config.to_dict(), f, indent=2)
+
+            logger.info(f"Configuration saved to: {save_path}")
+        except IOError as e:
+            logger.error(f"Failed to save config to {save_path}: {e}")
+            raise
+
+    def get_config(self) -> AppConfig:
+        """Get current configuration (loads default if none loaded)."""
+        if self._config is None:
+            return self.load_config()
+        return self._config
+
+    def create_default_config(self, path: Optional[Union[str, Path]] = None) -> Path:
+        """
+        Create a default configuration file.
+
+        Args:
+            path: Optional path for config file. If None, uses default location.
+
+        Returns:
+            Path to created config file
+        """
+        config_path = Path(path) if path else APP_DIR / self.DEFAULT_CONFIG_NAME
+
+        # Create default config
+        default_config = AppConfig()
+
+        # Ensure directory exists
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with config_path.open("w", encoding="utf-8") as f:
+            json.dump(default_config.to_dict(), f, indent=2)
+
+        logger.info(f"Created default configuration: {config_path}")
+        return config_path
+
+    @property
+    def config_path(self) -> Optional[Path]:
+        """Get the path of the currently loaded config file."""
+        return self._config_path
+
+
+# Global config manager instance
+_config_manager: Optional[ConfigManager] = None
+
+
+def get_config_manager() -> ConfigManager:
+    """Get global configuration manager instance."""
+    global _config_manager
+    if _config_manager is None:
+        _config_manager = ConfigManager()
+    return _config_manager
+
+
+def get_config() -> AppConfig:
+    """Get current application configuration."""
+    return get_config_manager().get_config()
