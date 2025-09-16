@@ -1,0 +1,27 @@
+[tool.poetry]
+name = "ws-cli"
+version = "0.1.0"
+description = "Weather Station CLI"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.9,<4.0"
+typer = {extras = ["rich"], version = "^0.12.3"}
+azure-iot-device = "^2.14.0"
+protobuf = "^6.32.1"
+pyyaml = "^6.0.2"
+
+[tool.poetry.scripts]
+ws-cli = "ws_cli.__main__:app"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+[dependency-groups]
+dev = [
+    "pytest (>=8.4.2,<9.0.0)"
+]
+
+[tool.pytest.ini_options]
+addopts = "-q --tb=short"
+testpaths = ["tests"]

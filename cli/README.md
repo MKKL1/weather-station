@@ -1,0 +1,4 @@
+# ws-cli
+
+## TODO
+[] - Autocompletion
