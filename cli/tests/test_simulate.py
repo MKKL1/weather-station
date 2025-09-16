@@ -1,191 +1,146 @@
 # tests/test_simulate.py
 import pytest
-import asyncio
 from types import SimpleNamespace
 from ws_cli.__main__ import app
-from ws_cli.core.models.models import Device, AuthConfig, DPSConfig, AuthType
+from ws_cli.core.models.models import Device, AuthConfig, DPSConfig, AuthType, WeatherData, Histogram, DeviceInfo
 
-# A reusable dummy device for testing
+# Reusable dummy device for testing
 dummy_device = Device(
     device_id="sim-001",
     auth=AuthConfig(type=AuthType.SYMMETRIC_KEY, symmetric_key="abc123"),
-    dps_config=DPSConfig(id_scope="scope-xyz", registration_id="sim-001",
-                         provisioning_host="global.azure-devices-provisioning.net")
+    dps_config=DPSConfig(id_scope="scope-xyz", registration_id="sim-001")
 )
 
-# Use a generic object (SimpleNamespace) to represent the provisioned identity
-dummy_identity = SimpleNamespace(
-    assigned_hub="my-hub.azure-devices.net",
-    device_id="sim-001",
-    auth_info=SimpleNamespace(type='symmetric_key', key='...'),
+# A fake telemetry object for the mock generator
+fake_telemetry = WeatherData(
+    created_at=1234567890,
+    temperature=21.5,
+    pressure=1012.5,
+    humidity=55.2,
+    tips=Histogram(data=b'\x00\x00', count=16, interval_duration=120, start_time=1234560000),
+    info=DeviceInfo(id="sim-001", mm_per_tip=0.2, instance_id=1234)
 )
-
-
-class MockDeviceManager:
-    def __init__(self, device=None, default_id=None):
-        self._device = device
-        self._default_id = default_id if default_id else (device.device_id if device else None)
-
-    def get_device(self, device_id):
-        return self._device if self._device and device_id == self._device.device_id else None
-
-    def get_default_device(self):
-        return self._device if self._default_id else None
-
-
-class MockProvisioner:
-    def __init__(self, identity=None, should_fail=False):
-        self._identity = identity
-        self._should_fail = should_fail
-        self.provision_called_with = None
-
-    async def get_device_identity(self, device, force_provision=False):
-        self.provision_called_with = device
-        if self._should_fail:
-            raise Exception("Provisioning failed")
-        return self._identity
 
 
 class MockPublisher:
-    def __init__(self, should_fail=False):
-        self.publish_calls = []
-        self._should_fail = should_fail
+    """A mock publisher to intercept calls and simulate success or failure."""
 
-    async def connect(self) -> None:
-        """Mock connect method."""
-        pass
+    def __init__(self, should_fail=False, should_timeout=False):
+        self.connect_called = 0
+        self.send_called_with = None
+        self.disconnect_called = 0
+        self.should_fail = should_fail
+        self.should_timeout = should_timeout
+        self.invalidate_called = 0
 
-    async def send(self, data) -> None:
-        """Mock send method, replacing publish."""
-        if self._should_fail:
-            raise Exception("Publishing failed")
-        self.publish_calls.append(data)
+    async def connect(self):
+        self.connect_called += 1
+        if self.should_timeout: raise TimeoutError("Connection timed out")
+        if self.should_fail: raise ConnectionError("Failed to connect")
 
-    async def disconnect(self) -> None:
-        """Mock disconnect method."""
-        pass
+    async def send(self, data):
+        self.send_called_with = data
+        if self.should_timeout: raise TimeoutError("Send timed out")
+        if self.should_fail: raise ValueError("Failed to send")
 
-    async def __aenter__(self):
-        return self
+    async def disconnect(self):
+        self.disconnect_called += 1
 
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        pass
-
-
-@pytest.fixture
-def patch_console_utils(monkeypatch):
-    """Patch all console printing functions."""
-    monkeypatch.setattr("ws_cli.utils.console.print_success", print)
-    monkeypatch.setattr("ws_cli.utils.console.print_info", print)
-    monkeypatch.setattr("ws_cli.utils.console.print_warning", print)
-    monkeypatch.setattr("ws_cli.utils.console.print_error", print)
+    async def invalidate_cache_and_reconnect(self):
+        self.invalidate_called += 1
+        await self.connect()
 
 
 @pytest.fixture
-def mock_dependencies(monkeypatch, patch_console_utils):
-    """A comprehensive fixture to mock all external dependencies for simulation."""
-    from types import SimpleNamespace  # Ensure imported
-    mocks = SimpleNamespace()
-    mocks.device_manager = MockDeviceManager(device=dummy_device)
-    mocks.provisioner = MockProvisioner(identity=dummy_identity)
-    mocks.publisher = MockPublisher()
-    mocks.fake_publisher = MockPublisher()
+def mock_simulation_deps(monkeypatch, mock_storage):
+    """Mocks all dependencies for the 'simulate' commands."""
+    # 1. Setup mock storage with a default device
+    mock_storage.section("devices").set_item("sim-001", dummy_device.to_dict())
+    mock_storage.set("default_device", "sim-001")
 
-    # The command function imports these classes locally, so we must patch them at their original source.
-    monkeypatch.setattr("ws_cli.commands.simulate.DeviceManager", lambda: mocks.device_manager)
-    monkeypatch.setattr("ws_cli.commands.simulate.AzureDPSProvisioner", lambda *args, **kwargs: mocks.provisioner)
-    monkeypatch.setattr("ws_cli.commands.simulate.FakeDataPublisher", lambda *args, **kwargs: mocks.fake_publisher)
+    # 2. Mock the data generator to return predictable data
+    monkeypatch.setattr(
+        "ws_cli.commands.simulate.SimulatedDataGenerator.generate",
+        lambda self, device: fake_telemetry
+    )
 
-    class MockDataGenerator:
-        def __init__(self):
-            pass
+    # 3. Create a controllable mock publisher instance
+    mock_pub = MockPublisher()
 
-        def generate(self, device):
-            return b"fake_data"
+    # 4. Mock the publisher factory to always return our mock publisher
+    monkeypatch.setattr(
+        "ws_cli.commands.simulate.create_publisher",
+        lambda device, dry_run, force_provision=False, progress=None, task_id=None: mock_pub
+    )
 
-    monkeypatch.setattr("ws_cli.commands.simulate.SimulatedDataGenerator", MockDataGenerator)
-
-    # Mock AzureDataPublisher as a class that performs provisioning in connect()
-    class MockAzureDataPublisher(MockPublisher):
-        def __init__(self, device_cfg, provisioner, *args, **kwargs):
-            self.device_cfg = device_cfg
-            self.provisioner = provisioner
-            super().__init__(should_fail=False)
-
-        async def connect(self) -> None:
-            self.identity = await self.provisioner.get_device_identity(self.device_cfg)
-            # Optionally call super().connect() if needed, but it's pass
-
-    monkeypatch.setattr("ws_cli.commands.simulate.AzureDataPublisher", MockAzureDataPublisher)
-
-    return mocks
+    return SimpleNamespace(
+        storage=mock_storage,
+        publisher=mock_pub
+    )
 
 
-# def test_simulate_run_happy_path(runner, mock_dependencies):
-#     result = runner.invoke(app, ["simulate", "once"])
-#     #assert result.exit_code == 0
-#     assert "Telemetry sent successfully" in result.stdout
-#     assert mock_dependencies.provisioner.provision_called_with.device_id == "sim-001"
-#     assert len(mock_dependencies.publisher.publish_calls) == 1
-#     assert mock_dependencies.publisher.publish_calls[0] == b"fake_data"
-#     assert len(mock_dependencies.fake_publisher.publish_calls) == 0
+def test_simulate_once_happy_path(runner, mock_simulation_deps):
+    result = runner.invoke(app, ["simulate", "once"])
 
-
-def test_simulate_run_dry_run(runner, mock_dependencies):
-    result = runner.invoke(app, ["simulate", "once", "--dry-run"])
     assert result.exit_code == 0
-    assert "DRY RUN MODE - No data will be sent" in result.stdout
     assert "Telemetry sent successfully" in result.stdout
-    # Provisioner should not be called in dry run
-    assert mock_dependencies.provisioner.provision_called_with is None
-    # Real publisher should not be used
-    assert len(mock_dependencies.publisher.publish_calls) == 0
-    # Fake publisher should be used
-    assert len(mock_dependencies.fake_publisher.publish_calls) == 1
-    assert mock_dependencies.fake_publisher.publish_calls[0] == b"fake_data"
+    assert mock_simulation_deps.publisher.connect_called == 1
+    assert mock_simulation_deps.publisher.send_called_with == fake_telemetry
+    assert mock_simulation_deps.publisher.disconnect_called == 1
 
 
-# def test_simulate_run_no_device_configured(runner, mock_dependencies):
-#     mock_dependencies.device_manager._device = None
-#     mock_dependencies.device_manager._default_id = None
-#     result = runner.invoke(app, ["simulate", "once"])
-#     assert result.exit_code == 1
-#     assert "No device found. Add a device first with 'ws-cli devices add'" in result.stdout
+def test_simulate_once_dry_run(runner, mock_simulation_deps):
+    result = runner.invoke(app, ["simulate", "once", "--dry-run"])
+
+    assert result.exit_code == 0
+    assert "DRY RUN MODE" in result.stdout
+    # The factory should still be called, returning our mock
+    assert mock_simulation_deps.publisher.connect_called == 1
+    assert mock_simulation_deps.publisher.send_called_with is not None
 
 
-def test_simulate_run_device_not_found(runner, mock_dependencies):
-    result = runner.invoke(app, ["simulate", "once", "--device-id", "non-existent-device"])
+def test_simulate_once_no_default_device(runner, mock_storage):
+    # mock_storage is empty, so no devices are configured
+    result = runner.invoke(app, ["simulate", "once"])
     assert result.exit_code == 1
-    assert "Device 'non-existent-device' not found" in result.stdout
+    assert "No default device is set" in result.stdout
 
 
-# def test_simulate_provisioning_fails(runner, mock_dependencies):
-#     mock_dependencies.provisioner._should_fail = True
-#     result = runner.invoke(app, ["simulate", "once"])
-#     assert result.exit_code == 1
-#     assert "Failed to provision device" in result.stdout
-#     assert "Provisioning failed" in result.stdout
+def test_simulate_once_device_not_found(runner, mock_simulation_deps):
+    result = runner.invoke(app, ["simulate", "once", "--device-id", "not-found"])
+    assert result.exit_code == 1
+    assert "Device 'not-found' not found" in result.stdout
 
 
-# def test_simulate_publish_fails(runner, mock_dependencies):
-#     mock_dependencies.publisher._should_fail = True  # Note: publisher is now AzureDataPublisher mock
-#     result = runner.invoke(app, ["simulate", "once"])
-#     assert result.exit_code == 1
-#     assert "Failed to send message" in result.stdout
-#     assert "Publishing failed" in result.stdout
+def test_simulate_once_connection_fails(runner, mock_simulation_deps):
+    mock_simulation_deps.publisher.should_fail = True
+    result = runner.invoke(app, ["simulate", "once"])
+    assert result.exit_code == 1
+    assert "Failed to send telemetry" in result.stdout
+    assert "Failed to connect" in result.stdout  # The specific error from the mock
 
 
-def test_simulate_keyboard_interrupt(runner, monkeypatch, patch_console_utils):
-    from ws_cli.utils.console import print_warning  # For patching if needed
+def test_simulate_once_send_fails_with_retry(runner, mock_simulation_deps):
+    # Make the first send fail, but the reconnect/retry succeed
+    mock_simulation_deps.publisher.should_fail = True
+    result = runner.invoke(app, ["simulate", "once"])
+
+    assert result.exit_code == 1  # The command still fails overall
+    assert "Transmission failed" in result.stdout
+    assert "attempting cache invalidation and retry" in result.stdout
+
+    # Check that the invalidation logic was called
+    assert mock_simulation_deps.publisher.invalidate_called == 1
+
+
+def test_simulate_keyboard_interrupt(runner, monkeypatch, mock_simulation_deps):
     """Test that KeyboardInterrupt is handled gracefully."""
 
     def mock_raiser(*args, **kwargs):
         raise KeyboardInterrupt
 
-    # Patch asyncio.run in the simulate module
     monkeypatch.setattr("ws_cli.commands.simulate.asyncio.run", mock_raiser)
     result = runner.invoke(app, ["simulate", "once"])
 
-    # Exit code 130 is standard for Ctrl+C
-    assert result.exit_code == 130
+    assert result.exit_code == 130  # Standard exit code for Ctrl+C
     assert "Operation cancelled by user" in result.stdout
