@@ -1,3 +1,4 @@
+# ws_cli/commands/cache.py
 from typing import Optional
 
 import typer
@@ -16,7 +17,7 @@ def show_cache():
     Show current DPS cache status and entries.
 
     Examples:
-        ws-cli config cache show
+        ws-cli cache show
     """
     from ws_cli.core.config import ConfigManager
     from ws_cli.utils.console import print_warning, print_error
@@ -109,9 +110,9 @@ def clear_cache(
     Clear DPS cache entries.
 
     Examples:
-        ws-cli config cache clear
-        ws-cli config cache clear --device-id sim-001
-        ws-cli config cache clear --force
+        ws-cli cache clear
+        ws-cli cache clear --device-id sim-001
+        ws-cli cache clear --force
     """
     from ws_cli.core.config import ConfigManager
     from ws_cli.utils.console import print_info, print_success, print_error
@@ -169,9 +170,9 @@ def refresh_cache(
     Force refresh DPS cache entries by re-provisioning.
 
     Examples:
-        ws-cli config cache refresh
-        ws-cli config cache refresh --device-id sim-001
-        ws-cli config cache refresh --ttl 86400  # 24 hours
+        ws-cli cache refresh
+        ws-cli cache refresh --device-id sim-001
+        ws-cli cache refresh --ttl 86400  # 24 hours
     """
     import asyncio
     from ws_cli.core.config import ConfigManager
@@ -260,7 +261,7 @@ def validate_cache():
     Validate DPS cache entries and report any issues.
 
     Examples:
-        ws-cli config cache validate
+        ws-cli cache validate
     """
     from ws_cli.core.config import ConfigManager
     from ws_cli.utils.console import print_info, print_success, print_error, print_warning
@@ -331,8 +332,8 @@ def validate_cache():
         if not expired and not orphaned and not issues:
             print_success("✓ All cache entries are valid")
         else:
-            print_info("Run 'ws-cli config cache clear' to remove invalid entries")
-            print_info("Run 'ws-cli config cache refresh' to update expired entries")
+            print_info("Run 'ws-cli cache clear' to remove invalid entries")
+            print_info("Run 'ws-cli cache refresh' to update expired entries")
 
     except Exception as e:
         print_error(f"Failed to validate cache: {e}")

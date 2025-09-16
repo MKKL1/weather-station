@@ -326,7 +326,11 @@ def remove_device(
         device_manager.remove_device(device_id)
         print_success(f"✓ Device '{device_id}' removed")
 
+    except typer.Exit as e:
+        # Re-raise typer.Exit to preserve the intended exit code
+        raise
     except Exception as e:
+        # Handle other unexpected errors
         print_error(f"Failed to remove device: {e}")
         raise typer.Exit(1)
 

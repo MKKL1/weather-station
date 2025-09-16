@@ -1,3 +1,4 @@
+# ws_cli/commands/simulate.py
 import asyncio
 import random
 import signal
@@ -123,11 +124,17 @@ def simulate_once(
     try:
         # Get device
         device_manager = DeviceManager()
-        device = _get_device(device_manager, device_id)
-
-        if not device:
-            print_error("No device found. Add a device first with 'ws-cli devices add'")
-            raise typer.Exit(1)
+        if device_id:
+            device = device_manager.get_device(device_id)
+            if not device:
+                print_error(f"Device '{device_id}' not found")
+                print_info("Run 'ws-cli devices list' to see available devices")
+                raise typer.Exit(1)
+        else:
+            device = device_manager.get_default_device()
+            if not device:
+                print_error("No default device is set. Use --device-id or 'ws-cli devices set-default'")
+                raise typer.Exit(1)
 
         print_info(f"Using device: [bold]{device.device_id}[/bold]")
 
@@ -179,7 +186,7 @@ def simulate_continuous(
             "--device-id",
             "-d",
             help="Device ID to use",
-            autocompletion=lambda: ["sim-001", "sim-002", "dev-001"],
+            autocompletion=lambda: ["0", "1", "2"],
         ),
         interval: int = typer.Option(
             1800,
@@ -232,11 +239,16 @@ def simulate_continuous(
     try:
         # Get device
         device_manager = DeviceManager()
-        device = _get_device(device_manager, device_id)
-
-        if not device:
-            print_error("No device found. Add a device first with 'ws-cli devices add'")
-            raise typer.Exit(1)
+        if device_id:
+            device = device_manager.get_device(device_id)
+            if not device:
+                print_error(f"Device '{device_id}' not found")
+                raise typer.Exit(1)
+        else:
+            device = device_manager.get_default_device()
+            if not device:
+                print_error("No default device is set")
+                raise typer.Exit(1)
 
         print_info(f"Starting continuous simulation for device: [bold]{device.device_id}[/bold]")
         print_info(f"Interval: {interval}s, Jitter: ±{jitter}s")
