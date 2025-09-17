@@ -6,7 +6,7 @@ from typing import Dict, Any
 from azure.iot.device import X509
 from azure.iot.device.aio import ProvisioningDeviceClient
 
-from ws_cli.core.models.models import Device
+from hw_cli.core.models.models import Device
 
 logger = logging.getLogger(__name__)
 

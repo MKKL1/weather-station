@@ -9,10 +9,10 @@ from pathlib import Path
 if any(arg == "?" for arg in sys.argv[1:]):
     sys.argv = [sys.argv[0]] + ["--help" if arg == "?" else arg for arg in sys.argv[1:]]
 
-from ws_cli.commands import simulate, devices, enrollment
-from ws_cli.commands.cache import cache_app
-from ws_cli.commands.config_cmd import config_app  # NEW IMPORT
-from ws_cli.core.config import get_config_manager, AppConfig  # NEW IMPORT
+from hw_cli.commands import simulate, devices, enrollment
+from hw_cli.commands.cache import cache_app
+from hw_cli.commands.config_cmd import config_app  # NEW IMPORT
+from hw_cli.core.config import get_config_manager, AppConfig  # NEW IMPORT
 
 app = typer.Typer(
     name="ws-cli",
@@ -72,7 +72,7 @@ def verbose_callback(ctx: typer.Context, param, value: bool):
 
 def version_callback(value: bool):
     if value:
-        from ws_cli.utils.console import print_success
+        from hw_cli.utils.console import print_success
         print_success("Weather Station CLI v0.1.0")
         raise typer.Exit()
 
@@ -93,7 +93,7 @@ def main(
             "--config",
             "-c",
             help="Configuration file path (defaults to config.json)",
-            envvar="WS_CLI_CONFIG",
+            envvar="hw_cli_CONFIG",
         ),
         verbose: bool = typer.Option(
             False,
@@ -106,7 +106,7 @@ def main(
     """
     Weather Station CLI - Simulate weather telemetry for Azure IoT Hub
     """
-    from ws_cli.utils.console import print_info
+    from hw_cli.utils.console import print_info
 
     # Initialize context
     if ctx.obj is None:

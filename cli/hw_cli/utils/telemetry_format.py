@@ -4,7 +4,7 @@ from rich.text import Text
 
 from datetime import datetime
 
-from ws_cli.core.models.models import WeatherData
+from hw_cli.core.models.models import WeatherData
 
 
 def print_telemetry(msg: str, data: WeatherData, timezone: str = "CEST") -> None:

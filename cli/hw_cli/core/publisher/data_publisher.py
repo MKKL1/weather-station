@@ -1,6 +1,6 @@
 from typing import Protocol
 
-from ws_cli.core.models.models import WeatherData
+from hw_cli.core.models.models import WeatherData
 
 
 class DataPublisher(Protocol):

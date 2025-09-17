@@ -1,0 +1,110 @@
+name: Build and Test CLI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cli/**'
+      - '.github/workflows/build-cli.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'cli/**'
+      - '.github/workflows/build-cli.yml'
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+    
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install poetry
+      
+      - name: Install CLI dependencies
+        working-directory: ./cli
+        run: |
+          poetry config virtualenvs.create false --local
+          poetry install --no-interaction --no-ansi
+      
+      - name: Run tests with coverage
+        working-directory: ./cli
+        run: |
+          poetry run pytest
+
+  build:
+    needs: test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install poetry build twine
+      
+      - name: Install CLI dependencies
+        working-directory: ./cli
+        run: |
+          poetry config virtualenvs.create false --local
+          poetry install --no-interaction --no-ansi
+      
+      - name: Build distributions
+        working-directory: ./cli
+        run: |
+          poetry build
+      
+      - name: Check build artifacts
+        working-directory: ./cli
+        run: |
+          ls -la dist/
+          python -m twine check dist/*
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: cli-dist
+          path: ./cli/dist/
+          retention-days: 7
+
+  test-install:
+    needs: build
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: cli-dist
+          path: ./dist/
+      
+      - name: Test wheel installation
+        run: |
+          pip install ./dist/*.whl
+          hw --help

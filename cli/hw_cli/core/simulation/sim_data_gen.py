@@ -3,8 +3,8 @@ import random
 import time
 from typing import Optional
 
-from ws_cli.core.models.models import SimulationConfig, WeatherData, Device, Histogram, DeviceInfo
-from ws_cli.core.simulation.data_generator import WeatherDataGenerator
+from hw_cli.core.models.models import SimulationConfig, WeatherData, Device, Histogram, DeviceInfo
+from hw_cli.core.simulation.data_generator import WeatherDataGenerator
 
 
 class WeatherEntry:

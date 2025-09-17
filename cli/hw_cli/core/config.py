@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional, Union
 from dataclasses import dataclass, asdict, field
 
-from ws_cli.core.storage import APP_DIR
+from hw_cli.core.storage import APP_DIR
 
 logger = logging.getLogger(__name__)
 

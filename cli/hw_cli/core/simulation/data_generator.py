@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from ws_cli.core.models.models import Device, WeatherData
+from hw_cli.core.models.models import Device, WeatherData
 
 
 class WeatherDataGenerator(ABC):

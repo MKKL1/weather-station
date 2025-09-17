@@ -1,4 +1,4 @@
-# ws_cli/commands/cache.py
+# hw_cli/commands/cache.py
 from typing import Optional
 import time
 from datetime import datetime
@@ -8,8 +8,8 @@ from rich.table import Table
 from rich.prompt import Confirm
 from rich import print
 
-from ws_cli.core.storage import get_data
-from ws_cli.utils.console import print_info, print_success, print_error, print_warning
+from hw_cli.core.storage import get_data
+from hw_cli.utils.console import print_info, print_success, print_error, print_warning
 
 cache_app = typer.Typer(help="DPS cache management commands")
 

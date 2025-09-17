@@ -64,7 +64,7 @@ def generate_keys(
         ),
 ):
     """Generate per-device symmetric keys from a group enrollment primary key."""
-    from ws_cli.utils.console import print_error, print_info, print_success
+    from hw_cli.utils.console import print_error, print_info, print_success
 
     try:
         devices: List[str] = list(device_names or [])

@@ -3,7 +3,7 @@ import time
 import hashlib
 from typing import Optional, Dict, Any
 
-from ws_cli.core.storage import get_data
+from hw_cli.core.storage import get_data
 
 logger = logging.getLogger(__name__)
 

@@ -1,8 +1,8 @@
 # tests/test_devices.py
 import pytest
-from ws_cli.__main__ import app
-from ws_cli.core.models.models import Device, AuthConfig, DPSConfig, AuthType
-from ws_cli.core.device_manager import DeviceManager
+from hw_cli.__main__ import app
+from hw_cli.core.models.models import Device, AuthConfig, DPSConfig, AuthType
+from hw_cli.core.device_manager import DeviceManager
 from datetime import datetime
 
 # A reusable dummy device for testing

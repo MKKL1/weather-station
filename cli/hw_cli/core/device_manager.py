@@ -1,6 +1,6 @@
 from typing import Optional, List
-from ws_cli.core.storage import get_data
-from ws_cli.core.models.models import Device
+from hw_cli.core.storage import get_data
+from hw_cli.core.models.models import Device
 
 
 class DeviceManager:

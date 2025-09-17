@@ -1,8 +1,8 @@
 import asyncio
 
-from ws_cli.core.publisher.data_publisher import DataPublisher
-from ws_cli.utils.console import print_info, print_success
-from ws_cli.utils.telemetry_format import print_telemetry
+from hw_cli.core.publisher.data_publisher import DataPublisher
+from hw_cli.utils.console import print_info, print_success
+from hw_cli.utils.telemetry_format import print_telemetry
 
 
 class FakeDataPublisher(DataPublisher):

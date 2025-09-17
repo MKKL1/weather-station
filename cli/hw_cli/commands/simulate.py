@@ -1,4 +1,4 @@
-# ws_cli/commands/simulate.py
+# hw_cli/commands/simulate.py
 import asyncio
 import random
 import signal
@@ -11,11 +11,11 @@ from typing import Optional, Dict
 import typer
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from ws_cli.core.device_manager import DeviceManager
-from ws_cli.core.publisher.azure_publisher import AzureDataPublisher
-from ws_cli.core.publisher.fake_data_publisher import FakeDataPublisher
-from ws_cli.core.simulation.sim_data_gen import SimulatedDataGenerator
-from ws_cli.utils.console import print_info, print_success, print_error, print_warning
+from hw_cli.core.device_manager import DeviceManager
+from hw_cli.core.publisher.azure_publisher import AzureDataPublisher
+from hw_cli.core.publisher.fake_data_publisher import FakeDataPublisher
+from hw_cli.core.simulation.sim_data_gen import SimulatedDataGenerator
+from hw_cli.utils.console import print_info, print_success, print_error, print_warning
 
 app = typer.Typer(help="Simulation commands")
 

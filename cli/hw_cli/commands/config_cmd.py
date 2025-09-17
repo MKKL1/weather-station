@@ -1,4 +1,4 @@
-# ws_cli/commands/config_cmd.py
+# hw_cli/commands/config_cmd.py
 import json
 import sys
 from typing import Optional
@@ -8,9 +8,9 @@ import typer
 from rich import print
 from rich.prompt import Confirm
 
-from ws_cli.core.config import get_config_manager
-from ws_cli.core.storage import APP_DIR
-from ws_cli.utils.console import print_info, print_success, print_error
+from hw_cli.core.config import get_config_manager
+from hw_cli.core.storage import APP_DIR
+from hw_cli.utils.console import print_info, print_success, print_error
 
 config_app = typer.Typer(help="Configuration management commands")
 

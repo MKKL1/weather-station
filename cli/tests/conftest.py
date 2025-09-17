@@ -76,10 +76,10 @@ def mock_storage(monkeypatch):
     """
     mock_store = MockStorage()
     # Patch the get_data function in all modules where it's used.
-    monkeypatch.setattr("ws_cli.core.storage.get_data", lambda: mock_store)
-    monkeypatch.setattr("ws_cli.core.device_manager.get_data", lambda: mock_store)
-    monkeypatch.setattr("ws_cli.core.identity.provisioning_cache.get_data", lambda: mock_store)
-    monkeypatch.setattr("ws_cli.commands.cache.get_data", lambda: mock_store)
+    monkeypatch.setattr("hw_cli.core.storage.get_data", lambda: mock_store)
+    monkeypatch.setattr("hw_cli.core.device_manager.get_data", lambda: mock_store)
+    monkeypatch.setattr("hw_cli.core.identity.provisioning_cache.get_data", lambda: mock_store)
+    monkeypatch.setattr("hw_cli.commands.cache.get_data", lambda: mock_store)
     return mock_store
 
 
@@ -90,7 +90,7 @@ def patch_console_utils(monkeypatch):
     to avoid rich formatting issues in test output.
     """
     # Using lambda to ignore the message argument and just print a simple string
-    monkeypatch.setattr("ws_cli.utils.console.print_success", lambda msg: print(f"SUCCESS: {msg}"))
-    monkeypatch.setattr("ws_cli.utils.console.print_info", lambda msg: print(f"INFO: {msg}"))
-    monkeypatch.setattr("ws_cli.utils.console.print_warning", lambda msg: print(f"WARNING: {msg}"))
-    monkeypatch.setattr("ws_cli.utils.console.print_error", lambda msg: print(f"ERROR: {msg}"))
+    monkeypatch.setattr("hw_cli.utils.console.print_success", lambda msg: print(f"SUCCESS: {msg}"))
+    monkeypatch.setattr("hw_cli.utils.console.print_info", lambda msg: print(f"INFO: {msg}"))
+    monkeypatch.setattr("hw_cli.utils.console.print_warning", lambda msg: print(f"WARNING: {msg}"))
+    monkeypatch.setattr("hw_cli.utils.console.print_error", lambda msg: print(f"ERROR: {msg}"))

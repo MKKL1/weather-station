@@ -1,7 +1,7 @@
 # tests/test_cache.py
 import time
 import pytest
-from ws_cli.__main__ import app
+from hw_cli.__main__ import app
 
 
 @pytest.fixture

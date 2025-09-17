@@ -4,8 +4,8 @@ from typing import Optional
 import typer
 
 
-from ws_cli.core.device_manager import DeviceManager
-from ws_cli.core.models.models import AuthConfig, DPSConfig, Device, AuthType
+from hw_cli.core.device_manager import DeviceManager
+from hw_cli.core.models.models import AuthConfig, DPSConfig, Device, AuthType
 
 app = typer.Typer(help="Device management commands")
 
@@ -86,7 +86,7 @@ def add_device(
         # Symmetric key + DPS
         ws-cli devices add dev-device-92fc2ca1 --auth-type symmetric_key --primary-key "h9...=" --dps-id-scope "0ne00FD4B37"
     """
-    from ws_cli.utils.console import print_info, print_success, print_error, print_warning
+    from hw_cli.utils.console import print_info, print_success, print_error, print_warning
     from rich.prompt import Confirm
 
     try:
@@ -170,7 +170,7 @@ def list_devices(
         ws-cli devices list
         ws-cli devices list --verbose
     """
-    from ws_cli.utils.console import print_error, print_warning
+    from hw_cli.utils.console import print_error, print_warning
     from rich.table import Table
     from rich import print
 
@@ -239,7 +239,7 @@ def set_default_device(
         ws-cli devices set-default sim-001
         ws-cli devices set-default 0
     """
-    from ws_cli.utils.console import print_info, print_success, print_error
+    from hw_cli.utils.console import print_info, print_success, print_error
 
     try:
         device_manager = DeviceManager()
@@ -292,7 +292,7 @@ def remove_device(
         ws-cli devices remove sim-001
         ws-cli devices remove 0 --force
     """
-    from ws_cli.utils.console import print_info, print_success, print_error
+    from hw_cli.utils.console import print_info, print_success, print_error
     from rich.prompt import Confirm
 
     try:
@@ -349,7 +349,7 @@ def show_device(
         ws-cli devices show sim-001
         ws-cli devices show 0
     """
-    from ws_cli.utils.console import print_error
+    from hw_cli.utils.console import print_error
     from rich import print
 
     try:

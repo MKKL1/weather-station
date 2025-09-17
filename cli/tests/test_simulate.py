@@ -1,8 +1,8 @@
 # tests/test_simulate.py
 import pytest
 from types import SimpleNamespace
-from ws_cli.__main__ import app
-from ws_cli.core.models.models import Device, AuthConfig, DPSConfig, AuthType, WeatherData, Histogram, DeviceInfo
+from hw_cli.__main__ import app
+from hw_cli.core.models.models import Device, AuthConfig, DPSConfig, AuthType, WeatherData, Histogram, DeviceInfo
 
 # Reusable dummy device for testing
 dummy_device = Device(
@@ -60,7 +60,7 @@ def mock_simulation_deps(monkeypatch, mock_storage):
 
     # 2. Mock the data generator to return predictable data
     monkeypatch.setattr(
-        "ws_cli.commands.simulate.SimulatedDataGenerator.generate",
+        "hw_cli.commands.simulate.SimulatedDataGenerator.generate",
         lambda self, device: fake_telemetry
     )
 
@@ -69,7 +69,7 @@ def mock_simulation_deps(monkeypatch, mock_storage):
 
     # 4. Mock the publisher factory to always return our mock publisher
     monkeypatch.setattr(
-        "ws_cli.commands.simulate.create_publisher",
+        "hw_cli.commands.simulate.create_publisher",
         lambda device, dry_run, force_provision=False, progress=None, task_id=None: mock_pub
     )
 
@@ -139,7 +139,7 @@ def test_simulate_keyboard_interrupt(runner, monkeypatch, mock_simulation_deps):
     def mock_raiser(*args, **kwargs):
         raise KeyboardInterrupt
 
-    monkeypatch.setattr("ws_cli.commands.simulate.asyncio.run", mock_raiser)
+    monkeypatch.setattr("hw_cli.commands.simulate.asyncio.run", mock_raiser)
     result = runner.invoke(app, ["simulate", "once"])
 
     assert result.exit_code == 130  # Standard exit code for Ctrl+C
