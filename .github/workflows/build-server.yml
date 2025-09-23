@@ -1,4 +1,4 @@
-name: Build and test
+name: Build and Test server
 
 on:
   push:
@@ -11,7 +11,6 @@ jobs:
     name: Build Solution 
     runs-on: ubuntu-latest
 
-    # <<< Set the working directory once for all `run:` steps
     defaults:
       run:
         working-directory: server
