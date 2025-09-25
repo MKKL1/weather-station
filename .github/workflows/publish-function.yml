@@ -1,0 +1,83 @@
+name: Publish IoTEventWorker on tag
+
+on:
+  push:
+    tags:
+      - 'func-v*'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: deploy/IoTEventWorker
+
+    steps:
+      - name: Checkout the tag
+        uses: actions/checkout@v5
+
+      - name: Install OS deps
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y zip jq
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore solution
+        run: dotnet restore IoTEventWorker.sln
+
+      - name: Build solution (Release)
+        run: dotnet build IoTEventWorker.sln --no-restore -c Release
+
+      - name: Run tests
+        run: dotnet test --no-build --configuration Release || true
+
+      - name: Publish Worker project
+        run: |
+          PUBLISH_DIR=./publish
+          rm -rf "$PUBLISH_DIR"
+          dotnet publish ./Worker/Worker.csproj -c Release -o "$PUBLISH_DIR" --self-contained false -r linux-x64 || dotnet publish ./Worker/Worker.csproj -c Release -o "$PUBLISH_DIR" --self-contained false
+          ls -la "$PUBLISH_DIR"
+
+      - name: Package published output (zip)
+        id: package
+        run: |
+          SHA=${GITHUB_SHA::8}
+          ZIPNAME="function-${SHA}.zip"
+          PUBLISH_DIR=./publish
+          (cd "$PUBLISH_DIR" && zip -r ../"$ZIPNAME" .)
+          echo "$ZIPNAME" > build-zip-name.txt
+          echo "::set-output name=zipname::$ZIPNAME"
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: function-zip
+          path: function-*.zip
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy zip to production Function App
+        uses: azure/cli@v2
+        with:
+          azcliversion: latest
+          inlineScript: |
+            echo "Deploying $ZIPNAME to ${{ vars.AZURE_FUNCTIONAPP_NAME }} in ${{ vars.AZURE_RESOURCE_GROUP }}"
+            az functionapp deployment source config-zip \
+              --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
+              --name "${{ vars.AZURE_FUNCTIONAPP_NAME }}" \
+              --src "./${ZIPNAME}"
