@@ -33,7 +33,7 @@ jobs:
         shell: bash
         run: |
           pushd './${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
-          dotnet build --configuration Release --output ./output
+          dotnet publish Worker/Worker.csproj --configuration Release --no-restore --output ./output
           popd
 
       - name: Azure Login
