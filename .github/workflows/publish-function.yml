@@ -9,8 +9,7 @@ on:
 env:
   AZURE_FUNCTIONAPP_PACKAGE_PATH: 'deploy/IoTEventWorker'
   DOTNET_VERSION: '8.0.x'
-
-
+  DOTNET_PROJECT_PATH: 'deploy/IoTEventWorker/Worker/Worker.csproj'
 
 jobs:
   build-and-publish:
@@ -29,12 +28,10 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: 'Resolve Project Dependencies Using Dotnet'
+      - name: 'Build and Publish Project'
         shell: bash
         run: |
-          pushd './${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
-          dotnet publish Worker/Worker.csproj --configuration Release --no-restore --output ./output
-          popd
+          dotnet publish "${{ env.DOTNET_PROJECT_PATH }}" --configuration Release --output "${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/output"
 
       - name: Azure Login
         uses: azure/login@v2
