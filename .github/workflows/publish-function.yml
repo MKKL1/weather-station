@@ -6,69 +6,35 @@ on:
       - 'func-v*'
   workflow_dispatch:
 
-permissions:
-  id-token: write
-  contents: read
+env:
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: 'deploy/IoTEventWorker'
+  DOTNET_VERSION: '8.0.x'
+
+
 
 jobs:
   build-and-publish:
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
     environment: production
-
-    defaults:
-      run:
-        working-directory: deploy/IoTEventWorker
 
     steps:
       - name: Checkout the tag
         uses: actions/checkout@v5
 
-      - name: Install OS deps
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y zip jq
-
-      - name: Setup .NET 8
+      - name: Setup DotNet ${{ env.DOTNET_VERSION }} Environment
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
-      - name: Restore solution
-        run: dotnet restore IoTEventWorker.sln
-
-      - name: Build solution (Release)
-        run: dotnet build IoTEventWorker.sln --no-restore -c Release
-
-      - name: Run tests
-        run: dotnet test --no-build --configuration Release || true
-
-      - name: Publish Worker project
+      - name: 'Resolve Project Dependencies Using Dotnet'
+        shell: bash
         run: |
-          PUBLISH_DIR=./publish
-          rm -rf "$PUBLISH_DIR"
-          dotnet publish ./Worker/Worker.csproj -c Release -o "$PUBLISH_DIR" --self-contained false -r linux-x64 || dotnet publish ./Worker/Worker.csproj -c Release -o "$PUBLISH_DIR" --self-contained false
-          ls -la "$PUBLISH_DIR"
-
-      - name: Package published output (zip)
-        id: package
-        run: |
-          set -e
-          SHA=${GITHUB_SHA::8}
-          ZIPNAME="function-${SHA}.zip"
-          PUBLISH_DIR=./publish
-          # Create zip in the current working directory (deploy/IoTEventWorker)
-          (cd "$PUBLISH_DIR" && zip -r "../${ZIPNAME}" .)
-          echo "Created zip: ${ZIPNAME}"
-          echo "ZIPNAME=${ZIPNAME}" >> $GITHUB_ENV
-          echo "zipname=${ZIPNAME}" >> $GITHUB_OUTPUT
-          # Verify the zip was created
-          ls -la "${ZIPNAME}"
-
-      - name: Upload package artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: function-zip
-          path: deploy/IoTEventWorker/function-*.zip
+          pushd './${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
+          dotnet build --configuration Release --output ./output
+          popd
 
       - name: Azure Login
         uses: azure/login@v2
@@ -77,11 +43,10 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Deploy zip to production Function App
-        run: |
-          echo "Deploying ${ZIPNAME} to ${{ vars.AZURE_FUNCTIONAPP_NAME }} in ${{ vars.AZURE_RESOURCE_GROUP }}"
-          test -f "${ZIPNAME}" || (echo "Zip not found: ${ZIPNAME}" && ls -la . && exit 1)
-          az functionapp deployment source config-zip \
-            --resource-group "${{ vars.AZURE_RESOURCE_GROUP }}" \
-            --name "${{ vars.AZURE_FUNCTIONAPP_NAME }}" \
-            --src "${ZIPNAME}"
+      - name: 'Run Azure Functions Action'
+        uses: Azure/functions-action@v1
+        id: fa
+        with:
+          app-name: 'fn-weather-station-dev'
+          slot-name: 'Production'
+          package: '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/output'
