@@ -55,9 +55,13 @@ jobs:
           SHA=${GITHUB_SHA::8}
           ZIPNAME="function-${SHA}.zip"
           PUBLISH_DIR=./publish
+          rm -f "../${ZIPNAME}"    # be safe
           (cd "$PUBLISH_DIR" && zip -r ../"$ZIPNAME" .)
-          echo "$ZIPNAME" > build-zip-name.txt
-          echo "::set-output name=zipname::$ZIPNAME"
+          echo "Created zip: $ZIPNAME"
+          echo "ZIPNAME=$ZIPNAME" >> $GITHUB_ENV
+          echo "zipname=$ZIPNAME" >> $GITHUB_OUTPUT
+          ls -la ..
+
 
       - name: Upload package artifact
         uses: actions/upload-artifact@v4
