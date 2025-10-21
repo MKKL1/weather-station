@@ -35,7 +35,7 @@ jobs:
         run: |
           pushd './${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}'
           dotnet build --configuration Release --output ./output
-          dotnet publish --configuration Release --output ./output --no-build
+          dotnet publish ./Worker/Worker.csproj --configuration Release --output ./output
           popd
       
       - name: Login to Azure
