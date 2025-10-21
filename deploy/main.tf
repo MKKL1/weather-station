@@ -2,7 +2,7 @@ terraform {
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
-      version = "=4.37.0"
+      version = "=4.49.0"
     }
     azapi = {
       source  = "Azure/azapi"
@@ -70,16 +70,16 @@ resource "azurerm_storage_account" "sa" {
   account_replication_type = "LRS"
 }
 
-resource "azurerm_service_plan" "asp" {
-  name                = "asp-${var.project_name}-${var.environment}"
+resource "azurerm_service_plan" "flex_asp" {
+  name                = "flex_asp-${var.project_name}-${var.environment}"
   resource_group_name = azurerm_resource_group.rg.name
   location            = var.location
   os_type             = "Linux"
-  sku_name            = "Y1"
+  sku_name            = "FC1"
 }
 
 resource "azurerm_cosmosdb_account" "this" {
-  name                = "cosmos-${var.project_name}-${var.environment}"
+  name                = "cosmos2-${var.project_name}-${var.environment}"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
   offer_type          = "Standard"
@@ -132,36 +132,48 @@ resource "azurerm_cosmosdb_sql_container" "leases" {
   partition_key_paths = ["/id"]
 }
 
-resource "azurerm_linux_function_app" "function_app" {
-  name                       = "fn-${var.project_name}-${var.environment}"
-  resource_group_name        = azurerm_resource_group.rg.name
-  location                   = var.location
-  
-  storage_account_name       = azurerm_storage_account.sa.name
-  storage_account_access_key = azurerm_storage_account.sa.primary_access_key
-  service_plan_id            = azurerm_service_plan.asp.id
+resource "azurerm_storage_container" "function_app_container" {
+  name                  = "functionappcontainerheavyweatherdev" # Must be lowercase, 3-63 characters, alphanumeric, and hyphens
+  storage_account_id    = azurerm_storage_account.sa.id # Uses full Resource Manager ID
+  container_access_type = "private" # Use "private" for security; adjust if needed
+}
 
-  site_config {
-    application_stack {
-      dotnet_version = "8.0"
-      use_dotnet_isolated_runtime = true
-    }
-  }
+# Function App with Flex Consumption Plan
+resource "azurerm_function_app_flex_consumption" "function_app" {
+  name                = "fn-${var.project_name}-${var.environment}"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = var.location
+  service_plan_id     = azurerm_service_plan.flex_asp.id
+
+  storage_container_endpoint  = "${azurerm_storage_account.sa.primary_blob_endpoint}${azurerm_storage_container.function_app_container.name}"
+  storage_container_type      = "blobContainer"
+  storage_authentication_type = "StorageAccountConnectionString"
+  storage_access_key          = azurerm_storage_account.sa.primary_access_key
+
+  runtime_name    = "dotnet-isolated"
+  runtime_version = "8.0"
+
+  # Optional: Configure instance limits and memory
+  maximum_instance_count = 40
+  instance_memory_in_mb  = 512
+
+  site_config {} # Required, even if empty
 
   app_settings = {
-    FUNCTIONS_WORKER_RUNTIME = "dotnet-isolated"
-    WEBSITE_RUN_FROM_PACKAGE = "1" #zip
+    WEBSITE_RUN_FROM_PACKAGE = "1" # Zip deployment
     AzureWebJobsStorage      = azurerm_storage_account.sa.primary_connection_string
 
     EH_CONN_STRING = "Endpoint=${azurerm_iothub.iothub.event_hub_events_endpoint};SharedAccessKeyName=${azurerm_iothub_shared_access_policy.hub_access_policy.name};SharedAccessKey=${azurerm_iothub_shared_access_policy.hub_access_policy.primary_key};EntityPath=${azurerm_iothub.iothub.event_hub_events_path}"
     EH_NAME        = azurerm_iothub.iothub.event_hub_events_path
 
-    COSMOS_CONNECTION = azurerm_cosmosdb_account.this.primary_sql_connection_string
-    COSMOS_DATABASE   = azurerm_cosmosdb_sql_database.this.name
-    COSMOS_CONTAINER  = azurerm_cosmosdb_sql_container.this.name
-    COSMOS_VIEWS_CONTAINER  = azurerm_cosmosdb_sql_container.views.name
+    COSMOS_CONNECTION      = azurerm_cosmosdb_account.this.primary_sql_connection_string
+    COSMOS_DATABASE        = azurerm_cosmosdb_sql_database.this.name
+    COSMOS_CONTAINER       = azurerm_cosmosdb_sql_container.this.name
+    COSMOS_VIEWS_CONTAINER = azurerm_cosmosdb_sql_container.views.name
     COSMOS_LEASE_CONTAINER = azurerm_cosmosdb_sql_container.leases.name
   }
+
+  depends_on = [azurerm_storage_container.function_app_container]
 }
 
 module "enrollment-group" {

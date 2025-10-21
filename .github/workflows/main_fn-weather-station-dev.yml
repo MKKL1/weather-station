@@ -5,13 +5,13 @@ name: Build and deploy dotnet core project to Azure Function App - fn-weather-st
 
 on:
   push:
-    branches:
-      - main
+    tags:
+      - 'func-v*'
   workflow_dispatch:
 
 env:
-  AZURE_FUNCTIONAPP_PACKAGE_PATH: '.' # set this to the path to your web app project, defaults to the repository root
-  DOTNET_VERSION: '8.0' # set this to the dotnet version to use
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: 'deploy/IoTEventWorker'
+  DOTNET_VERSION: '8.0'
 
 jobs:
   build-and-deploy:
@@ -19,13 +19,14 @@ jobs:
     permissions:
       id-token: write #This is required for requesting the JWT
       contents: read #This is required for actions/checkout
+    environment: production
 
     steps:
-      - name: 'Checkout GitHub Action'
-        uses: actions/checkout@v4
+      - name: Checkout the tag
+        uses: actions/checkout@v5
 
       - name: Setup DotNet ${{ env.DOTNET_VERSION }} Environment
-        uses: actions/setup-dotnet@v1
+        uses: actions/setup-dotnet@v4
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
 
