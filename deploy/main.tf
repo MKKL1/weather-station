@@ -160,7 +160,6 @@ resource "azurerm_function_app_flex_consumption" "function_app" {
   site_config {} # Required, even if empty
 
   app_settings = {
-    WEBSITE_RUN_FROM_PACKAGE = "1" # Zip deployment
     AzureWebJobsStorage      = azurerm_storage_account.sa.primary_connection_string
 
     EH_CONN_STRING = "Endpoint=${azurerm_iothub.iothub.event_hub_events_endpoint};SharedAccessKeyName=${azurerm_iothub_shared_access_policy.hub_access_policy.name};SharedAccessKey=${azurerm_iothub_shared_access_policy.hub_access_policy.primary_key};EntityPath=${azurerm_iothub.iothub.event_hub_events_path}"
