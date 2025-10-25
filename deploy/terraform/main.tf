@@ -1,22 +1,22 @@
-terraform {
-  required_providers {
-    azurerm = {
-      source  = "hashicorp/azurerm"
-      version = "=4.49.0"
-    }
-    azapi = {
-      source  = "Azure/azapi"
-      version = "=2.5.0"
-    }
-  }
+# This resource is used to generate a unique suffix for resources
+# to avoid naming conflicts
+resource "random_id" "suffix" {
+  byte_length = 4
 }
 
-provider "azurerm" {
-  subscription_id = var.subscription_id
-  features {}
-}
+locals {
+  # Clean project and env names for storage account (alphanumeric, lowercase)
+  sa_project_name = lower(replace(var.project_name, "/[^a-zA-Z0-9]/", ""))
+  sa_env_name     = lower(replace(var.environment, "/[^a-zA-Z0-9]/", ""))
 
-provider "azapi" {}
+  # Random suffix for all resources
+  random_suffix = random_id.suffix.hex
+
+  # Construct a unique name, ensuring it fits length constraints (max 24)
+  # "st" + "project" + "env" + "random"
+  # We'll take max 10 from project, 3 from env, plus "st" (2) and random (8) = 23
+  storage_account_name = var.storage_account_name != "" ? var.storage_account_name : "st${substr(local.sa_project_name, 0, 10)}${substr(local.sa_env_name, 0, 3)}${local.random_suffix}"
+}
 
 resource "azurerm_resource_group" "rg" {
   name     = "rg-${var.project_name}-${var.environment}"
@@ -24,9 +24,9 @@ resource "azurerm_resource_group" "rg" {
 }
 
 resource "azurerm_iothub" "iothub" {
-  name                = "iot-${var.project_name}-${var.environment}"
-  resource_group_name = azurerm_resource_group.rg.name
-  location            = azurerm_resource_group.rg.location
+  name                      = "iot-${var.project_name}-${var.environment}-${local.random_suffix}"
+  resource_group_name       = azurerm_resource_group.rg.name
+  location                  = azurerm_resource_group.rg.location
 
   event_hub_partition_count = 2
 
@@ -47,7 +47,7 @@ resource "azurerm_iothub_shared_access_policy" "hub_access_policy" {
 }
 
 resource "azurerm_iothub_dps" "dps" {
-  name                = "dps-${var.project_name}-${var.environment}"
+  name                = "dps-${var.project_name}-${var.environment}-${local.random_suffix}"
   resource_group_name = azurerm_resource_group.rg.name
   location            = azurerm_resource_group.rg.location
 
@@ -63,7 +63,7 @@ resource "azurerm_iothub_dps" "dps" {
 }
 
 resource "azurerm_storage_account" "sa" {
-  name                     = "weatherstationdevappsa" #unique name required
+  name                     = local.storage_account_name # Use the generated unique name
   resource_group_name      = azurerm_resource_group.rg.name
   location                 = var.location
   account_tier             = "Standard"
@@ -71,7 +71,7 @@ resource "azurerm_storage_account" "sa" {
 }
 
 resource "azurerm_service_plan" "flex_asp" {
-  name                = "flex_asp-${var.project_name}-${var.environment}"
+  name                = "asp-${var.project_name}-${var.environment}"
   resource_group_name = azurerm_resource_group.rg.name
   location            = var.location
   os_type             = "Linux"
@@ -79,7 +79,7 @@ resource "azurerm_service_plan" "flex_asp" {
 }
 
 resource "azurerm_cosmosdb_account" "this" {
-  name                = "cosmos2-${var.project_name}-${var.environment}"
+  name                = "cosmos-${var.project_name}-${var.environment}-${local.random_suffix}"
   location            = azurerm_resource_group.rg.location
   resource_group_name = azurerm_resource_group.rg.name
   offer_type          = "Standard"
@@ -90,7 +90,7 @@ resource "azurerm_cosmosdb_account" "this" {
   }
 
   geo_location {
-    location          = "Germany West Central" #In my case, West Europe is not available
+    location          = azurerm_resource_group.rg.location
     failover_priority = 0
   }
 
@@ -133,14 +133,14 @@ resource "azurerm_cosmosdb_sql_container" "leases" {
 }
 
 resource "azurerm_storage_container" "function_app_container" {
-  name                  = "functionappcontainerheavyweatherdev" # Must be lowercase, 3-63 characters, alphanumeric, and hyphens
-  storage_account_id    = azurerm_storage_account.sa.id # Uses full Resource Manager ID
-  container_access_type = "private" # Use "private" for security; adjust if needed
+  name                  = var.function_app_container_name
+  storage_account_id    = azurerm_storage_account.sa.id
+  container_access_type = "private"
 }
 
 # Function App with Flex Consumption Plan
 resource "azurerm_function_app_flex_consumption" "function_app" {
-  name                = "fn-${var.project_name}-${var.environment}"
+  name                = "fn-${var.project_name}-${var.environment}-${local.random_suffix}"
   resource_group_name = azurerm_resource_group.rg.name
   location            = var.location
   service_plan_id     = azurerm_service_plan.flex_asp.id
@@ -153,14 +153,13 @@ resource "azurerm_function_app_flex_consumption" "function_app" {
   runtime_name    = "dotnet-isolated"
   runtime_version = "8.0"
 
-  # Optional: Configure instance limits and memory
   maximum_instance_count = 40
   instance_memory_in_mb  = 512
 
   site_config {} # Required, even if empty
 
   app_settings = {
-    AzureWebJobsStorage      = azurerm_storage_account.sa.primary_connection_string
+    AzureWebJobsStorage = azurerm_storage_account.sa.primary_connection_string
 
     EH_CONN_STRING = "Endpoint=${azurerm_iothub.iothub.event_hub_events_endpoint};SharedAccessKeyName=${azurerm_iothub_shared_access_policy.hub_access_policy.name};SharedAccessKey=${azurerm_iothub_shared_access_policy.hub_access_policy.primary_key};EntityPath=${azurerm_iothub.iothub.event_hub_events_path}"
     EH_NAME        = azurerm_iothub.iothub.event_hub_events_path
@@ -175,71 +174,17 @@ resource "azurerm_function_app_flex_consumption" "function_app" {
   depends_on = [azurerm_storage_container.function_app_container]
 }
 
-module "enrollment-group" {
-  source            = "./modules/dps_enrollment_group"
-  subscription_id   = var.subscription_id
-  resource-group    = azurerm_resource_group.rg.name
-  iothub            = azurerm_iothub.iothub.name
-  iothub-hostname   = azurerm_iothub.iothub.hostname
-  dps               = azurerm_iothub_dps.dps.name
-  enrollment-name   = "${azurerm_iothub_dps.dps.name}-main"
-  initial-twin-tags = "[]"
+# doesn't work
+# module "enrollment-group" {
+#   source = "./modules/dps_enrollment_group"
 
-  depends_on = [azurerm_iothub_dps.dps]
-}
+#   subscription_id = var.subscription_id
+#   resource-group  = azurerm_resource_group.rg.name
+#   iothub          = azurerm_iothub.iothub.name
+#   iothub-hostname = azurerm_iothub.iothub.hostname
+#   dps             = azurerm_iothub_dps.dps.name
+#   enrollment-name = "${azurerm_iothub_dps.dps.name}-main"
+#   initial-twin-tags = "[]"
 
-
-
-
-
-
-output "resource_group_name" {
-  description = "Resource Group name"
-  value       = azurerm_resource_group.rg.name
-}
-
-output "iot_hub_name" {
-  description = "IoT Hub name"
-  value       = azurerm_iothub.iothub.name
-}
-
-output "iot_hub_hostname" {
-  description = "IoT Hub hostname"
-  value       = azurerm_iothub.iothub.hostname
-}
-
-output "dps_name" {
-  description = "Device Provisioning Service name"
-  value       = azurerm_iothub_dps.dps.name
-}
-
-output "dps_endpoint" {
-  description = "DPS global endpoint"
-  value       = "global.azure-devices-provisioning.net"
-}
-output "dps_id_scope" {
-  description = "DPS ID Scope"
-  value       = azurerm_iothub_dps.dps.id_scope
-}
-
-output "service_connection_string" {
-  description = "Service connection string"
-  value       = azurerm_iothub_shared_access_policy.hub_access_policy.primary_connection_string
-  sensitive   = true
-}
-
-output "cosmos_primary_connection_string" {
-  description = "Primary connection string for Cosmos DB"
-  value       = azurerm_cosmosdb_account.this.primary_sql_connection_string
-  sensitive   = true
-}
-
-output "cosmos_database_name" {
-  description = "Cosmos DB database name"
-  value       = azurerm_cosmosdb_sql_database.this.name
-}
-
-output "cosmos_container_name" {
-  description = "Cosmos DB container name"
-  value       = azurerm_cosmosdb_sql_container.this.name
-}
+#   depends_on = [azurerm_iothub_dps.dps]
+# }
