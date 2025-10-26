@@ -1,0 +1,61 @@
+name: Build and deploy IoTEventWorker to Azure Function App
+
+on:
+  push:
+    tags:
+      - 'func-v*'
+  workflow_dispatch:
+
+env:
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: 'deploy/IoTEventWorker'
+  DOTNET_VERSION: '8.0'
+
+permissions:
+  id-token: write
+  contents: write
+
+jobs:
+  build-test:
+    uses: ./.github/workflows/build-function.yml
+    with:
+      upload_artifact: true
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-test
+    environment: production
+
+    steps:
+      - name: Download artifact from build
+        uses: actions/download-artifact@v4
+        with:
+          name: function-app
+          path: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/output
+
+      - name: 'Create Release Archive'
+        run: |
+          cd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/output'
+          zip -r ../../IoTEventWorker-${{ github.ref_name }}.zip .
+          cd ../..
+      
+      - name: 'Upload to Release'
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: IoTEventWorker-${{ github.ref_name }}.zip
+          generate_release_notes: true
+      
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZUREAPPSERVICE_CLIENTID_56C329CFB6354D4D9E1B7DCAEFBF547E }}
+          tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_00970569888245DD877612E58F5F21D8 }}
+          subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_D8C6AAE24B2441DD93B6ABBFAB372CB9 }}
+
+      - name: 'Run Azure Functions Action'
+        uses: Azure/functions-action@v1
+        id: fa
+        with:
+          app-name: ${{ vars.AZURE_FUNCTION_NAME }}
+          slot-name: 'Production'
+          package: '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/output'

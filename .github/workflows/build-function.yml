@@ -13,6 +13,12 @@ on:
       - '.github/workflows/build-function.yml'
   workflow_dispatch:
   workflow_call:
+    inputs:
+      upload_artifact:
+        description: 'Whether to publish and upload the artifact for deployment'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -41,8 +47,19 @@ jobs:
       - name: Restore solution
         run: dotnet restore IoTEventWorker.sln
 
-      - name: Build
+      - name: Build (Release)
         run: dotnet build IoTEventWorker.sln --no-restore -c Release
 
       - name: Test
-        run: dotnet test --no-build --configuration Release
+        run: dotnet test --no-build -c Release
+
+      - name: Publish for deployment
+        if: ${{ inputs.upload_artifact }}
+        run: dotnet publish ./Worker/Worker.csproj --no-build -c Release --output ./output
+
+      - name: Upload artifact for deployment
+        if: ${{ inputs.upload_artifact }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: function-app
+          path: ${{ github.workspace }}/deploy/IoTEventWorker/output

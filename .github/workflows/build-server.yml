@@ -3,8 +3,16 @@ name: Build and Test server
 on:
   push:
     branches: [ main ]
+    paths:
+      - 'server/**'
+      - '.github/workflows/build-server.yml'
   pull_request:
     branches: [ main ]
+    paths:
+      - 'server/**'
+      - '.github/workflows/build-server.yml'
+  workflow_dispatch:
+  workflow_call:
 
 jobs:
   build:

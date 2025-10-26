@@ -1,11 +1,23 @@
 # storage.py - Single file for all storage needs
 import json
 import yaml
+import os
 from pathlib import Path
 from typing import Dict, Any, Optional
 import typer
 
-APP_DIR = Path(typer.get_app_dir("ws-cli", roaming=False)).expanduser()
+# Allow override via environment variable
+def get_app_dir() -> Path:
+    """Get application directory from env or use default user app dir."""
+    env_path = os.getenv("HW_CLI_DATA_DIR")
+    
+    if env_path:
+        return Path(env_path).expanduser().resolve()
+    
+    # Default to user app directory
+    return Path(typer.get_app_dir("ws-cli", roaming=False)).expanduser()
+
+APP_DIR = get_app_dir()
 
 
 def ensure_app_dir():
@@ -137,14 +149,3 @@ def get_data() -> Storage:
     if _data_instance is None:
         _data_instance = Storage("data.json", "json")
     return _data_instance
-
-# Example usage:
-# config = get_config()
-# config.set("api_key", "secret")
-# 
-# data = get_data() 
-# devices = data.section("devices")
-# devices.set_item("sim-001", {"type": "simulator"})
-# 
-# cache = data.section("dps_cache")
-# cache.set_item("key123", {"identity": {...}, "cached_at": time.time()})

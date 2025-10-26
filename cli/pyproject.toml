@@ -2,6 +2,7 @@
 name = "heavyweather-cli"
 version = "0.2.0"
 description = "Heavy Weather CLI"
+authors = ["MKKL1"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
