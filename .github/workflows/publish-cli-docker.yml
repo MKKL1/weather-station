@@ -51,15 +51,17 @@ jobs:
           tags: |
             type=ref,event=branch
             type=ref,event=pr
+            type=ref,event=tag
             type=semver,pattern={{version}},prefix=cli-v
             type=semver,pattern={{major}}.{{minor}},prefix=cli-v
             type=semver,pattern={{major}},prefix=cli-v
-            type=sha,prefix={{branch}}-
+            type=sha,prefix=sha-
             type=raw,value=latest,enable={{is_default_branch}}
           labels: |
             org.opencontainers.image.title=Heavy Weather CLI
             org.opencontainers.image.description=Command-line interface for Heavy Weather
             org.opencontainers.image.vendor=${{ github.repository_owner }}
+
 
       - name: Build and push Docker image
         id: build
