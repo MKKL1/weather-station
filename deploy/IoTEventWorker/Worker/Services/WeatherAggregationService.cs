@@ -13,6 +13,7 @@ public class WeatherAggregationService(
     IHistogramProcessor histogramProcessor): IWeatherAggregationService
 {
     private const int HourlyAggregateBucketSeconds = 300;
+    
     public async Task SaveLatestState(RawEventDocument document)
     {
         //TODO save only newer event (if events come out of order)
@@ -80,6 +81,70 @@ public class WeatherAggregationService(
         await Task.WhenAll(models.Select(viewRepository.UpdateHourlyView).ToArray());
     }
 
+    public async Task UpdateDailyAggregate(RawEventDocument document)
+    {
+        var histogram = histogramConverter.ToHistogramModel(document.Payload.Rain);
+        var resampledRainHistogram = histogramProcessor.ResampleHistogram(
+            histogram,
+            document.Payload.RainfallMMPerTip,
+            HourlyAggregateBucketSeconds);
+
+        var id = viewIdService.GenerateId(document.DeviceId, document.EventTimestamp, DocType.Daily);
+        var dateId = viewIdService.GenerateDateId(document.EventTimestamp, DocType.Daily);
+        var dailyAggregate = await GetOrCreateDailyAggregate(id, dateId, new DeviceId(document.DeviceId));
+
+        // Check if already processed (idempotency)
+        if (dailyAggregate.Payload.IncludedRawIds.Contains(document.id))
+        {
+            return;
+        }
+
+        // Check if finalized (should not update sealed aggregates)
+        if (dailyAggregate.Payload.IsFinalized)
+        {
+            return;
+        }
+
+        // Update daily totals
+        dailyAggregate.Payload.Temperature = IncrementOrSet(dailyAggregate.Payload.Temperature, document.Payload.Temperature);
+        dailyAggregate.Payload.Pressure = IncrementOrSet(dailyAggregate.Payload.Pressure, document.Payload.Pressure);
+        dailyAggregate.Payload.Humidity = IncrementOrSet(dailyAggregate.Payload.Humidity, document.Payload.Humidity);
+
+        // Update hourly breakdowns
+        var eventHour = document.EventTimestamp.Hour;
+        
+        dailyAggregate.Payload.HourlyTemperature ??= new Dictionary<int, MetricAggregate>();
+        dailyAggregate.Payload.HourlyTemperature[eventHour] = IncrementOrSet(
+            dailyAggregate.Payload.HourlyTemperature.GetValueOrDefault(eventHour),
+            document.Payload.Temperature);
+
+        dailyAggregate.Payload.HourlyHumidity ??= new Dictionary<int, MetricAggregate>();
+        dailyAggregate.Payload.HourlyHumidity[eventHour] = IncrementOrSet(
+            dailyAggregate.Payload.HourlyHumidity.GetValueOrDefault(eventHour),
+            document.Payload.Humidity);
+
+        dailyAggregate.Payload.HourlyPressure ??= new Dictionary<int, MetricAggregate>();
+        dailyAggregate.Payload.HourlyPressure[eventHour] = IncrementOrSet(
+            dailyAggregate.Payload.HourlyPressure.GetValueOrDefault(eventHour),
+            document.Payload.Pressure);
+
+        // Update hourly rain histogram
+        var dayStart = new DateTimeOffset(document.EventTimestamp.Year, document.EventTimestamp.Month,
+            document.EventTimestamp.Day, 0, 0, 0, document.EventTimestamp.Offset);
+        
+        dailyAggregate.Payload.HourlyRain ??= new Histogram<float>(
+            new float[24 * (3600 / HourlyAggregateBucketSeconds)], 
+            HourlyAggregateBucketSeconds, 
+            dayStart);
+        
+        histogramProcessor.AddToHistogram(dailyAggregate.Payload.HourlyRain, resampledRainHistogram);
+
+        // Track processed event
+        dailyAggregate.Payload.IncludedRawIds.Add(document.id);
+
+        await viewRepository.UpdateDailyView(dailyAggregate);
+    }
+
     private static MetricAggregate IncrementOrSet(MetricAggregate? metricAggregate, float value)
     {
         if (metricAggregate == null)
@@ -103,6 +168,20 @@ public class WeatherAggregationService(
             DocType = DocType.Hourly,
             Payload = new HourlyAggregatePayload()
         };
+    }
 
+    private async Task<AggregateModel<DailyAggregatePayload>> GetOrCreateDailyAggregate(Id dailyId, DateId dateId, DeviceId deviceId)
+    {
+        var response = await viewRepository.GetDailyAggregate(dailyId, deviceId);
+        if (response != null) return response;
+        
+        return new AggregateModel<DailyAggregatePayload>
+        {
+            Id = dailyId,
+            DeviceId = deviceId,
+            DateId = dateId,
+            DocType = DocType.Daily,
+            Payload = new DailyAggregatePayload()
+        };
     }
 }

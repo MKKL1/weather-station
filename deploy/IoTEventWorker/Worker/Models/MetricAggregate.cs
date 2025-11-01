@@ -2,13 +2,14 @@
 
 /// <summary>
 /// Represents aggregate statistics for a collection of numeric metric values.
+/// Supports both active aggregation (with Sum/Count) and finalized state (with precomputed Avg).
 /// </summary>
 public class MetricAggregate
 {
     /// <summary>
-    /// Gets the sum of all metric values in the aggregate.
+    /// Gets the sum of all metric values in the aggregate. Null when finalized.
     /// </summary>
-    public float Sum { get; private set; }
+    public float? Sum { get; private set; }
 
     /// <summary>
     /// Gets the minimum value among all metric values in the aggregate.
@@ -21,9 +22,14 @@ public class MetricAggregate
     public float Max { get; private set; }
 
     /// <summary>
-    /// Gets the total number of metric values in the aggregate.
+    /// Gets the total number of metric values in the aggregate. Null when finalized.
     /// </summary>
-    public int Count { get; private set; }
+    public int? Count { get; private set; }
+
+    /// <summary>
+    /// Gets the precomputed average value. Populated during finalization.
+    /// </summary>
+    public float? Avg { get; private set; }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="MetricAggregate"/> class with the specified aggregate values.
@@ -32,9 +38,10 @@ public class MetricAggregate
     /// <param name="min">The minimum value among all metric values.</param>
     /// <param name="max">The maximum value among all metric values.</param>
     /// <param name="count">The total number of metric values. Must be greater than 0.</param>
+    /// <param name="avg">Optional precomputed average (used for finalized aggregates).</param>
     /// <exception cref="T:System.ArgumentOutOfRangeException">Thrown if <paramref name="count" /> is less than or equal to 0.</exception>
     /// <exception cref="T:System.ArgumentException">Thrown if <paramref name="min" /> is greater than <paramref name="max" />.</exception>
-    public MetricAggregate(float sum, float min, float max, int count)
+    public MetricAggregate(float sum, float min, float max, int count, float? avg = null)
     {
         if (count <= 0)
         {
@@ -49,6 +56,28 @@ public class MetricAggregate
         Min = min;
         Max = max;
         Count = count;
+        Avg = avg;
+    }
+    
+    /// <summary>
+    /// Initializes a finalized instance with only Min, Max, and Avg (used for sealed aggregates).
+    /// </summary>
+    /// <param name="min">The minimum value.</param>
+    /// <param name="max">The maximum value.</param>
+    /// <param name="avg">The precomputed average value.</param>
+    /// <exception cref="T:System.ArgumentException">Thrown if <paramref name="min" /> is greater than <paramref name="max" />.</exception>
+    public MetricAggregate(float min, float max, float avg)
+    {
+        if (min > max)
+        {
+            throw new ArgumentException("Min cannot be greater than Max");
+        }
+        
+        Sum = null;
+        Min = min;
+        Max = max;
+        Count = null;
+        Avg = avg;
     }
     
     /// <summary>
@@ -60,7 +89,6 @@ public class MetricAggregate
     /// <remarks>
     /// This constructor computes the sum, minimum, maximum, and count from the provided values.
     /// </remarks>
-    //TODO could use factory methods instead
     public MetricAggregate(IEnumerable<float> values)
     {
         var v = values.ToList();
@@ -72,6 +100,7 @@ public class MetricAggregate
         Min = v.Min();
         Max = v.Max();
         Count = v.Count;
+        Avg = null;
     }
 
     /// <summary>
@@ -81,23 +110,64 @@ public class MetricAggregate
     public MetricAggregate(float value): this([value]) {}
 
     /// <summary>
-    /// Calculates the average value of aggregate
+    /// Calculates the average value of aggregate.
+    /// Returns precomputed Avg if available (finalized), otherwise computes from Sum/Count.
     /// </summary>
-    /// <returns>The average value calculated as <see cref="Sum"/> divided by <see cref="Count"/>.</returns>
-    public float GetAverage => Sum / Count;
+    /// <returns>The average value.</returns>
+    /// <exception cref="T:System.InvalidOperationException">Thrown if neither Avg nor Sum/Count are available.</exception>
+    public float GetAverage
+    {
+        get
+        {
+            if (Avg.HasValue)
+                return Avg.Value;
+            
+            if (Sum.HasValue && Count.HasValue)
+                return Sum.Value / Count.Value;
+            
+            throw new InvalidOperationException("Cannot calculate average: neither Avg nor Sum/Count are available.");
+        }
+    }
 
     /// <summary>
     /// Adds a new metric value to the aggregate, updating all statistical properties.
     /// </summary>
     /// <param name="value">The metric value to add to the aggregate.</param>
+    /// <exception cref="T:System.InvalidOperationException">Thrown if the aggregate is finalized.</exception>
     /// <remarks>
     /// This method updates <see cref="Sum"/>, <see cref="Min"/>, <see cref="Max"/>, and <see cref="Count"/> to include the new value.
     /// </remarks>
     public void Increment(float value)
     {
+        if (!Sum.HasValue || !Count.HasValue)
+        {
+            throw new InvalidOperationException("Cannot increment a finalized aggregate.");
+        }
+        
         Sum += value;
         Min = Math.Min(Min, value);
         Max = Math.Max(Max, value);
         Count++;
+    }
+
+    /// <summary>
+    /// Finalizes the aggregate by computing and storing the average, then clearing Sum and Count.
+    /// </summary>
+    /// <exception cref="T:System.InvalidOperationException">Thrown if the aggregate is already finalized or Sum/Count are unavailable.</exception>
+    public void FinalizeAggregate()
+    {
+        if (Avg.HasValue)
+        {
+            throw new InvalidOperationException("Aggregate is already finalized.");
+        }
+        
+        if (!Sum.HasValue || !Count.HasValue)
+        {
+            throw new InvalidOperationException("Cannot finalize: Sum or Count is not available.");
+        }
+        
+        Avg = Sum.Value / Count.Value;
+        Sum = null;
+        Count = null;
     }
 }

@@ -13,6 +13,7 @@ public interface IWeatherAggregationService
     /// <param name="document">Raw weather event with sensor readings.</param>
     /// <returns>Completed task when the latest state view has been persisted.</returns>
     public Task SaveLatestState(RawEventDocument document);
+    
     /// <summary>
     /// Accumulates weather measurements into hourly time-series buckets.
     /// Creates or updates multiple hourly aggregates when rainfall data spans across hour boundaries.
@@ -20,4 +21,13 @@ public interface IWeatherAggregationService
     /// <param name="document">Raw weather event with sensor readings.</param>
     /// <returns>Completed task when all affected hourly aggregates have been updated.</returns>
     public Task UpdateHourlyAggregate(RawEventDocument document);
+
+    /// <summary>
+    /// Accumulates weather measurements into daily time-series buckets.
+    /// Creates or updates daily aggregates with both full-day and hourly breakdowns.
+    /// Tracks processed raw event IDs to prevent duplicate processing.
+    /// </summary>
+    /// <param name="document">Raw weather event with sensor readings.</param>
+    /// <returns>Completed task when the daily aggregate has been updated.</returns>
+    public Task UpdateDailyAggregate(RawEventDocument document);
 }

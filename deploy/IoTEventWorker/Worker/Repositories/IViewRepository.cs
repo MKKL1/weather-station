@@ -23,4 +23,18 @@ public interface IViewRepository
     /// </summary>
     /// <param name="hourlyAggregatePayload">The aggregate data to persist.</param>
     public Task UpdateHourlyView(AggregateModel<HourlyAggregatePayload> hourlyAggregatePayload);
+
+    /// <summary>
+    /// Retrieves daily aggregate data for a specific device and time period.
+    /// </summary>
+    /// <param name="id">The aggregate record identifier.</param>
+    /// <param name="deviceId">The target device identifier.</param>
+    /// <returns>The aggregate data if found; otherwise, <see langword="null" />.</returns>
+    public Task<AggregateModel<DailyAggregatePayload>?> GetDailyAggregate(Id id, DeviceId deviceId);
+
+    /// <summary>
+    /// Stores or replaces daily aggregate data for a device.
+    /// </summary>
+    /// <param name="dailyAggregatePayload">The aggregate data to persist.</param>
+    public Task UpdateDailyView(AggregateModel<DailyAggregatePayload> dailyAggregatePayload);
 }

@@ -32,7 +32,9 @@ public class ProcessCosmosRawEvents(ILoggerFactory loggerFactory, IWeatherAggreg
     private async Task ProcessSingleRawEvent(RawEventDocument document)
     {
         //TODO validate event (histogram is valid, temperatures are in realistic range etc)
-        await Task.WhenAll(weatherAggregationService.SaveLatestState(document),
-            weatherAggregationService.UpdateHourlyAggregate(document));
+        await Task.WhenAll(
+            weatherAggregationService.SaveLatestState(document),
+            weatherAggregationService.UpdateHourlyAggregate(document),
+            weatherAggregationService.UpdateDailyAggregate(document));
     }
 }

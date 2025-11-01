@@ -7,7 +7,7 @@ public class MetricAggregateDocument
 {
     [JsonProperty("sum")]
     [JsonPropertyName("sum")]
-    public float Sum { get; set; }
+    public float? Sum { get; set; }
 
     [JsonProperty("min")]
     [JsonPropertyName("min")]
@@ -19,5 +19,9 @@ public class MetricAggregateDocument
 
     [JsonProperty("count")]
     [JsonPropertyName("count")]
-    public int Count { get; set; }
+    public int? Count { get; set; }
+
+    [JsonProperty("avg")]
+    [JsonPropertyName("avg")]
+    public float? Avg { get; set; }
 }

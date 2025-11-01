@@ -49,6 +49,30 @@ public class CosmosDbModelMapper
         return ToDocument(model, docPayload);
     }
 
+    public AggregateDocument<DailyAggregatePayloadDocument> ToDocument(AggregateModel<DailyAggregatePayload> model)
+    {
+        var docPayload = new DailyAggregatePayloadDocument
+        {
+            Temperature = model.Payload.Temperature != null ? ToDocument(model.Payload.Temperature) : null,
+            Humidity = model.Payload.Humidity != null ? ToDocument(model.Payload.Humidity) : null,
+            Pressure = model.Payload.Pressure != null ? ToDocument(model.Payload.Pressure) : null,
+            HourlyTemperature = model.Payload.HourlyTemperature?.ToDictionary(
+                kvp => kvp.Key,
+                kvp => ToDocument(kvp.Value)),
+            HourlyHumidity = model.Payload.HourlyHumidity?.ToDictionary(
+                kvp => kvp.Key,
+                kvp => ToDocument(kvp.Value)),
+            HourlyPressure = model.Payload.HourlyPressure?.ToDictionary(
+                kvp => kvp.Key,
+                kvp => ToDocument(kvp.Value)),
+            HourlyRain = model.Payload.HourlyRain != null ? ToDocument(model.Payload.HourlyRain) : null,
+            IncludedRawIds = model.Payload.IncludedRawIds,
+            IsFinalized = model.Payload.IsFinalized
+        };
+
+        return ToDocument(model, docPayload);
+    }
+
     public HistogramDocument<T> ToDocument<T>(Histogram<T> histogram)
     {
         return new HistogramDocument<T>
@@ -66,7 +90,8 @@ public class CosmosDbModelMapper
             Sum = metricAggregate.Sum,
             Min = metricAggregate.Min,
             Max = metricAggregate.Max,
-            Count = metricAggregate.Count
+            Count = metricAggregate.Count,
+            Avg = metricAggregate.Avg
         };
     }
     
@@ -136,9 +161,45 @@ public class CosmosDbModelMapper
         return FromDocument(doc, domainPayload);
     }
 
+    public AggregateModel<DailyAggregatePayload> FromDocument(AggregateDocument<DailyAggregatePayloadDocument> doc)
+    {
+        var domainPayload = new DailyAggregatePayload
+        {
+            Temperature = doc.Payload.Temperature != null ? FromDocument(doc.Payload.Temperature) : null,
+            Humidity = doc.Payload.Humidity != null ? FromDocument(doc.Payload.Humidity) : null,
+            Pressure = doc.Payload.Pressure != null ? FromDocument(doc.Payload.Pressure) : null,
+            HourlyTemperature = doc.Payload.HourlyTemperature?.ToDictionary(
+                kvp => kvp.Key,
+                kvp => FromDocument(kvp.Value)),
+            HourlyHumidity = doc.Payload.HourlyHumidity?.ToDictionary(
+                kvp => kvp.Key,
+                kvp => FromDocument(kvp.Value)),
+            HourlyPressure = doc.Payload.HourlyPressure?.ToDictionary(
+                kvp => kvp.Key,
+                kvp => FromDocument(kvp.Value)),
+            HourlyRain = doc.Payload.HourlyRain != null ? FromDocument(doc.Payload.HourlyRain) : null,
+            IncludedRawIds = doc.Payload.IncludedRawIds,
+            IsFinalized = doc.Payload.IsFinalized
+        };
+
+        return FromDocument(doc, domainPayload);
+    }
+
     public MetricAggregate FromDocument(MetricAggregateDocument doc)
     {
-        return new MetricAggregate(doc.Sum, doc.Min, doc.Max, doc.Count);
+        // Check if it's a finalized aggregate (has Avg but no Sum/Count)
+        if (doc.Avg.HasValue && (!doc.Sum.HasValue || !doc.Count.HasValue))
+        {
+            return new MetricAggregate(doc.Min, doc.Max, doc.Avg.Value);
+        }
+        
+        // Active aggregate with Sum and Count
+        return new MetricAggregate(
+            doc.Sum ?? 0, 
+            doc.Min, 
+            doc.Max, 
+            doc.Count ?? 0, 
+            doc.Avg);
     }
 
     public Histogram<T> FromDocument<T>(HistogramDocument<T> doc)
