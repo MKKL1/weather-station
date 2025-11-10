@@ -32,3 +32,21 @@ variable "function_app_container_name" {
   type        = string
   default     = "function-app-files"
 }
+
+variable "apim_publisher_name" {
+  description = "The publisher name for APIM."
+  type        = string
+  default     = "My Company"
+}
+
+variable "apim_publisher_email" {
+  description = "The publisher email for APIM."
+  type        = string
+  default     = "admin@example.com"
+}
+
+variable "ca_cert_path" {
+  description = "Path to the public CA certificate (.cer file) for mTLS."
+  type        = string
+  default     = "my-ca-public-cert.cer"
+}

@@ -3,36 +3,6 @@ output "resource_group_name" {
   value       = azurerm_resource_group.rg.name
 }
 
-output "iot_hub_name" {
-  description = "IoT Hub name"
-  value       = azurerm_iothub.iothub.name
-}
-
-output "iot_hub_hostname" {
-  description = "IoT Hub hostname"
-  value       = azurerm_iothub.iothub.hostname
-}
-
-output "dps_name" {
-  description = "Device Provisioning Service name"
-  value       = azurerm_iothub_dps.dps.name
-}
-
-output "dps_endpoint" {
-  description = "DPS global endpoint"
-  value       = "global.azure-devices-provisioning.net"
-}
-output "dps_id_scope" {
-  description = "DPS ID Scope"
-  value       = azurerm_iothub_dps.dps.id_scope
-}
-
-output "service_connection_string" {
-  description = "Service connection string"
-  value       = azurerm_iothub_shared_access_policy.hub_access_policy.primary_connection_string
-  sensitive   = true
-}
-
 output "cosmos_primary_connection_string" {
   description = "Primary connection string for Cosmos DB"
   value       = azurerm_cosmosdb_account.this.primary_sql_connection_string
