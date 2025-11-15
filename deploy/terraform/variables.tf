@@ -45,8 +45,20 @@ variable "apim_publisher_email" {
   default     = "admin@example.com"
 }
 
-variable "ca_cert_path" {
-  description = "Path to the public CA certificate (.cer file) for mTLS."
+variable "provisioning_public_key" {
+  description = "Public key for validating provisioning JWTs"
   type        = string
-  default     = "my-ca-public-cert.cer"
+  sensitive   = true
+}
+
+variable "access_token_private_key" {
+  description = "Private key for signing access token JWTs (PEM format, base64 encoded)"
+  type        = string
+  sensitive   = true
+}
+
+variable "access_token_public_key" {
+  description = "Public key for validating access token JWTs (PEM format, base64 encoded)"
+  type        = string
+  sensitive   = true
 }

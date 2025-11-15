@@ -12,16 +12,14 @@ import (
 	"github.com/rs/zerolog"
 )
 
-// DeviceRepository provides data access operations for devices.
 type DeviceRepository struct {
-	db     *infrastructure.Database
+	db     *infrastructure.CosmosDB
 	config *infrastructure.Config
 	logger zerolog.Logger
 }
 
-// NewDeviceRepository creates a new DeviceRepository instance.
 func NewDeviceRepository(
-	db *infrastructure.Database,
+	db *infrastructure.CosmosDB,
 	config *infrastructure.Config,
 	logger zerolog.Logger,
 ) *DeviceRepository {
@@ -33,8 +31,8 @@ func NewDeviceRepository(
 }
 
 // Get retrieves a device by its device ID.
-// Returns nil if the device is not found (not an error condition).
-// Returns an error only if the database operation fails.
+// Returns nil if the device is not found.
+// Returns an error if the database operation fails.
 func (r *DeviceRepository) Get(ctx context.Context, deviceID string) (*domain.Device, error) {
 	dbData, err := r.db.Get(ctx, deviceID)
 	if err != nil {
@@ -84,8 +82,8 @@ func (r *DeviceRepository) Save(ctx context.Context, device *domain.Device) erro
 }
 
 // GetByActiveActivationCode finds a device by its active (non-expired) activation code.
-// Returns nil if no device with the given active code is found (not an error condition).
-// Returns an error only if the database query fails.
+// Returns nil if no device with the given active code is found.
+// Returns an error if the database query fails.
 func (r *DeviceRepository) GetByActiveActivationCode(ctx context.Context, code string) (*domain.Device, error) {
 	dbData, err := r.db.QueryByActiveActivationCode(ctx, code)
 	if err != nil {
@@ -107,9 +105,4 @@ func (r *DeviceRepository) GetByActiveActivationCode(ctx context.Context, code s
 	}
 
 	return &device, nil
-}
-
-// GetConfig returns the repository's configuration for use by services.
-func (r *DeviceRepository) GetConfig() *infrastructure.Config {
-	return r.config
 }

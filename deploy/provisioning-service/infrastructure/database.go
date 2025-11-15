@@ -25,15 +25,14 @@ var (
 	ErrNotFound = errors.New("document not found")
 )
 
-// Database provides access to Cosmos DB operations for device management.
-type Database struct {
+type CosmosDB struct {
 	devices       *azcosmos.ContainerClient
 	containerName string
 	tracer        trace.Tracer
 }
 
-// NewDatabase creates a new Database instance connected to the specified Cosmos DB.
-func NewDatabase(connectionString, database, container string) (*Database, error) {
+// NewCosmosDB creates a new CosmosDB instance connected to the specified Cosmos DB.
+func NewCosmosDB(connectionString, database, container string) (*CosmosDB, error) {
 	if connectionString == "" {
 		return nil, errors.New("cosmos DB connection string is required")
 	}
@@ -59,7 +58,7 @@ func NewDatabase(connectionString, database, container string) (*Database, error
 		return nil, fmt.Errorf("failed to access container '%s': %w", container, err)
 	}
 
-	return &Database{
+	return &CosmosDB{
 		devices:       devices,
 		containerName: container,
 		tracer:        otel.Tracer(tracerName),
@@ -67,7 +66,7 @@ func NewDatabase(connectionString, database, container string) (*Database, error
 }
 
 // Get retrieves a device document by its device ID.
-func (db *Database) Get(ctx context.Context, deviceID string) ([]byte, error) {
+func (db *CosmosDB) Get(ctx context.Context, deviceID string) ([]byte, error) {
 	ctx, span := db.tracer.Start(ctx, "cosmos.read_item",
 		trace.WithAttributes(
 			attribute.String("db.system", "cosmosdb"),
@@ -95,7 +94,7 @@ func (db *Database) Get(ctx context.Context, deviceID string) ([]byte, error) {
 }
 
 // Upsert inserts or updates a device document.
-func (db *Database) Upsert(ctx context.Context, deviceID string, data []byte) error {
+func (db *CosmosDB) Upsert(ctx context.Context, deviceID string, data []byte) error {
 	ctx, span := db.tracer.Start(ctx, "cosmos.upsert_item",
 		trace.WithAttributes(
 			attribute.String("db.system", "cosmosdb"),
@@ -119,7 +118,7 @@ func (db *Database) Upsert(ctx context.Context, deviceID string, data []byte) er
 }
 
 // QueryByActiveActivationCode finds a device by its active activation code.
-func (db *Database) QueryByActiveActivationCode(ctx context.Context, code string) ([]byte, error) {
+func (db *CosmosDB) QueryByActiveActivationCode(ctx context.Context, code string) ([]byte, error) {
 	ctx, span := db.tracer.Start(ctx, "cosmos.query_items",
 		trace.WithAttributes(
 			attribute.String("db.system", "cosmosdb"),

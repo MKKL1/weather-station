@@ -17,17 +17,20 @@ const (
 	defaultEnvironment       = "development"
 
 	// Environment variable names
-	envActivationCodeTTL = "ACTIVATION_CODE_TTL"
-	envFailedAttemptsTTL = "FAILED_ATTEMPTS_TTL"
-	envMaxFailedAttempts = "MAX_FAILED_ATTEMPTS"
-	envServerPort        = "FUNCTIONS_CUSTOMHANDLER_PORT"
-	envCosmosConnection  = "COSMOS_CONNECTION"
-	envCosmosDatabase    = "COSMOS_DATABASE"
-	envCosmosContainer   = "COSMOS_CONTAINER"
-	envLogLevel          = "LOG_LEVEL"
-	envOTLPEndpoint      = "OTEL_EXPORTER_OTLP_ENDPOINT"
-	envServiceVersion    = "SERVICE_VERSION"
-	envEnvironment       = "ENVIRONMENT"
+	envActivationCodeTTL    = "ACTIVATION_CODE_TTL"
+	envFailedAttemptsTTL    = "FAILED_ATTEMPTS_TTL"
+	envMaxFailedAttempts    = "MAX_FAILED_ATTEMPTS"
+	envServerPort           = "FUNCTIONS_CUSTOMHANDLER_PORT"
+	envCosmosConnection     = "COSMOS_CONNECTION"
+	envCosmosDatabase       = "COSMOS_DATABASE"
+	envCosmosContainer      = "COSMOS_CONTAINER"
+	envLogLevel             = "LOG_LEVEL"
+	envOTLPEndpoint         = "OTEL_EXPORTER_OTLP_ENDPOINT"
+	envServiceVersion       = "SERVICE_VERSION"
+	envEnvironment          = "ENVIRONMENT"
+	envAccessTokenPrivKey   = "ACCESS_TOKEN_PRIVATE_KEY"
+	envRateLimitFunctionURL = "RATE_LIMIT_FUNCTION_URL"
+	envRateLimitFunctionKey = "RATE_LIMIT_FUNCTION_KEY"
 )
 
 // Config holds the application configuration.
@@ -56,22 +59,32 @@ type Config struct {
 	OTLPEndpoint   string // OTLP HTTP endpoint (empty = telemetry disabled)
 	ServiceVersion string
 	Environment    string
+
+	// JWT signing configuration
+	AccessTokenPrivateKey string // PEM-encoded RSA private key
+
+	// Rate limiting configuration
+	RateLimitFunctionURL string // Azure Function URL (empty = rate limiting disabled)
+	RateLimitFunctionKey string // Azure Function access key
 }
 
 // NewConfig creates a new Config instance by reading from environment variables.
 func NewConfig() *Config {
 	return &Config{
-		ActivationCodeTTL: getEnvDuration(envActivationCodeTTL, defaultActivationCodeTTL),
-		FailedAttemptsTTL: getEnvDuration(envFailedAttemptsTTL, defaultFailedAttemptsTTL),
-		MaxFailedAttempts: getEnvInt(envMaxFailedAttempts, defaultMaxFailedAttempts),
-		ServerPort:        getEnvString(envServerPort, defaultServerPort),
-		CosmosConnection:  getEnvString(envCosmosConnection, ""),
-		CosmosDatabase:    getEnvString(envCosmosDatabase, ""),
-		CosmosContainer:   getEnvString(envCosmosContainer, defaultContainerName),
-		LogLevel:          getEnvString(envLogLevel, "info"),
-		OTLPEndpoint:      getEnvString(envOTLPEndpoint, ""),
-		ServiceVersion:    getEnvString(envServiceVersion, defaultServiceVersion),
-		Environment:       getEnvString(envEnvironment, defaultEnvironment),
+		ActivationCodeTTL:     getEnvDuration(envActivationCodeTTL, defaultActivationCodeTTL),
+		FailedAttemptsTTL:     getEnvDuration(envFailedAttemptsTTL, defaultFailedAttemptsTTL),
+		MaxFailedAttempts:     getEnvInt(envMaxFailedAttempts, defaultMaxFailedAttempts),
+		ServerPort:            getEnvString(envServerPort, defaultServerPort),
+		CosmosConnection:      getEnvString(envCosmosConnection, ""),
+		CosmosDatabase:        getEnvString(envCosmosDatabase, ""),
+		CosmosContainer:       getEnvString(envCosmosContainer, defaultContainerName),
+		LogLevel:              getEnvString(envLogLevel, "info"),
+		OTLPEndpoint:          getEnvString(envOTLPEndpoint, ""),
+		ServiceVersion:        getEnvString(envServiceVersion, defaultServiceVersion),
+		Environment:           getEnvString(envEnvironment, defaultEnvironment),
+		AccessTokenPrivateKey: getEnvString(envAccessTokenPrivKey, ""),
+		RateLimitFunctionURL:  getEnvString(envRateLimitFunctionURL, ""),
+		RateLimitFunctionKey:  getEnvString(envRateLimitFunctionKey, ""),
 	}
 }
 

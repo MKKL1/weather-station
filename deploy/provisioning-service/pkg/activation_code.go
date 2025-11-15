@@ -11,13 +11,10 @@ const (
 	CodeLength = 9
 
 	// charset defines the characters used in activation codes.
-	// Excludes ambiguous characters: 0, O, 1, I to prevent user confusion.
 	charset = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 )
 
 // GenerateActivationCode generates a cryptographically random activation code.
-// The code consists of CodeLength characters from the charset.
-// Returns an error if the random number generation fails.
 func GenerateActivationCode() (string, error) {
 	code := make([]byte, CodeLength)
 	charsetLen := big.NewInt(int64(len(charset)))

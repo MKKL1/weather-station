@@ -12,6 +12,11 @@ type Device struct {
 	ProvisionedDate time.Time  `json:"provisioned_date"`
 	ClaimedAt       *time.Time `json:"claimed_at"`
 
+	// Registration fields
+	HMACSecret   string     `json:"hmacSecret,omitempty"`
+	ActivatedAt  *time.Time `json:"activatedAt,omitempty"`
+	RegisteredAt *time.Time `json:"registeredAt,omitempty"`
+
 	// Activation code fields (replaces Redis cache)
 	ActivationCode          string     `json:"activationCode,omitempty"`
 	ActivationCodeExpiresAt *time.Time `json:"activationCodeExpiresAt,omitempty"`
@@ -57,6 +62,13 @@ func (d *Device) SetActivationCode(code string, ttl time.Duration) {
 func (d *Device) ClearActivationCode() {
 	d.ActivationCode = ""
 	d.ActivationCodeExpiresAt = nil
+}
+
+// SetHMACSecret assigns the HMAC secret to the device and records registration timestamp.
+func (d *Device) SetHMACSecret(secret string) {
+	d.HMACSecret = secret
+	now := time.Now().UTC()
+	d.RegisteredAt = &now
 }
 
 // IsLocked checks if the device is currently locked due to failed claim attempts.

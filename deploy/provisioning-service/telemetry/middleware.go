@@ -15,16 +15,13 @@ const (
 	tracerName = "provisioning-service"
 )
 
-// Middleware creates HTTP middleware that traces requests.
 func Middleware(next http.Handler) http.Handler {
 	tracer := otel.Tracer(tracerName)
 	propagator := otel.GetTextMapPropagator()
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Extract context from incoming request
 		ctx := propagator.Extract(r.Context(), propagation.HeaderCarrier(r.Header))
 
-		// Start span
 		ctx, span := tracer.Start(
 			ctx,
 			r.Method+" "+r.URL.Path,
@@ -39,7 +36,6 @@ func Middleware(next http.Handler) http.Handler {
 		)
 		defer span.End()
 
-		// Add device/user ID if present in headers
 		if deviceID := r.Header.Get("X-Device-ID"); deviceID != "" {
 			span.SetAttributes(attribute.String("device.id", deviceID))
 		}
@@ -47,13 +43,10 @@ func Middleware(next http.Handler) http.Handler {
 			span.SetAttributes(attribute.String("user.id", userID))
 		}
 
-		// Wrap response writer to capture status code
 		rw := &responseWriter{ResponseWriter: w, statusCode: http.StatusOK}
 
-		// Process request
 		next.ServeHTTP(rw, r.WithContext(ctx))
 
-		// Record response status
 		span.SetAttributes(semconv.HTTPStatusCode(rw.statusCode))
 		if rw.statusCode >= 400 {
 			span.SetStatus(codes.Error, http.StatusText(rw.statusCode))
@@ -61,7 +54,6 @@ func Middleware(next http.Handler) http.Handler {
 	})
 }
 
-// responseWriter wraps http.ResponseWriter to capture status code.
 type responseWriter struct {
 	http.ResponseWriter
 	statusCode int

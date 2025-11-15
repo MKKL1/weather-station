@@ -25,15 +25,11 @@ const (
 )
 
 func main() {
-	// Initialize configuration
 	config := infrastructure.NewConfig()
 
-	// Configure logger
 	logger := configureLogger(config.LogLevel)
-
 	logger.Info().Msg("provisioning service starting")
 
-	// Initialize telemetry
 	telProvider, err := telemetry.NewProvider(telemetry.Config{
 		ServiceName:    serviceName,
 		ServiceVersion: config.ServiceVersion,
@@ -53,8 +49,7 @@ func main() {
 		}
 	}()
 
-	// Initialize database
-	db, err := infrastructure.NewDatabase(
+	db, err := infrastructure.NewCosmosDB(
 		config.CosmosConnection,
 		config.CosmosDatabase,
 		config.CosmosContainer,
@@ -67,15 +62,27 @@ func main() {
 			Msg("database initialization failed")
 	}
 
-	// Initialize repositories and services
 	deviceRepo := repository.NewDeviceRepository(db, config, logger)
-	activationService := service.NewActivationService(deviceRepo, logger)
+
+	registerService := service.NewRegisterService(deviceRepo, logger)
+	tokenService, err := service.NewTokenService(deviceRepo, config.AccessTokenPrivateKey, logger)
+	if err != nil {
+		logger.Fatal().
+			Err(err).
+			Msg("token service initialization failed")
+	}
+	activationService := service.NewActivationService(deviceRepo, logger, config.ActivationCodeTTL)
 	claimService := service.NewClaimService(deviceRepo, config, logger)
 
 	// Initialize controller
-	ctrl := controller.NewController(activationService, claimService, logger)
+	ctrl := controller.NewController(
+		registerService,
+		tokenService,
+		activationService,
+		claimService,
+		logger,
+	)
 
-	// Create HTTP server
 	addr := ":" + config.ServerPort
 	srv := &http.Server{
 		Addr:         addr,
@@ -85,7 +92,6 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	// Start server in goroutine
 	go func() {
 		logger.Info().
 			Str("addr", addr).
@@ -102,7 +108,6 @@ func main() {
 		}
 	}()
 
-	// Wait for interrupt signal
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
@@ -122,26 +127,20 @@ func main() {
 	logger.Info().Msg("server stopped")
 }
 
-// configureLogger sets up zerolog for Azure Functions.
 func configureLogger(levelStr string) zerolog.Logger {
-	// Parse log level
 	level, err := zerolog.ParseLevel(levelStr)
 	if err != nil {
 		level = zerolog.InfoLevel
 	}
 	zerolog.SetGlobalLevel(level)
 
-	// Configure for Azure Functions - use JSON for Log Analytics
 	logger := zerolog.New(os.Stdout).
 		With().
 		Timestamp().
 		Str("service", serviceName).
 		Logger()
 
-	// Set as global logger
 	log.Logger = logger
-
-	// Configure time format for Azure (RFC3339)
 	zerolog.TimeFieldFormat = time.RFC3339
 
 	return logger
