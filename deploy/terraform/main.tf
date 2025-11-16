@@ -90,6 +90,22 @@ resource "azurerm_storage_container" "function_app_container" {
   container_access_type = "private"
 }
 
+resource "azurerm_log_analytics_workspace" "logs" {
+  name                = "log-${var.project_name}-${var.environment}-${local.random_suffix}"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  sku                 = "PerGB2018"
+  retention_in_days   = 30
+}
+
+resource "azurerm_application_insights" "appinsights" {
+  name                = "appi-${var.project_name}-${var.environment}-${local.random_suffix}"
+  location            = azurerm_resource_group.rg.location
+  resource_group_name = azurerm_resource_group.rg.name
+  workspace_id        = azurerm_log_analytics_workspace.logs.id
+  application_type    = "web"
+}
+
 resource "azurerm_function_app_flex_consumption" "function_app" {
   name                = "fn-${var.project_name}-${var.environment}-${local.random_suffix}"
   resource_group_name = azurerm_resource_group.rg.name
@@ -115,6 +131,9 @@ resource "azurerm_function_app_flex_consumption" "function_app" {
     COSMOS_DATABASE        = azurerm_cosmosdb_sql_database.this.name
     COSMOS_CONTAINER       = azurerm_cosmosdb_sql_container.this.name
     COSMOS_VIEWS_CONTAINER = azurerm_cosmosdb_sql_container.views.name
+
+    APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.appinsights.connection_string
+    ApplicationInsightsAgent_EXTENSION_VERSION = "~3"
   }
 
   depends_on = [azurerm_storage_container.function_app_container]
@@ -178,6 +197,8 @@ resource "azurerm_function_app_flex_consumption" "function_app_provisioning" {
     COSMOS_CONTAINER         = "device-registry"
     ACCESS_TOKEN_PRIVATE_KEY = var.access_token_private_key
     WEBSITE_AUTH_AAD_ALLOWED_TENANTS = data.azurerm_client_config.current.tenant_id
+    APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.appinsights.connection_string
+    ApplicationInsightsAgent_EXTENSION_VERSION = "~3"
   }
 
   depends_on = [
@@ -424,7 +445,7 @@ resource "azurerm_api_management_api_operation_policy" "token_refresh_policy" {
     }" />
     
     <!-- Get managed identity token for Function App authentication -->
-    <authentication-managed-identity resource="@("api://" + "{{function-app-client-id}}")" output-token-variable-name="msi-access-token" ignore-error="false" />
+    <authentication-managed-identity resource="{{function-app-client-id}}" output-token-variable-name="msi-access-token" ignore-error="false" />
     
     <!-- Replace Authorization header with managed identity token -->
     <set-header name="Authorization" exists-action="override">
@@ -473,12 +494,19 @@ resource "azurerm_api_management_api_operation_policy" "telemetry_policy" {
   <inbound>
     <base />
     <!-- Validate access token JWT -->
-    <validate-jwt header-name="Authorization" failed-validation-httpcode="401" failed-validation-error-message="Invalid or expired access token">
-      <issuer-signing-keys>
-        <key>{{access-token-jwt-public-key}}</key>
-      </issuer-signing-keys>
+    <validate-jwt header-name="Authorization" failed-validation-httpcode="401" failed-validation-error-message="Invalid or expired access token" require-scheme="Bearer">
+      <openid-config url="{{access_token_issuer_url}}/.well-known/openid-configuration" />
+      <audiences>
+        <audience>weather-api</audience>
+      </audiences>
+      <issuers>
+        <issuer>{{access_token_issuer_url}}</issuer>
+      </issuers>
       <required-claims>
         <claim name="sub" match="any" />
+        <claim name="roles" match="any">
+          <value>weather-telemetry-write</value>
+        </claim>
       </required-claims>
     </validate-jwt>
     
@@ -507,4 +535,32 @@ resource "azurerm_api_management_api_operation_policy" "telemetry_policy" {
   </on-error>
 </policies>
 XML
+
+depends_on = [ azurerm_api_management_named_value.access_token_issuer_url ]
+}
+
+
+
+resource "azurerm_static_web_app" "jwks" {
+  name                = "swa-${var.project_name}-${var.environment}-jwks-${local.random_suffix}"
+  resource_group_name = azurerm_resource_group.rg.name
+  location            = "eastus2"
+  sku_tier            = "Free"
+  sku_size            = "Free"
+}
+
+resource "azurerm_static_web_app_custom_domain" "jwks_domain" {
+  count               = var.custom_jwks_domain != "" ? 1 : 0
+  static_web_app_id   = azurerm_static_web_app.jwks.id
+  domain_name         = var.custom_jwks_domain
+  validation_type     = "cname-delegation"
+}
+
+resource "azurerm_api_management_named_value" "access_token_issuer_url" {
+  name                = "access_token_issuer_url"
+  resource_group_name = azurerm_resource_group.rg.name
+  api_management_name = azurerm_api_management.apim.name
+  display_name        = "access_token_issuer_url"
+  value               = "https://${azurerm_static_web_app.jwks.default_host_name}"
+  secret              = false
 }

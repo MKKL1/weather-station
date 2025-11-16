@@ -28,3 +28,19 @@ output "function_app_name" {
   description = "The name of the Function App."
   value       = azurerm_function_app_flex_consumption.function_app.name
 }
+
+output "static_web_app_default_hostname" {
+  value       = azurerm_static_web_app.jwks.default_host_name
+  description = "Default hostname for the JWKS Static Web App"
+}
+
+output "static_web_app_api_key" {
+  value       = azurerm_static_web_app.jwks.api_key
+  description = "API key for deploying to Static Web App"
+  sensitive   = true
+}
+
+output "jwks_url" {
+  value       = "https://${azurerm_static_web_app.jwks.default_host_name}/.well-known/jwks.json"
+  description = "Full URL to the JWKS endpoint"
+}

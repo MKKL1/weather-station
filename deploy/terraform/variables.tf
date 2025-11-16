@@ -62,3 +62,9 @@ variable "access_token_public_key" {
   type        = string
   sensitive   = true
 }
+
+variable "custom_jwks_domain" {
+  description = "Custom domain for JWKS endpoint (optional, leave empty for default)"
+  type        = string
+  default     = ""
+}

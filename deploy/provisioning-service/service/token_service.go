@@ -16,6 +16,7 @@ import (
 	"provisioning-service/repository"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 )
 
@@ -25,6 +26,11 @@ const (
 
 	// TokenExpiry is the duration for which the access token is valid
 	TokenExpiry = 24 * time.Hour
+
+	//TODO make configurable
+	Issuer   = "https://red-bay-08da8cb0f.3.azurestaticapps.net"
+	Audience = "weather-api"
+	KeyId    = "device-access-token"
 )
 
 var (
@@ -139,7 +145,7 @@ func (s *TokenService) validateTimestamp(timestamp int64) error {
 
 // validateSignature verifies the HMAC-SHA256 signature.
 func (s *TokenService) validateSignature(deviceID string, timestamp int64, signature string, hmacSecret string) error {
-	message := fmt.Sprintf("%s:%s", deviceID, timestamp)
+	message := fmt.Sprintf("%s:%d", deviceID, timestamp)
 
 	mac := hmac.New(sha256.New, []byte(hmacSecret))
 	mac.Write([]byte(message))
@@ -156,13 +162,21 @@ func (s *TokenService) generateJWT(deviceID string) (string, error) {
 	now := time.Now().UTC()
 	expiresAt := now.Add(TokenExpiry)
 
-	claims := jwt.RegisteredClaims{
-		Subject:   deviceID,
-		ExpiresAt: jwt.NewNumericDate(expiresAt),
-		IssuedAt:  jwt.NewNumericDate(now),
+	claims := jwt.MapClaims{
+		"iss":   Issuer,
+		"sub":   deviceID,
+		"aud":   Audience,
+		"iat":   now.Unix(),
+		"nbf":   now.Unix(),
+		"exp":   expiresAt.Unix(),
+		"jti":   uuid.NewString(),
+		"typ":   "device",
+		"roles": []string{"weather-telemetry-write"},
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
+	token.Header["kid"] = KeyId
+
 	signedToken, err := token.SignedString(s.privateKey)
 	if err != nil {
 		return "", fmt.Errorf("failed to sign JWT: %w", err)
