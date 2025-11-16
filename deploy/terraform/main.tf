@@ -191,13 +191,15 @@ resource "azurerm_function_app_flex_consumption" "function_app_provisioning" {
   }
 
   app_settings = {
-    AzureWebJobsStorage      = azurerm_storage_account.sa.primary_connection_string
-    COSMOS_CONNECTION        = azurerm_cosmosdb_account.this.primary_sql_connection_string
-    COSMOS_DATABASE          = azurerm_cosmosdb_sql_database.this.name
-    COSMOS_CONTAINER         = "device-registry"
-    ACCESS_TOKEN_PRIVATE_KEY = var.access_token_private_key
-    WEBSITE_AUTH_AAD_ALLOWED_TENANTS = data.azurerm_client_config.current.tenant_id
-    APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.appinsights.connection_string
+    AzureWebJobsStorage              = azurerm_storage_account.sa.primary_connection_string
+    COSMOS_CONNECTION                = azurerm_cosmosdb_account.this.primary_sql_connection_string
+    COSMOS_DATABASE                  = azurerm_cosmosdb_sql_database.this.name
+    COSMOS_CONTAINER                 = "device-registry"
+    ACCESS_TOKEN_PRIVATE_KEY_B64     = var.access_token_private_key
+    JWT_ISSUER                       = "https://${azurerm_static_web_app.jwks.default_host_name}/device"
+
+    WEBSITE_AUTH_AAD_ALLOWED_TENANTS           = data.azurerm_client_config.current.tenant_id
+    APPLICATIONINSIGHTS_CONNECTION_STRING      = azurerm_application_insights.appinsights.connection_string
     ApplicationInsightsAgent_EXTENSION_VERSION = "~3"
   }
 
@@ -205,7 +207,8 @@ resource "azurerm_function_app_flex_consumption" "function_app_provisioning" {
     azurerm_storage_container.function_app_provisioning_container,
     azurerm_api_management.apim,
     azuread_application.function_app_auth,
-    azuread_application_identifier_uri.function_app_auth
+    azuread_application_identifier_uri.function_app_auth,
+    azurerm_static_web_app.jwks
   ]
 }
 
@@ -300,7 +303,6 @@ resource "azurerm_api_management_named_value" "access_token_jwt_public_key" {
   secret              = false
 }
 
-# Store the Function App's App Registration client ID as a named value
 resource "azurerm_api_management_named_value" "function_app_client_id" {
   name                = "function-app-client-id"
   resource_group_name = azurerm_resource_group.rg.name
@@ -346,9 +348,13 @@ resource "azurerm_api_management_api_operation_policy" "device_register_policy" 
     <base />
     <!-- Validate provisioning JWT from device -->
     <validate-jwt header-name="Authorization" failed-validation-httpcode="401" failed-validation-error-message="Invalid or expired provisioning token" require-expiration-time="false">
-      <issuer-signing-keys>
-        <key certificate-id="provisioning-public-key" />
-      </issuer-signing-keys>
+      <openid-config url="{{access_token_issuer_url}}/provisioning/.well-known/openid-configuration" />
+      <audiences>
+        <audience>provisioning-api</audience>
+      </audiences>
+      <issuers>
+        <issuer>{{access_token_issuer_url}}/provisioning</issuer>
+      </issuers>
       <required-claims>
         <claim name="sub" match="any" />
       </required-claims>
@@ -426,9 +432,13 @@ resource "azurerm_api_management_api_operation_policy" "token_refresh_policy" {
     <base />
     <!-- Validate provisioning JWT to avoid spam-->
     <validate-jwt header-name="Authorization" failed-validation-httpcode="401" failed-validation-error-message="Invalid or expired provisioning token" require-expiration-time="false">
-      <issuer-signing-keys>
-        <key certificate-id="provisioning-public-key" />
-      </issuer-signing-keys>
+      <openid-config url="{{access_token_issuer_url}}/provisioning/.well-known/openid-configuration" />
+      <audiences>
+        <audience>provisioning-api</audience>
+      </audiences>
+      <issuers>
+        <issuer>{{access_token_issuer_url}}/provisioning</issuer>
+      </issuers>
       <required-claims>
         <claim name="sub" match="any" />
       </required-claims>
@@ -495,12 +505,12 @@ resource "azurerm_api_management_api_operation_policy" "telemetry_policy" {
     <base />
     <!-- Validate access token JWT -->
     <validate-jwt header-name="Authorization" failed-validation-httpcode="401" failed-validation-error-message="Invalid or expired access token" require-scheme="Bearer">
-      <openid-config url="{{access_token_issuer_url}}/.well-known/openid-configuration" />
+      <openid-config url="{{access_token_issuer_url}}/device/.well-known/openid-configuration" />
       <audiences>
         <audience>weather-api</audience>
       </audiences>
       <issuers>
-        <issuer>{{access_token_issuer_url}}</issuer>
+        <issuer>{{access_token_issuer_url}}/device</issuer>
       </issuers>
       <required-claims>
         <claim name="sub" match="any" />

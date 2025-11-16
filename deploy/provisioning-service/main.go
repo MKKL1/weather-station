@@ -25,7 +25,10 @@ const (
 )
 
 func main() {
-	config := infrastructure.NewConfig()
+	config, err := infrastructure.NewConfig()
+	if err != nil {
+		log.Fatal().Err(err).Msg("Error loading config")
+	}
 
 	logger := configureLogger(config.LogLevel)
 	logger.Info().Msg("provisioning service starting")
@@ -33,7 +36,7 @@ func main() {
 	telProvider, err := telemetry.NewProvider(telemetry.Config{
 		ServiceName:    serviceName,
 		ServiceVersion: config.ServiceVersion,
-		Endpoint:       config.OTLPEndpoint,
+		Endpoint:       config.OtlpEndpoint,
 		Environment:    config.Environment,
 	}, logger)
 	if err != nil {
@@ -65,7 +68,14 @@ func main() {
 	deviceRepo := repository.NewDeviceRepository(db, config, logger)
 
 	registerService := service.NewRegisterService(deviceRepo, logger)
-	tokenService, err := service.NewTokenService(deviceRepo, config.AccessTokenPrivateKey, logger)
+	tokenService, err := service.NewTokenService(service.TokenServiceConfig{
+		DeviceRepo:       deviceRepo,
+		PrivateKeyBase64: config.AccessTokenPrivateKeyB64,
+		Logger:           logger,
+		Issuer:           config.JwtIssuer,
+		Audience:         config.JwtAudience,
+		KeyId:            config.JwtKeyID,
+	})
 	if err != nil {
 		logger.Fatal().
 			Err(err).

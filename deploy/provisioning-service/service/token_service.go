@@ -26,11 +26,6 @@ const (
 
 	// TokenExpiry is the duration for which the access token is valid
 	TokenExpiry = 24 * time.Hour
-
-	//TODO make configurable
-	Issuer   = "https://red-bay-08da8cb0f.3.azurestaticapps.net"
-	Audience = "weather-api"
-	KeyId    = "device-access-token"
 )
 
 var (
@@ -59,27 +54,38 @@ type TokenService struct {
 	deviceRepo *repository.DeviceRepository
 	privateKey *rsa.PrivateKey
 	logger     zerolog.Logger
+	issuer     string
+	audience   string
+	keyId      string
+}
+
+type TokenServiceConfig struct {
+	DeviceRepo       *repository.DeviceRepository
+	PrivateKeyBase64 string
+	Logger           zerolog.Logger
+	Issuer           string
+	Audience         string
+	KeyId            string
 }
 
 // NewTokenService creates a new TokenService instance.
-func NewTokenService(
-	deviceRepo *repository.DeviceRepository,
-	privateKeyPEM string,
-	logger zerolog.Logger,
-) (*TokenService, error) {
-	if privateKeyPEM == "" {
+func NewTokenService(config TokenServiceConfig) (*TokenService, error) {
+	if config.PrivateKeyBase64 == "" {
 		return nil, ErrMissingPrivateKey
 	}
 
-	privateKey, err := parseRSAPrivateKey(privateKeyPEM)
+	privateKey, err := parseRSAPrivateKey(config.PrivateKeyBase64)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse RSA private key: %w", err)
 	}
 
 	return &TokenService{
-		deviceRepo: deviceRepo,
+		deviceRepo: config.DeviceRepo,
 		privateKey: privateKey,
-		logger:     logger.With().Str("component", "token_service").Logger(),
+		logger:     config.Logger.With().Str("component", "token_service").Logger(),
+		issuer:     config.Issuer,
+		audience:   config.Audience,
+		keyId:      config.KeyId,
 	}, nil
 }
 
@@ -163,9 +169,9 @@ func (s *TokenService) generateJWT(deviceID string) (string, error) {
 	expiresAt := now.Add(TokenExpiry)
 
 	claims := jwt.MapClaims{
-		"iss":   Issuer,
+		"iss":   s.issuer,
 		"sub":   deviceID,
-		"aud":   Audience,
+		"aud":   s.audience,
 		"iat":   now.Unix(),
 		"nbf":   now.Unix(),
 		"exp":   expiresAt.Unix(),
@@ -175,7 +181,7 @@ func (s *TokenService) generateJWT(deviceID string) (string, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
-	token.Header["kid"] = KeyId
+	token.Header["kid"] = s.keyId
 
 	signedToken, err := token.SignedString(s.privateKey)
 	if err != nil {
