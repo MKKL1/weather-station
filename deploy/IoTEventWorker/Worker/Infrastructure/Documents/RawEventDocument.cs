@@ -57,11 +57,11 @@ public class RawEventDocument
 
         [JsonProperty("slotCount")]
         [JsonPropertyName("slotCount")]
-        public byte SlotCount { get; set; }
+        public int SlotCount { get; set; }
 
         [JsonProperty("slotSecs")]
         [JsonPropertyName("slotSecs")]
-        public ushort SlotSecs { get; set; }
+        public int SlotSecs { get; set; }
 
         [JsonProperty("startTime")]
         [JsonPropertyName("startTime")]

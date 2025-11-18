@@ -1,13 +1,14 @@
 ﻿using System.Net;
 using Microsoft.Azure.Cosmos;
 using Worker.Infrastructure.Documents;
+using Worker.Mappers;
 using Worker.Models;
 using Worker.Repositories;
 using Worker.Services;
 
 namespace Worker.Infrastructure;
 
-public class CosmosDbViewRepository(Container viewContainer, CosmosDbModelMapper mapper) : IViewRepository
+public class CosmosDbViewRepository(Container viewContainer, ICosmosDbModelMapper mapper) : IViewRepository
 {
     public async Task UpdateLatestView(AggregateModel<LatestStatePayload> latestStatePayload)
     {

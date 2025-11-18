@@ -1,10 +1,9 @@
-﻿using Proto;
-using Worker.Infrastructure.Documents;
+﻿using Worker.Infrastructure.Documents;
 using Worker.Models;
 
-namespace Worker.Services;
+namespace Worker.Mappers;
 
-public class CosmosDbModelMapper
+public class CosmosDbModelMapper: ICosmosDbModelMapper
 {
     public AggregateDocument<TDocPayload> ToDocument<TDomainPayload, TDocPayload>(
         AggregateModel<TDomainPayload> model, 
