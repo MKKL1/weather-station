@@ -3,10 +3,11 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Worker.Domain;
 using Worker.Infrastructure;
 using Worker.Mappers;
-using Worker.Repositories;
 using Worker.Services;
+using Worker.Validators;
 
 var builder = FunctionsApplication.CreateBuilder(args);
 
@@ -16,47 +17,63 @@ builder.Services
     .AddApplicationInsightsTelemetryWorkerService()
     .ConfigureFunctionsApplicationInsights();
 
-// Register configuration
+// Configuration
 builder.Services.AddSingleton<CosmosDbConfiguration>(sp =>
 {
     var conn = Environment.GetEnvironmentVariable("COSMOS_CONNECTION")
-               ?? throw new InvalidOperationException("COSMOS_CONNECTION environment variable is not set.");
+               ?? throw new InvalidOperationException("COSMOS_CONNECTION not set");
     var dbName = Environment.GetEnvironmentVariable("COSMOS_DATABASE")
-                 ?? throw new InvalidOperationException("COSMOS_DATABASE environment variable is not set.");
+                 ?? throw new InvalidOperationException("COSMOS_DATABASE not set");
     var containerName = Environment.GetEnvironmentVariable("COSMOS_VIEWS_CONTAINER")
-                        ?? throw new InvalidOperationException("COSMOS_VIEWS_CONTAINER environment variable is not set.");
-    
+                        ?? throw new InvalidOperationException("COSMOS_VIEWS_CONTAINER not set");
+
     return new CosmosDbConfiguration(conn, dbName, containerName);
 });
 
-// Register CosmosDB infrastructure
+// Infrastructure
 builder.Services.AddSingleton<CosmosClient>(sp =>
 {
     var config = sp.GetRequiredService<CosmosDbConfiguration>();
-    return new CosmosClient(config.ConnectionString);
+    // Use Bulk Execution for better performance on ReadMany/Batch
+    return new CosmosClient(config.ConnectionString, new CosmosClientOptions()
+    {
+        AllowBulkExecution = true 
+    });
 });
 
-builder.Services.AddSingleton<Container>(sp =>
+// Register the VIEWS Container
+builder.Services.AddSingleton<WeatherViewsContainer>(sp =>
 {
     var config = sp.GetRequiredService<CosmosDbConfiguration>();
     var client = sp.GetRequiredService<CosmosClient>();
-    return client.GetDatabase(config.DatabaseName).GetContainer(config.ViewsContainerName);
+    var container = client.GetDatabase(config.DatabaseName).GetContainer(config.ViewsContainerName);
+    return new WeatherViewsContainer(container);
 });
 
-// Register mappers
-builder.Services.AddSingleton<ICosmosDbModelMapper, CosmosDbModelMapper>();
-builder.Services.AddSingleton<ITelemetryModelMapper, TelemetryModelMapper>();
+// Register the RAW Container
+builder.Services.AddSingleton<RawTelemetryContainer>(sp =>
+{
+    var config = sp.GetRequiredService<CosmosDbConfiguration>();
+    var client = sp.GetRequiredService<CosmosClient>();
+    // Assumes you add RawContainerName to your config or hardcode it here
+    var containerName = "telemetry-raw"; 
+    var container = client.GetDatabase(config.DatabaseName).GetContainer(containerName);
+    return new RawTelemetryContainer(container);
+});
 
-// Register services
-builder.Services.AddSingleton<IViewIdService, ViewIdService>();
-builder.Services.AddSingleton<IHistogramConverter, HistogramConverter>();
-builder.Services.AddSingleton<IHistogramProcessor, HistogramProcessor>();
+// Repositories
+builder.Services.AddSingleton<IWeatherRepository, CosmosWeatherRepository>();
 
-// Register repositories
-builder.Services.AddSingleton<IViewRepository, CosmosDbViewRepository>();
+// Application Services
+builder.Services.AddSingleton<WeatherIngestionService>();
+builder.Services.AddSingleton<WeatherAggregationService>();
 
-// Register aggregation service
-builder.Services.AddSingleton<IWeatherAggregationService, WeatherAggregationService>();
+// Mappers
+builder.Services.AddSingleton<TelemetryMapper>();
+builder.Services.AddSingleton<DocumentMapper>();
+
+// Validators
+builder.Services.AddSingleton<TelemetryDtoValidator>();
 
 builder.Build().Run();
 

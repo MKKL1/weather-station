@@ -17,8 +17,8 @@ public class MetricAggregateDocument
     [JsonPropertyName("max")]
     public float Max { get; set; }
 
-    [JsonProperty("count")]
-    [JsonPropertyName("count")]
+    [JsonProperty("n")]
+    [JsonPropertyName("n")]
     public int? Count { get; set; }
 
     [JsonProperty("avg")]

@@ -137,7 +137,7 @@ public class MetricAggregate
     /// <remarks>
     /// This method updates <see cref="Sum"/>, <see cref="Min"/>, <see cref="Max"/>, and <see cref="Count"/> to include the new value.
     /// </remarks>
-    public void Increment(float value)
+    public void Update(float value)
     {
         if (!Sum.HasValue || !Count.HasValue)
         {

@@ -5,15 +5,15 @@ namespace Worker.Infrastructure.Documents;
 
 public class HistogramDocument<T>
 {
-    [JsonProperty("data")]
-    [JsonPropertyName("data")]
+    [JsonProperty("dat")]
+    [JsonPropertyName("dat")]
     public List<T> Data { get; set; }
 
-    [JsonProperty("slotSecs")]
-    [JsonPropertyName("slotSecs")]
+    [JsonProperty("sec")]
+    [JsonPropertyName("sec")]
     public int SlotSecs { get; set; }
 
-    [JsonProperty("startTime")]
-    [JsonPropertyName("startTime")]
-    public DateTimeOffset StartTime { get; set; }
+    [JsonProperty("sts")]
+    [JsonPropertyName("sts")]
+    public long StartTime { get; set; }
 }

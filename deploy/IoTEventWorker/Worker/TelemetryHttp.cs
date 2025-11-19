@@ -1,137 +1,97 @@
 using System.Net;
+using System.Text.Json;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
-using Worker.Infrastructure.Documents;
-using Worker.Mappers;
+using Worker.Dto;
 using Worker.Services;
 
 namespace Worker;
 
+/// <summary>
+/// HTTP endpoint for telemetry ingestion.
+/// Responsibilities: HTTP protocol handling only.
+/// </summary>
 public class TelemetryHttp
 {
     private const string DeviceIdHeader = "X-DEVICE-ID";
     private readonly ILogger<TelemetryHttp> _logger;
-    private readonly IWeatherAggregationService _weatherAggregationService;
-    private readonly ITelemetryModelMapper _telemetryModelMapper;
+    private readonly WeatherIngestionService _ingestionService;
 
     public TelemetryHttp(
         ILogger<TelemetryHttp> logger,
-        IWeatherAggregationService weatherAggregationService,
-        ITelemetryModelMapper telemetryModelMapper)
+        WeatherIngestionService ingestionService)
     {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _weatherAggregationService = weatherAggregationService ?? throw new ArgumentNullException(nameof(weatherAggregationService));
-        _telemetryModelMapper = telemetryModelMapper ?? throw new ArgumentNullException(nameof(telemetryModelMapper));
+        _logger = logger;
+        _ingestionService = ingestionService;
     }
 
     [Function(nameof(TelemetryHttp))]
     public async Task<HttpResponseData> Run(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/telemetry")] HttpRequestData req)
     {
+        //Check if X-DEVICE-ID header is present
+        if (!TryGetDeviceId(req, out var deviceId, out var errorResponse))
+            return errorResponse!;
+        
+        //Json body -> TelemetryDocument
+        TelemetryRequest? telemetry;
         try
         {
-            var deviceId = ExtractDeviceId(req);
-            var telemetry = await DeserializeTelemetry(req);
-            var document = MapToDocument(telemetry, deviceId);
-
-            await ProcessTelemetryEvent(document);
-
-            // _logger.LogInformation("Telemetry processed successfully for device {DeviceId}", deviceId);
-            return req.CreateResponse(HttpStatusCode.Created);
+            telemetry = await req.ReadFromJsonAsync<TelemetryRequest>();
+            if (telemetry?.Payload is null)
+                return await CreateError(req, HttpStatusCode.BadRequest, "Missing telemetry payload");
         }
-        catch (MissingHeaderException ex)
+        catch (JsonException ex)
         {
-            _logger.LogCritical(ex, "Missing required header: {Header}", DeviceIdHeader);
-            return await CreateErrorResponse(req, HttpStatusCode.InternalServerError, "An error occurred processing telemetry");
-        }
-        catch (InvalidTelemetryException ex)
-        {
-            // _logger.LogError(ex, "Invalid telemetry data received");
-            return await CreateErrorResponse(req, HttpStatusCode.BadRequest, $"Invalid telemetry data: {ex.Message}");
+            _logger.LogWarning(ex, "Invalid JSON from {DeviceId}", deviceId);
+            return await CreateError(req, HttpStatusCode.BadRequest, "Invalid JSON syntax");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error processing telemetry");
-            return await CreateErrorResponse(req, HttpStatusCode.InternalServerError, "An error occurred processing telemetry");
+            _logger.LogError(ex, "Failed to parse request from {DeviceId}", deviceId);
+            return await CreateError(req, HttpStatusCode.BadRequest, "Unable to process request");
+        }
+        
+        try
+        {
+            var result = await _ingestionService.Ingest(telemetry, deviceId!);
+            return result.IsSuccess
+                ? req.CreateResponse(HttpStatusCode.Created)
+                : await CreateError(req, HttpStatusCode.BadRequest, result.ErrorMessage!);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error for {DeviceId}", deviceId);
+            return await CreateError(req, HttpStatusCode.InternalServerError, "Internal server error");
         }
     }
 
-    private string ExtractDeviceId(HttpRequestData req)
+    private bool TryGetDeviceId(HttpRequestData req, out string? deviceId, out HttpResponseData? errorResponse)
     {
+        deviceId = null;
+        errorResponse = null;
+
         if (!req.Headers.TryGetValues(DeviceIdHeader, out var values))
         {
-            throw new MissingHeaderException($"Header {DeviceIdHeader} is required");
+            errorResponse = CreateError(req, HttpStatusCode.BadRequest, $"Missing {DeviceIdHeader} header").Result;
+            return false;
         }
 
-        var valuesList = values.ToList();
-        if (valuesList.Count == 0)
-        {
-            throw new MissingHeaderException($"Header {DeviceIdHeader} is required");
-        }
-
-        var deviceId = valuesList[0];
+        deviceId = values.FirstOrDefault();
         if (string.IsNullOrWhiteSpace(deviceId))
         {
-            throw new MissingHeaderException($"Header {DeviceIdHeader} cannot be empty");
+            errorResponse = CreateError(req, HttpStatusCode.BadRequest, "Device ID cannot be empty").Result;
+            return false;
         }
 
-        return deviceId;
+        return true;
     }
 
-    private async Task<TelemetryDocument> DeserializeTelemetry(HttpRequestData req)
+    private static async Task<HttpResponseData> CreateError(HttpRequestData req, HttpStatusCode status, string message)
     {
-        try
-        {
-            var telemetry = await req.ReadFromJsonAsync<TelemetryDocument>();
-            
-            if (telemetry == null)
-            {
-                throw new InvalidTelemetryException("Telemetry data cannot be null");
-            }
-
-            return telemetry;
-        }
-        catch (Exception ex) when (ex is not InvalidTelemetryException)
-        {
-            throw new InvalidTelemetryException("Failed to deserialize telemetry data", ex);
-        }
-    }
-
-    private RawEventDocument MapToDocument(TelemetryDocument telemetry, string deviceId)
-    {
-        try
-        {
-            return _telemetryModelMapper.ToDocument(telemetry, deviceId, eventType: "WeatherReport");
-        }
-        catch (Exception ex)
-        {
-            throw new InvalidTelemetryException("Failed to map telemetry to document", ex);
-        }
-    }
-
-    private async Task ProcessTelemetryEvent(RawEventDocument document)
-    {
-        await Task.WhenAll(
-            _weatherAggregationService.SaveLatestState(document),
-            _weatherAggregationService.UpdateHourlyAggregate(document),
-            _weatherAggregationService.UpdateDailyAggregate(document));
-    }
-
-    private async Task<HttpResponseData> CreateErrorResponse(HttpRequestData req, HttpStatusCode statusCode, string message)
-    {
-        var response = req.CreateResponse(statusCode);
-        await response.WriteAsJsonAsync(new ErrorResponse(message));
+        var response = req.CreateResponse(status);
+        await response.WriteAsJsonAsync(new { error = message });
         return response;
     }
 }
-
-public class MissingHeaderException(string message) : Exception(message);
-
-public class InvalidTelemetryException : Exception
-{
-    public InvalidTelemetryException(string message) : base(message) { }
-    public InvalidTelemetryException(string message, Exception innerException) : base(message, innerException) { }
-}
-
-public record ErrorResponse(string Message);
