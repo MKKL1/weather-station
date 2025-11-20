@@ -4,15 +4,9 @@ using Worker.Domain;
 using Worker.Domain.Models;
 using Worker.Dto;
 using Worker.Infrastructure.Documents;
-using Worker.Mappers;
-using Worker.Models;
 
 namespace Worker.Infrastructure;
 
-/// <summary>
-/// Cosmos DB implementation of weather repository.
-/// Infrastructure concern - handles persistence details.
-/// </summary>
 public class CosmosWeatherRepository(
     WeatherViewsContainer viewsWrapper,
     RawTelemetryContainer rawWrapper,
@@ -22,7 +16,7 @@ public class CosmosWeatherRepository(
     private readonly Container _viewsContainer = viewsWrapper.Instance;
     private readonly Container _rawContainer = rawWrapper.Instance;
 
-    public async Task SaveRawTelemetry(TelemetryRequest telemetryRequest, string deviceId)
+    public async Task SaveRawTelemetry(ValidatedTelemetryDto telemetryRequest, string deviceId)
     {
         var document = mapper.ToRawDocument(telemetryRequest, deviceId);
         
@@ -55,6 +49,9 @@ public class CosmosWeatherRepository(
         var deviceId = weatherStateUpdate.CurrentReading.DeviceId;
         var batch = _viewsContainer.CreateTransactionalBatch(new PartitionKey(deviceId));
 
+        var currentDoc = mapper.ToDocument(weatherStateUpdate.CurrentReading);
+        batch.UpsertItem(currentDoc);
+        
         foreach (var daily in weatherStateUpdate.DailyChanges)
         {
             var doc = mapper.ToDocument(daily);

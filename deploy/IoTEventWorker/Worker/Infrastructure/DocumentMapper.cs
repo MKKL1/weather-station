@@ -1,8 +1,9 @@
+using System.Globalization;
+using Worker.Domain.Entities;
 using Worker.Domain.Models;
 using Worker.Domain.ValueObjects;
 using Worker.Dto;
 using Worker.Infrastructure.Documents;
-using Worker.Models;
 
 namespace Worker.Infrastructure;
 
@@ -25,13 +26,31 @@ public class DocumentMapper
                 HourlyHumidity = ToDictDoc(domain.HourlyHumidity),
                 HourlyPressure = ToDictDoc(domain.HourlyPressure),
                 HourlyRain = ToHistogramDoc(domain.Rain),
-                IncludedTimestamps = domain.IncludedTimestamps.Select(x=> x.ToUnixTimeSeconds()).ToList(),
+                IncludedTimestamps = domain.IncludedTimestamps.Select(x => x.ToUnixTimeSeconds()).ToList(),
                 IsFinalized = domain.IsFinalized
             }
         };
     }
+    
+    public LatestWeatherDocument ToDocument(WeatherReading reading)
+    {
+        return new LatestWeatherDocument
+        {
+            id = IdBuilder.BuildLatest(reading.DeviceId), 
+            
+            DeviceId = reading.DeviceId,
+            DocType = "latest",
+            Timestamp = reading.Timestamp.ToUniversalTime().ToUnixTimeSeconds(),
+            
+            Temperature = reading.TemperatureVo?.Value,
+            Humidity = reading.HumidityVo?.Value,
+            Pressure = reading.PressureVo?.Value,
+            
+            Rain = ToHistogramDoc(reading.RainfallVo) 
+        };
+    }
 
-    public RawTelemetryDocument ToRawDocument(TelemetryRequest request, string deviceId)
+    public RawTelemetryDocument ToRawDocument(ValidatedTelemetryDto request, string deviceId)
     {
         var id = $"{deviceId}|{request.TimestampEpoch}";
 
@@ -40,7 +59,7 @@ public class DocumentMapper
             id = id,
             DeviceId = deviceId,
             EventType = "WeatherReport",
-            EventTimestamp = DateTimeOffset.FromUnixTimeSeconds(request.TimestampEpoch),
+            EventTimestamp = DateTimeOffset.FromUnixTimeSeconds(request.TimestampEpoch).ToUniversalTime(),
             Payload = new RawTelemetryDocument.PayloadDocument
             {
                 Temperature = request.Payload.Temperature ?? 0,
@@ -59,8 +78,9 @@ public class DocumentMapper
     
     public DailyWeather ToDomain(DailyWeatherDocument doc)
     {
-        var datePart = doc.id.Split('|')[1];
-        var timestamp = DateTimeOffset.Parse(datePart);
+        var datePart = doc.id.Split('|')[2];
+        var dt = DateTime.ParseExact(datePart, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var timestamp = new DateTimeOffset(dt, TimeSpan.Zero);
 
         return new DailyWeather(doc.DeviceId, timestamp)
         {
@@ -70,12 +90,14 @@ public class DocumentMapper
             HourlyTemperature = ToDictDomain(doc.Payload.HourlyTemperature),
             HourlyHumidity = ToDictDomain(doc.Payload.HourlyHumidity),
             HourlyPressure = ToDictDomain(doc.Payload.HourlyPressure),
-            IncludedTimestamps = doc.Payload.IncludedTimestamps.Select(DateTimeOffset.FromUnixTimeSeconds).ToList() ?? [],
+            IncludedTimestamps = doc.Payload.IncludedTimestamps
+                .Select(t => DateTimeOffset.FromUnixTimeSeconds(t).ToUniversalTime())
+                .ToList() ?? [],
             IsFinalized = doc.Payload.IsFinalized,
             Rain = doc.Payload.HourlyRain == null ? null : Rainfall.Create(
                 doc.Payload.HourlyRain.Data.ToArray(),
                 doc.Payload.HourlyRain.SlotSecs,
-                DateTimeOffset.FromUnixTimeSeconds(doc.Payload.HourlyRain.StartTime)
+                DateTimeOffset.FromUnixTimeSeconds(doc.Payload.HourlyRain.StartTime).ToUniversalTime()
             )
         };
     }
@@ -100,13 +122,14 @@ public class DocumentMapper
         source?.ToDictionary(k => k.Key, v => ToDoc(v.Value)!);
 
     private Dictionary<int, MetricAggregate>? ToDictDomain(Dictionary<int, MetricAggregateDocument>? source) =>
-        source?.ToDictionary(k => k.Key, v => ToDomain(v.Value)!);
+        source?.ToDictionary(k => k.Key, 
+            v => ToDomain(v.Value)!);
 
     private HistogramDocument<float>? ToHistogramDoc(Rainfall? rain) =>
         rain == null ? null : new HistogramDocument<float>
         {
             Data = [..rain.Histogram.Data], 
             SlotSecs = rain.IntervalSeconds,
-            StartTime = rain.StartTime.ToUnixTimeSeconds()
+            StartTime = rain.StartTime.ToUniversalTime().ToUnixTimeSeconds()
         };
 }

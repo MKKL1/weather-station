@@ -1,15 +1,9 @@
 ﻿using Worker.Domain;
 using Worker.Domain.Entities;
 using Worker.Domain.Models;
-using Worker.Dto;
-using Worker.Models;
 
 namespace Worker.Services;
 
-/// <summary>
-/// Business logic for aggregating weather readings into time-bucketed views.
-/// Pure business logic - no infrastructure concerns.
-/// </summary>
 public class WeatherAggregationService(IWeatherRepository repository)
 {
     public async Task<WeatherStateUpdate> ProcessReading(WeatherReading reading)

@@ -1,8 +1,5 @@
 namespace Worker.Domain.ValueObjects;
 
-/// <summary>
-/// Temperature value object with built-in validation.
-/// </summary>
 public readonly record struct Temperature
 {
     private const float MinValue = -80.0f;

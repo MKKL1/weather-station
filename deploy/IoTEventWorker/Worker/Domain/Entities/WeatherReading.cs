@@ -4,7 +4,6 @@ namespace Worker.Domain.Entities;
 
 /// <summary>
 /// Domain entity representing a complete weather reading from a device.
-/// All validation is enforced through value objects.
 /// </summary>
 public class WeatherReading
 {

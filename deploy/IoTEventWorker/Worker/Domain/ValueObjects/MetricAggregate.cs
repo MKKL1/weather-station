@@ -1,4 +1,4 @@
-﻿namespace Worker.Models;
+﻿namespace Worker.Domain.ValueObjects;
 
 /// <summary>
 /// Represents aggregate statistics for a collection of numeric metric values.

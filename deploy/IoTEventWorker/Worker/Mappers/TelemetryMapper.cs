@@ -1,34 +1,29 @@
 using Worker.Domain.Entities;
 using Worker.Domain.ValueObjects;
 using Worker.Dto;
-using Worker.Infrastructure.Documents;
 
 namespace Worker.Mappers;
 
-/// <summary>
-/// Maps telemetry DTOs to domain entities.
-/// Validation and sanitization happen in the domain layer through value objects.
-/// </summary>
 public class TelemetryMapper
 {
-    public WeatherReading ToDomain(TelemetryRequest dto, string deviceId)
+    public WeatherReading ToDomain(ValidatedTelemetryDto dto, string deviceId)
     {
-        var timestamp = DateTimeOffset.FromUnixTimeSeconds(dto.TimestampEpoch);
+        var timestamp = DateTimeOffset.FromUnixTimeSeconds(dto.TimestampEpoch).ToUniversalTime();
         var payload = dto.Payload;
 
         Rainfall? rainVo = null;
-
-        // check if we have rain data
-        if (dto.Payload.Rain != null && dto.Payload.Rain.Data.Length > 0)
+        
+        if (payload.Rain != null)
         {
-            float mmPerTip = dto.Payload.MmPerTip ?? 0.2f; 
-            var mmValues = dto.Payload.Rain.Data
+            float mmPerTip = payload.MmPerTip ?? 0.2f; 
+            var mmValues = payload.Rain.Data
                 .Select(tips => tips * mmPerTip)
                 .ToArray();
+            
             rainVo = Rainfall.Create(
                 mmValues,
-                dto.Payload.Rain.SlotSeconds,
-                DateTimeOffset.FromUnixTimeSeconds(dto.Payload.Rain.StartTimeEpoch)
+                payload.Rain.SlotSeconds,
+                DateTimeOffset.FromUnixTimeSeconds(payload.Rain.StartTimeEpoch).ToUniversalTime()
             );
         }
 
@@ -39,5 +34,26 @@ public class TelemetryMapper
             payload.HumidityPpm ?? 0,
             payload.PressurePa ?? 0,
             rainVo);
+    }
+    
+    public ValidatedTelemetryDto ToValidatedDto(TelemetryRequest request)
+    {
+        return new ValidatedTelemetryDto
+        {
+            TimestampEpoch = request.TimestampEpoch!.Value,
+            Payload = new ValidatedTelemetryDto.ValidatedPayload
+            {
+                Temperature = request.Payload!.Temperature,
+                PressurePa = request.Payload.PressurePa,
+                HumidityPpm = request.Payload.HumidityPpm,
+                MmPerTip = request.Payload.MmPerTip,
+                Rain = request.Payload.Rain == null ? null : new ValidatedTelemetryDto.ValidatedHistogram
+                {
+                    Data = request.Payload.Rain.Data!,
+                    SlotSeconds = request.Payload.Rain.SlotSeconds!.Value,
+                    StartTimeEpoch = request.Payload.Rain.StartTimeEpoch!.Value
+                }
+            }
+        };
     }
 }

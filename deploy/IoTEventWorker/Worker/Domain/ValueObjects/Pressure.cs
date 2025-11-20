@@ -1,8 +1,5 @@
 namespace Worker.Domain.ValueObjects;
 
-/// <summary>
-/// Pressure value object with built-in validation (hPa).
-/// </summary>
 public readonly record struct Pressure
 {
     private const float MinValue = 800.0f;

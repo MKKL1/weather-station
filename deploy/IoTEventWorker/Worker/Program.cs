@@ -1,3 +1,5 @@
+using System.Globalization;
+using FluentValidation;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Builder;
@@ -7,7 +9,6 @@ using Worker.Domain;
 using Worker.Infrastructure;
 using Worker.Mappers;
 using Worker.Services;
-using Worker.Validators;
 
 var builder = FunctionsApplication.CreateBuilder(args);
 
@@ -17,7 +18,6 @@ builder.Services
     .AddApplicationInsightsTelemetryWorkerService()
     .ConfigureFunctionsApplicationInsights();
 
-// Configuration
 builder.Services.AddSingleton<CosmosDbConfiguration>(sp =>
 {
     var conn = Environment.GetEnvironmentVariable("COSMOS_CONNECTION")
@@ -30,18 +30,15 @@ builder.Services.AddSingleton<CosmosDbConfiguration>(sp =>
     return new CosmosDbConfiguration(conn, dbName, containerName);
 });
 
-// Infrastructure
 builder.Services.AddSingleton<CosmosClient>(sp =>
 {
     var config = sp.GetRequiredService<CosmosDbConfiguration>();
-    // Use Bulk Execution for better performance on ReadMany/Batch
     return new CosmosClient(config.ConnectionString, new CosmosClientOptions()
     {
         AllowBulkExecution = true 
     });
 });
 
-// Register the VIEWS Container
 builder.Services.AddSingleton<WeatherViewsContainer>(sp =>
 {
     var config = sp.GetRequiredService<CosmosDbConfiguration>();
@@ -50,30 +47,25 @@ builder.Services.AddSingleton<WeatherViewsContainer>(sp =>
     return new WeatherViewsContainer(container);
 });
 
-// Register the RAW Container
 builder.Services.AddSingleton<RawTelemetryContainer>(sp =>
 {
     var config = sp.GetRequiredService<CosmosDbConfiguration>();
     var client = sp.GetRequiredService<CosmosClient>();
-    // Assumes you add RawContainerName to your config or hardcode it here
     var containerName = "telemetry-raw"; 
     var container = client.GetDatabase(config.DatabaseName).GetContainer(containerName);
     return new RawTelemetryContainer(container);
 });
 
-// Repositories
 builder.Services.AddSingleton<IWeatherRepository, CosmosWeatherRepository>();
 
-// Application Services
 builder.Services.AddSingleton<WeatherIngestionService>();
 builder.Services.AddSingleton<WeatherAggregationService>();
 
-// Mappers
 builder.Services.AddSingleton<TelemetryMapper>();
 builder.Services.AddSingleton<DocumentMapper>();
 
-// Validators
-builder.Services.AddSingleton<TelemetryDtoValidator>();
+ValidatorOptions.Global.LanguageManager.Culture = new CultureInfo("en-US");
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
 builder.Build().Run();
 

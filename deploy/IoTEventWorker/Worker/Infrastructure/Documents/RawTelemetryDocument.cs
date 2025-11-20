@@ -3,10 +3,6 @@ using Newtonsoft.Json;
 
 namespace Worker.Infrastructure.Documents;
 
-/// <summary>
-/// CosmosDB document for storing raw weather events.
-/// Represents the persisted form of RawEvent domain model.
-/// </summary>
 public class RawTelemetryDocument
 {
     [JsonProperty("id")]

@@ -1,69 +1,64 @@
 using System.Net;
-using System.Text.Json;
+using FluentValidation;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
 using Worker.Dto;
+using Worker.Mappers;
 using Worker.Services;
 
 namespace Worker;
 
-/// <summary>
-/// HTTP endpoint for telemetry ingestion.
-/// Responsibilities: HTTP protocol handling only.
-/// </summary>
-public class TelemetryHttp
+public class TelemetryHttp(
+    ILogger<TelemetryHttp> logger,
+    WeatherIngestionService ingestionService,
+    IValidator<TelemetryRequest> validator,
+    TelemetryMapper mapper)
 {
     private const string DeviceIdHeader = "X-DEVICE-ID";
-    private readonly ILogger<TelemetryHttp> _logger;
-    private readonly WeatherIngestionService _ingestionService;
-
-    public TelemetryHttp(
-        ILogger<TelemetryHttp> logger,
-        WeatherIngestionService ingestionService)
-    {
-        _logger = logger;
-        _ingestionService = ingestionService;
-    }
 
     [Function(nameof(TelemetryHttp))]
     public async Task<HttpResponseData> Run(
         [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = "v1/telemetry")] HttpRequestData req)
     {
-        //Check if X-DEVICE-ID header is present
         if (!TryGetDeviceId(req, out var deviceId, out var errorResponse))
             return errorResponse!;
+
         
-        //Json body -> TelemetryDocument
-        TelemetryRequest? telemetry;
+        TelemetryRequest? telemetry = null;
         try
         {
             telemetry = await req.ReadFromJsonAsync<TelemetryRequest>();
-            if (telemetry?.Payload is null)
-                return await CreateError(req, HttpStatusCode.BadRequest, "Missing telemetry payload");
         }
-        catch (JsonException ex)
+        catch
         {
-            _logger.LogWarning(ex, "Invalid JSON from {DeviceId}", deviceId);
-            return await CreateError(req, HttpStatusCode.BadRequest, "Invalid JSON syntax");
+            return await CreateError(req, HttpStatusCode.BadRequest, "Invalid body"); 
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to parse request from {DeviceId}", deviceId);
-            return await CreateError(req, HttpStatusCode.BadRequest, "Unable to process request");
-        }
+
+        if (telemetry is null) return await CreateError(req, HttpStatusCode.BadRequest, "Empty body");
         
+        var validationResult = await validator.ValidateAsync(telemetry);
+
+        if (!validationResult.IsValid)
+        {
+            var errors = validationResult.Errors.Select(e => e.ErrorMessage).ToList();
+            logger.LogWarning("Validation failed for {DeviceId}", deviceId);
+            return await CreateValidationError(req, errors);
+        }
+
+        var validatedDto = mapper.ToValidatedDto(telemetry);
+
         try
         {
-            var result = await _ingestionService.Ingest(telemetry, deviceId!);
+            var result = await ingestionService.Ingest(validatedDto, deviceId!);
             return result.IsSuccess
                 ? req.CreateResponse(HttpStatusCode.Created)
                 : await CreateError(req, HttpStatusCode.BadRequest, result.ErrorMessage!);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unexpected error for {DeviceId}", deviceId);
-            return await CreateError(req, HttpStatusCode.InternalServerError, "Internal server error");
+            logger.LogError(ex, "Unexpected error processing {DeviceId}", deviceId);
+            return await CreateError(req, HttpStatusCode.InternalServerError, "Internal processing error");
         }
     }
 
@@ -92,6 +87,13 @@ public class TelemetryHttp
     {
         var response = req.CreateResponse(status);
         await response.WriteAsJsonAsync(new { error = message });
+        return response;
+    }
+
+    private static async Task<HttpResponseData> CreateValidationError(HttpRequestData req, List<string> errors)
+    {
+        var response = req.CreateResponse(HttpStatusCode.BadRequest);
+        await response.WriteAsJsonAsync(new { title = "Validation Failed", errors = errors });
         return response;
     }
 }

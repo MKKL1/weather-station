@@ -1,8 +1,5 @@
 namespace Worker.Domain.ValueObjects;
 
-/// <summary>
-/// Humidity value object with built-in validation (0-100%).
-/// </summary>
 public readonly record struct Humidity
 {
     private const float MinValue = 0.0f;
