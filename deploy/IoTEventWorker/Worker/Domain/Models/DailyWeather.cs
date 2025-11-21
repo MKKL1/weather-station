@@ -8,7 +8,7 @@ public class DailyWeather
     private const int BucketSizeSeconds = 300; // 5 minutes
     public string DeviceId { get; }
     public DateTimeOffset DayTimestamp { get; }
-    public Rainfall? Rain { get; set; }
+    public RainfallAccumulator? Rain { get; set; }
     public MetricAggregate? Temperature { get; set; }
     public MetricAggregate? Humidity { get; set; }
     public MetricAggregate? Pressure { get; set; }
@@ -32,17 +32,8 @@ public class DailyWeather
     {
         if (reading.RainfallVo != null)
         {
-            if (Rain == null)
-            {
-                int slotsInDay = 86400 / BucketSizeSeconds;
-                Rain = Rainfall.Create(
-                    new float[slotsInDay], 
-                    BucketSizeSeconds, 
-                    DayTimestamp
-                );
-            }
-            var incomingBuckets = reading.RainfallVo.ResampleToBuckets(BucketSizeSeconds);
-            Rain.Merge(incomingBuckets);
+            Rain ??= RainfallAccumulator.FromDuration(DayTimestamp, BucketSizeSeconds, 86400);
+            Rain.Add(reading.RainfallVo.Value);
         }
         
         // Check if this specific point in time belongs to this day.

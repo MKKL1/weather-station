@@ -13,8 +13,8 @@ public class WeatherAggregationService(IWeatherRepository repository)
 
         if (reading.RainfallVo != null)
         {
-            start = reading.RainfallVo.StartTime;
-            end = reading.RainfallVo.StartTime.AddSeconds(reading.RainfallVo.IntervalSeconds * reading.RainfallVo.SlotCount);
+            start = reading.RainfallVo.Value.StartTime;
+            end = reading.RainfallVo.Value.StartTime.AddSeconds(reading.RainfallVo.Value.TotalDuration);
         }
         
         var affectedDates = GetUniqueDays(start, end);

@@ -94,7 +94,7 @@ public class DocumentMapper
                 .Select(t => DateTimeOffset.FromUnixTimeSeconds(t).ToUniversalTime())
                 .ToList() ?? [],
             IsFinalized = doc.Payload.IsFinalized,
-            Rain = doc.Payload.HourlyRain == null ? null : Rainfall.Create(
+            Rain = doc.Payload.HourlyRain == null ? null : RainfallAccumulator.FromData(
                 doc.Payload.HourlyRain.Data.ToArray(),
                 doc.Payload.HourlyRain.SlotSecs,
                 DateTimeOffset.FromUnixTimeSeconds(doc.Payload.HourlyRain.StartTime).ToUniversalTime()
@@ -125,11 +125,19 @@ public class DocumentMapper
         source?.ToDictionary(k => k.Key, 
             v => ToDomain(v.Value)!);
 
-    private HistogramDocument<float>? ToHistogramDoc(Rainfall? rain) =>
+    private HistogramDocument<float>? ToHistogramDoc(RainfallAccumulator? rain) =>
         rain == null ? null : new HistogramDocument<float>
         {
             Data = [..rain.Histogram.Data], 
-            SlotSecs = rain.IntervalSeconds,
-            StartTime = rain.StartTime.ToUniversalTime().ToUnixTimeSeconds()
+            SlotSecs = rain.Histogram.IntervalSeconds,
+            StartTime = rain.Histogram.StartTime.ToUniversalTime().ToUnixTimeSeconds()
+        };
+    
+    private HistogramDocument<float>? ToHistogramDoc(RainfallReading? rain) =>
+        rain == null ? null : new HistogramDocument<float>
+        {
+            Data = [..rain.Value.Values], 
+            SlotSecs = rain.Value.IntervalSeconds,
+            StartTime = rain.Value.StartTime.ToUniversalTime().ToUnixTimeSeconds()
         };
 }

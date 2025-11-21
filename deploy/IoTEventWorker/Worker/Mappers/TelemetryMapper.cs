@@ -11,7 +11,7 @@ public class TelemetryMapper
         var timestamp = DateTimeOffset.FromUnixTimeSeconds(dto.TimestampEpoch).ToUniversalTime();
         var payload = dto.Payload;
 
-        Rainfall? rainVo = null;
+        RainfallReading? rainVo = null;
         
         if (payload.Rain != null)
         {
@@ -20,7 +20,7 @@ public class TelemetryMapper
                 .Select(tips => tips * mmPerTip)
                 .ToArray();
             
-            rainVo = Rainfall.Create(
+            rainVo = RainfallReading.Create(
                 mmValues,
                 payload.Rain.SlotSeconds,
                 DateTimeOffset.FromUnixTimeSeconds(payload.Rain.StartTimeEpoch).ToUniversalTime()

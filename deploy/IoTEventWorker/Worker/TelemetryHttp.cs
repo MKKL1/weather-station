@@ -1,5 +1,6 @@
 using System.Net;
 using FluentValidation;
+using FluentValidation.Results;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Http;
 using Microsoft.Extensions.Logging;
@@ -15,7 +16,7 @@ public class TelemetryHttp(
     IValidator<TelemetryRequest> validator,
     TelemetryMapper mapper)
 {
-    private const string DeviceIdHeader = "X-DEVICE-ID";
+    private const string DeviceIdHeader = "X-Device-ID";
 
     [Function(nameof(TelemetryHttp))]
     public async Task<HttpResponseData> Run(
@@ -24,7 +25,6 @@ public class TelemetryHttp(
         if (!TryGetDeviceId(req, out var deviceId, out var errorResponse))
             return errorResponse!;
 
-        
         TelemetryRequest? telemetry = null;
         try
         {
@@ -32,18 +32,18 @@ public class TelemetryHttp(
         }
         catch
         {
-            return await CreateError(req, HttpStatusCode.BadRequest, "Invalid body"); 
+            return await CreateError(req, HttpStatusCode.BadRequest, "INVALID_JSON", "Invalid body"); 
         }
 
-        if (telemetry is null) return await CreateError(req, HttpStatusCode.BadRequest, "Empty body");
+        if (telemetry is null) 
+            return await CreateError(req, HttpStatusCode.BadRequest, "EMPTY_BODY", "Body cannot be null");
         
         var validationResult = await validator.ValidateAsync(telemetry);
 
         if (!validationResult.IsValid)
         {
-            var errors = validationResult.Errors.Select(e => e.ErrorMessage).ToList();
             logger.LogWarning("Validation failed for {DeviceId}", deviceId);
-            return await CreateValidationError(req, errors);
+            return await CreateValidationError(req, validationResult.Errors);
         }
 
         var validatedDto = mapper.ToValidatedDto(telemetry);
@@ -53,12 +53,12 @@ public class TelemetryHttp(
             var result = await ingestionService.Ingest(validatedDto, deviceId!);
             return result.IsSuccess
                 ? req.CreateResponse(HttpStatusCode.Created)
-                : await CreateError(req, HttpStatusCode.BadRequest, result.ErrorMessage!);
+                : await CreateError(req, HttpStatusCode.BadRequest, "INGESTION_FAILED", result.ErrorMessage!);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Unexpected error processing {DeviceId}", deviceId);
-            return await CreateError(req, HttpStatusCode.InternalServerError, "Internal processing error");
+            return await CreateError(req, HttpStatusCode.InternalServerError, "INTERNAL_ERROR", "Internal processing error");
         }
     }
 
@@ -69,31 +69,47 @@ public class TelemetryHttp(
 
         if (!req.Headers.TryGetValues(DeviceIdHeader, out var values))
         {
-            errorResponse = CreateError(req, HttpStatusCode.BadRequest, $"Missing {DeviceIdHeader} header").Result;
+            errorResponse = CreateError(req, HttpStatusCode.BadRequest, "MISSING_HEADER", $"Missing {DeviceIdHeader} header").Result;
             return false;
         }
 
         deviceId = values.FirstOrDefault();
         if (string.IsNullOrWhiteSpace(deviceId))
         {
-            errorResponse = CreateError(req, HttpStatusCode.BadRequest, "Device ID cannot be empty").Result;
+            errorResponse = CreateError(req, HttpStatusCode.BadRequest, "INVALID_HEADER", "Device ID cannot be empty").Result;
             return false;
         }
 
         return true;
     }
-
-    private static async Task<HttpResponseData> CreateError(HttpRequestData req, HttpStatusCode status, string message)
+    
+    private static async Task<HttpResponseData> CreateError(HttpRequestData req, HttpStatusCode status, string code, string message)
     {
         var response = req.CreateResponse(status);
-        await response.WriteAsJsonAsync(new { error = message });
+        await response.WriteAsJsonAsync(new 
+        { 
+            error = new { code, message } 
+        });
         return response;
     }
-
-    private static async Task<HttpResponseData> CreateValidationError(HttpRequestData req, List<string> errors)
+    
+    private static async Task<HttpResponseData> CreateValidationError(HttpRequestData req, List<ValidationFailure> failures)
     {
         var response = req.CreateResponse(HttpStatusCode.BadRequest);
-        await response.WriteAsJsonAsync(new { title = "Validation Failed", errors = errors });
+        
+        var errorList = failures.Select(f => new 
+        {
+            code = f.ErrorCode,
+            message = f.ErrorMessage,
+            target = f.PropertyName
+        }).ToList();
+
+        await response.WriteAsJsonAsync(new 
+        { 
+            title = "Validation Failed", 
+            errors = errorList 
+        });
+        
         return response;
     }
 }
