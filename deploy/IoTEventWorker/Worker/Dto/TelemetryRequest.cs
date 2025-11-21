@@ -21,8 +21,9 @@ public record TelemetryRequest
 
     public record HistogramRecord
     {
-        [JsonPropertyName("dat")] public int[]? Data { get; init; }
+        [JsonPropertyName("dat")] public Dictionary<int, int>? Data { get; init; }
         [JsonPropertyName("sec")] public int? SlotSeconds { get; init; }
         [JsonPropertyName("sts")] public long? StartTimeEpoch { get; init; }
+        [JsonPropertyName("n")] public int? SlotCount { get; init; }
     }
 }

@@ -15,15 +15,17 @@ public class TelemetryMapper
         
         if (payload.Rain != null)
         {
-            float mmPerTip = payload.MmPerTip ?? 0.2f; 
-            var mmValues = payload.Rain.Data
-                .Select(tips => tips * mmPerTip)
-                .ToArray();
+            float mmPerTip = payload.MmPerTip ?? 0.2f;
+            var sparseMmData = payload.Rain.Data.ToDictionary(
+                kvp => kvp.Key, 
+                kvp => kvp.Value * mmPerTip
+            );
             
             rainVo = RainfallReading.Create(
-                mmValues,
+                sparseMmData,
                 payload.Rain.SlotSeconds,
-                DateTimeOffset.FromUnixTimeSeconds(payload.Rain.StartTimeEpoch).ToUniversalTime()
+                DateTimeOffset.FromUnixTimeSeconds(payload.Rain.StartTimeEpoch).ToUniversalTime(),
+                payload.Rain.SlotCount // Use explicit count
             );
         }
 
@@ -51,7 +53,8 @@ public class TelemetryMapper
                 {
                     Data = request.Payload.Rain.Data!,
                     SlotSeconds = request.Payload.Rain.SlotSeconds!.Value,
-                    StartTimeEpoch = request.Payload.Rain.StartTimeEpoch!.Value
+                    StartTimeEpoch = request.Payload.Rain.StartTimeEpoch!.Value,
+                    SlotCount = request.Payload.Rain.SlotCount!.Value,
                 }
             }
         };

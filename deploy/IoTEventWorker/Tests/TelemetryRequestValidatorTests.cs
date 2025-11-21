@@ -90,7 +90,7 @@ public class TelemetryRequestValidatorTests
     }
 
     [Fact]
-    public void Should_Fail_When_Rain_Data_Is_Empty_But_Object_Exists()
+    public void Should_Fail_When_Slot_Count_Is_Missing()
     {
         var request = new TelemetryRequest
         {
@@ -99,15 +99,18 @@ public class TelemetryRequestValidatorTests
             {
                 Rain = new TelemetryRequest.HistogramRecord
                 {
-                    Data = []
+                    Data = new Dictionary<int, int>(),
+                    SlotSeconds = 60,
+                    StartTimeEpoch = 1000,
+                    SlotCount = null
                 }
             }
         };
         
         var result = _validator.TestValidate(request);
 
-        result.ShouldHaveValidationErrorFor(x => x.Payload!.Rain!.Data)
-            .WithErrorCode("EMPTY_RAIN_DATA");
+        result.ShouldHaveValidationErrorFor(x => x.Payload!.Rain!.SlotCount)
+            .WithErrorCode("MISSING_SLOT_COUNT");
     }
 
     [Fact]
@@ -123,8 +126,9 @@ public class TelemetryRequestValidatorTests
             {
                 Rain = new TelemetryRequest.HistogramRecord
                 {
-                    Data = [0, 0, 0],
+                    Data = new Dictionary<int, int>(),
                     SlotSeconds = 10,
+                    SlotCount = 3,
                     StartTimeEpoch = rainStart.ToUnixTimeSeconds()
                 }
             }
@@ -150,8 +154,9 @@ public class TelemetryRequestValidatorTests
             {
                 Rain = new TelemetryRequest.HistogramRecord
                 {
-                    Data = [0],
+                    Data = new Dictionary<int, int> { { 0, 1 } },
                     SlotSeconds = (int?)rainDuration.TotalSeconds,
+                    SlotCount = 1,
                     StartTimeEpoch = rainStart.ToUnixTimeSeconds()
                 }
             }
@@ -166,8 +171,6 @@ public class TelemetryRequestValidatorTests
     public void Should_Fail_When_Histogram_Duration_Exceeds_Limit()
     {
         var now = _timeProvider.GetUtcNow();
-
-        var histogramDuration = 8 * 600;
         
         var request = new TelemetryRequest
         {
@@ -176,9 +179,10 @@ public class TelemetryRequestValidatorTests
             {
                 Rain = new TelemetryRequest.HistogramRecord
                 {
-                    Data = [0, 0, 0, 0, 0, 0, 0, 0],
+                    Data = new Dictionary<int, int>(),
                     SlotSeconds = 600,
-                    StartTimeEpoch = now.Subtract(TimeSpan.FromSeconds(histogramDuration)).ToUnixTimeSeconds()
+                    SlotCount = 8, 
+                    StartTimeEpoch = now.Subtract(TimeSpan.FromMinutes(80)).ToUnixTimeSeconds()
                 }
             }
         };
@@ -187,5 +191,34 @@ public class TelemetryRequestValidatorTests
 
         result.ShouldHaveValidationErrorFor("Payload.Rain")
             .WithErrorCode("HISTOGRAM_DURATION_EXCEEDED");
+    }
+    
+    [Fact]
+    public void Should_Fail_When_Sparse_Index_Exceeds_SlotCount()
+    {
+        var now = _timeProvider.GetUtcNow();
+        
+        var request = new TelemetryRequest
+        {
+            TimestampEpoch = now.ToUnixTimeSeconds(),
+            Payload = new TelemetryRequest.PayloadRecord
+            {
+                Rain = new TelemetryRequest.HistogramRecord
+                {
+                    Data = new Dictionary<int, int>
+                    {
+                        { 5, 1 }
+                    },
+                    SlotSeconds = 60,
+                    SlotCount = 5, 
+                    StartTimeEpoch = now.Subtract(TimeSpan.FromMinutes(5)).ToUnixTimeSeconds()
+                }
+            }
+        };
+        
+        var result = _validator.TestValidate(request);
+
+        result.ShouldHaveValidationErrorFor("Payload.Rain.Data")
+            .WithErrorCode("INDEX_OUT_OF_BOUNDS");
     }
 }

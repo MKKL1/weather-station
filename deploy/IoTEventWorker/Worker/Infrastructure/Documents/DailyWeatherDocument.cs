@@ -49,7 +49,7 @@ public class DailyWeatherDocument
 
         [JsonProperty("hrain")]
         [JsonPropertyName("hrain")]
-        public HistogramDocument<float>? HourlyRain { get; set; }
+        public HistogramDocument? HourlyRain { get; set; }
 
         [JsonProperty("ids")]
         [JsonPropertyName("ids")]

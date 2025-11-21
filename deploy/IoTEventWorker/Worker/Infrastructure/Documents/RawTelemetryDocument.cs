@@ -52,7 +52,7 @@ public class RawTelemetryDocument
     {
         [JsonProperty("dat")]
         [JsonPropertyName("dat")]
-        public required int[] Data { get; set; }
+        public required Dictionary<int, int>? Data { get; init; }
 
         [JsonProperty("sec")]
         [JsonPropertyName("sec")]

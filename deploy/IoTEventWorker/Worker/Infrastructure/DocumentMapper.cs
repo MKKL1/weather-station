@@ -95,9 +95,10 @@ public class DocumentMapper
                 .ToList() ?? [],
             IsFinalized = doc.Payload.IsFinalized,
             Rain = doc.Payload.HourlyRain == null ? null : RainfallAccumulator.FromData(
-                doc.Payload.HourlyRain.Data.ToArray(),
+                doc.Payload.HourlyRain.Data,
                 doc.Payload.HourlyRain.SlotSecs,
-                DateTimeOffset.FromUnixTimeSeconds(doc.Payload.HourlyRain.StartTime).ToUniversalTime()
+                DateTimeOffset.FromUnixTimeSeconds(doc.Payload.HourlyRain.StartTime).ToUniversalTime(),
+                doc.Payload.HourlyRain.SlotCount 
             )
         };
     }
@@ -125,19 +126,21 @@ public class DocumentMapper
         source?.ToDictionary(k => k.Key, 
             v => ToDomain(v.Value)!);
 
-    private HistogramDocument<float>? ToHistogramDoc(RainfallAccumulator? rain) =>
-        rain == null ? null : new HistogramDocument<float>
+    private HistogramDocument? ToHistogramDoc(RainfallReading? rain) =>
+        rain == null ? null : new HistogramDocument
         {
-            Data = [..rain.Histogram.Data], 
-            SlotSecs = rain.Histogram.IntervalSeconds,
-            StartTime = rain.Histogram.StartTime.ToUniversalTime().ToUnixTimeSeconds()
+            Data = rain.Value.Values.ToDictionary(k=>k.Key, v=>v.Value), // Copy to mutable Dict for serialization
+            SlotSecs = rain.Value.IntervalSeconds,
+            StartTime = rain.Value.StartTime.ToUniversalTime().ToUnixTimeSeconds(),
+            SlotCount = rain.Value.TotalDuration / rain.Value.IntervalSeconds
         };
     
-    private HistogramDocument<float>? ToHistogramDoc(RainfallReading? rain) =>
-        rain == null ? null : new HistogramDocument<float>
+    private HistogramDocument? ToHistogramDoc(RainfallAccumulator? rain) =>
+        rain == null ? null : new HistogramDocument
         {
-            Data = [..rain.Value.Values], 
-            SlotSecs = rain.Value.IntervalSeconds,
-            StartTime = rain.Value.StartTime.ToUniversalTime().ToUnixTimeSeconds()
+            Data = rain.Histogram.Data, // Pass reference (Cosmos SDK handles serialization)
+            SlotSecs = rain.Histogram.IntervalSeconds,
+            StartTime = rain.Histogram.StartTime.ToUniversalTime().ToUnixTimeSeconds(),
+            SlotCount = rain.Histogram.SlotCount
         };
 }

@@ -67,6 +67,8 @@ builder.Services.AddSingleton<DocumentMapper>();
 ValidatorOptions.Global.LanguageManager.Culture = new CultureInfo("en-US");
 builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 
+builder.Services.AddSingleton(TimeProvider.System);
+
 builder.Build().Run();
 
 public record CosmosDbConfiguration(

@@ -7,9 +7,9 @@ namespace Worker.Validators;
 public class TelemetryRequestValidator : AbstractValidator<TelemetryRequest>
 {
     private const int MaxDataAgeMinutes = 180;
-    private const int MaxHistogramArrayLength = 32;
     private const int MaxHistogramDurationMinutes = 60;
     private const int HistogramTimeAlignmentMinutes = 30;
+    private const int MaxDataPoints = 100;
     private readonly TimeProvider _timeProvider;
     
     public TelemetryRequestValidator(TimeProvider timeProvider)
@@ -77,52 +77,68 @@ public class TelemetryRequestValidator : AbstractValidator<TelemetryRequest>
         if (req.TimestampEpoch == null || 
             req.Payload?.Rain?.Data == null || 
             req.Payload.Rain.SlotSeconds == null ||
-            req.Payload.Rain.StartTimeEpoch == null)
+            req.Payload.Rain.StartTimeEpoch == null ||
+            req.Payload.Rain.SlotCount == null)
         {
             return;
         }
 
         var rain = req.Payload.Rain;
-
-        // Max Length Check
-        if (rain.Data.Length > MaxHistogramArrayLength)
+        
+        if (rain.Data.Count > MaxDataPoints)
         {
-            context.AddFailure(new ValidationFailure("Payload.Rain.Data", $"Histogram array exceeds max length of {MaxHistogramArrayLength}")
-            {
-                ErrorCode = "HISTOGRAM_TOO_LARGE"
-            });
+            context.AddFailure(new ValidationFailure("Payload.Rain.Data", 
+                    $"Too many data points. Max allowed: {MaxDataPoints}")
+                { ErrorCode = "TOO_MANY_POINTS" });
             return;
         }
 
-        var totalSeconds = rain.Data.Length * rain.SlotSeconds.Value;
-        
-        // Duration Check
-        if (totalSeconds > MaxHistogramDurationMinutes * 60)
+        long totalDurationSeconds = (long)rain.SlotCount.Value * rain.SlotSeconds.Value;
+
+        if (totalDurationSeconds > MaxHistogramDurationMinutes * 60)
         {
-            context.AddFailure(new ValidationFailure("Payload.Rain", $"Histogram duration exceeds {MaxHistogramDurationMinutes} minutes")
-            {
-                ErrorCode = "HISTOGRAM_DURATION_EXCEEDED"
-            });
+            context.AddFailure(new ValidationFailure("Payload.Rain", 
+                    $"Histogram duration ({totalDurationSeconds}s) exceeds limit of {MaxHistogramDurationMinutes} minutes")
+                { ErrorCode = "HISTOGRAM_DURATION_EXCEEDED" });
             return;
         }
-        
+
+        if (rain.Data.Count > 0)
+        {
+            int maxIndex = rain.Data.Keys.Max();
+            int minIndex = rain.Data.Keys.Min();
+
+            if (minIndex < 0)
+            {
+                context.AddFailure(new ValidationFailure("Payload.Rain.Data", "Negative time slots are not allowed")
+                    { ErrorCode = "INVALID_SLOT_INDEX" });
+                return;
+            }
+
+            if (maxIndex >= rain.SlotCount.Value)
+            {
+                context.AddFailure(new ValidationFailure("Payload.Rain.Data", 
+                        $"Data contains index {maxIndex} which exceeds declared SlotCount {rain.SlotCount.Value}")
+                    { ErrorCode = "INDEX_OUT_OF_BOUNDS" });
+                return;
+            }
+        }
+
+        // 4. Timeline Alignment
         var histStart = rain.StartTimeEpoch.Value > 0
             ? DateTimeOffset.FromUnixTimeSeconds(rain.StartTimeEpoch.Value)
             : DateTimeOffset.UnixEpoch;
 
-        var histEnd = histStart.AddSeconds(totalSeconds);
+        var histEnd = histStart.AddSeconds(totalDurationSeconds);
         var eventTime = DateTimeOffset.FromUnixTimeSeconds(req.TimestampEpoch.Value);
-        
+    
         var diff = Math.Abs((eventTime - histEnd).TotalMinutes);
 
-        // Alignment Check
         if (diff > HistogramTimeAlignmentMinutes)
         {
             context.AddFailure(new ValidationFailure("Payload.Rain", 
-                $"Histogram timeline mismatch (off by {diff:F0} minutes, max {HistogramTimeAlignmentMinutes})")
-            {
-                ErrorCode = "HISTOGRAM_ALIGNMENT_MISMATCH"
-            });
+                    $"Histogram timeline mismatch (off by {diff:F0} minutes)")
+                { ErrorCode = "HISTOGRAM_ALIGNMENT_MISMATCH" });
         }
     }
 }
@@ -160,5 +176,11 @@ public class HistogramValidator : AbstractValidator<TelemetryRequest.HistogramRe
                 .WithErrorCode("MISSING_HIST_START")
             .GreaterThan(0).WithMessage("Histogram start time must be positive")
                 .WithErrorCode("INVALID_HIST_START");
+        
+        RuleFor(x => x.SlotCount)
+            .NotNull().WithMessage("Slot count is required")
+            .WithErrorCode("MISSING_SLOT_COUNT")
+            .GreaterThan(0).WithMessage("Slot count must be positive")
+            .WithErrorCode("INVALID_SLOT_COUNT");
     }
 }

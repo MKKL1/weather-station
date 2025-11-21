@@ -35,5 +35,5 @@ public class LatestWeatherDocument
 
     [JsonProperty("rain")]
     [JsonPropertyName("rain")]
-    public HistogramDocument<float>? Rain { get; set; }
+    public HistogramDocument? Rain { get; set; }
 }

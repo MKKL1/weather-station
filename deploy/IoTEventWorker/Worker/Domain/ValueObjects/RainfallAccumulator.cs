@@ -12,19 +12,19 @@ public class RainfallAccumulator
     public static RainfallAccumulator FromDuration(DateTimeOffset startTime, int intervalSeconds, int durationSeconds)
     {
         var slots = durationSeconds / intervalSeconds;
-        var emptyHistogram = new Histogram(new float[slots], intervalSeconds, startTime);
+        var emptyHistogram = new Histogram(new Dictionary<int, float>(), intervalSeconds, startTime, slots);
         return new RainfallAccumulator(emptyHistogram);
     }
     
     public static RainfallAccumulator FromSize(DateTimeOffset startTime, int intervalSeconds, int size)
     {
-        var emptyHistogram = new Histogram(new float[size], intervalSeconds, startTime);
+        var emptyHistogram = new Histogram(new Dictionary<int, float>(), intervalSeconds, startTime, size);
         return new RainfallAccumulator(emptyHistogram);
     }
     
-    public static RainfallAccumulator FromData(float[] data, int intervalSeconds, DateTimeOffset startTime)
+    public static RainfallAccumulator FromData(Dictionary<int, float> data, int intervalSeconds, DateTimeOffset startTime, int totalCount)
     {
-        var existingHistogram = new Histogram(data, intervalSeconds, startTime);
+        var existingHistogram = new Histogram(data, intervalSeconds, startTime, totalCount);
         return new RainfallAccumulator(existingHistogram);
     }
 
@@ -36,7 +36,7 @@ public class RainfallAccumulator
 
         if (intervalsMatch && isPhaseAligned)
         {
-            MergeDirectly(incoming, (int)(timeDiff / Histogram.IntervalSeconds));
+            MergeDirectly(incoming);
         }
         else
         {
@@ -44,21 +44,14 @@ public class RainfallAccumulator
         }
     }
 
-    private void MergeDirectly(RainfallReading incoming, int startIndexOffset)
+    private void MergeDirectly(RainfallReading incoming)
     {
         var sourceData = incoming.Values;
         var targetData = Histogram.Data;
-
-        for (int i = 0; i < sourceData.Length; i++)
+        
+        foreach (var keyValuePair in sourceData)
         {
-            if (sourceData[i] <= 0) continue;
-
-            int targetIndex = startIndexOffset + i;
-
-            if (targetIndex >= 0 && targetIndex < targetData.Length)
-            {
-                targetData[targetIndex] += sourceData[i];
-            }
+            targetData.Add(keyValuePair.Key, keyValuePair.Value);
         }
     }
 
