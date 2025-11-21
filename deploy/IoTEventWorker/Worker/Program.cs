@@ -51,7 +51,7 @@ builder.Services.AddSingleton<RawTelemetryContainer>(sp =>
 {
     var config = sp.GetRequiredService<CosmosDbConfiguration>();
     var client = sp.GetRequiredService<CosmosClient>();
-    var containerName = "telemetry-raw"; 
+    var containerName = "telemetry-raw"; //TODO set with config
     var container = client.GetDatabase(config.DatabaseName).GetContainer(containerName);
     return new RawTelemetryContainer(container);
 });

@@ -1,0 +1,52 @@
+<policies>
+  <inbound>
+    <base />
+    <!-- Validate access token JWT -->
+    <validate-jwt header-name="Authorization" failed-validation-httpcode="401" failed-validation-error-message="Invalid or expired access token" require-scheme="Bearer">
+      <openid-config url="{{access_token_issuer_url}}/device/.well-known/openid-configuration" />
+      <audiences>
+        <audience>weather-api</audience>
+      </audiences>
+      <issuers>
+        <issuer>{{access_token_issuer_url}}/device</issuer>
+      </issuers>
+      <required-claims>
+        <claim name="sub" match="any" />
+        <claim name="roles" match="any">
+          <value>weather-telemetry-write</value>
+        </claim>
+      </required-claims>
+    </validate-jwt>
+    
+    <!-- Extract device ID from JWT sub claim -->
+    <set-variable name="device-id" value="@{
+      var jwt = context.Request.Headers.GetValueOrDefault("Authorization", "").Split(' ').Last();
+      Jwt token;
+      if (jwt.TryParseJwt(out token)) {
+        return token.Claims.GetValueOrDefault("sub", "unknown");
+      }
+      return "unknown";
+    }" />
+
+    <authentication-managed-identity resource="{{function-app-main-client-id}}" output-token-variable-name="msi-access-token" ignore-error="false" />
+
+    <set-header name="Authorization" exists-action="override">
+      <value>@("Bearer " + (string)context.Variables["msi-access-token"])</value>
+    </set-header>
+
+    <set-header name="X-Device-ID" exists-action="override">
+      <value>@((string)context.Variables["device-id"])</value>
+    </set-header>
+    
+    <set-backend-service backend-id="telemetry-backend" />
+  </inbound>
+  <backend>
+    <base />
+  </backend>
+  <outbound>
+    <base />
+  </outbound>
+  <on-error>
+    <base />
+  </on-error>
+</policies>

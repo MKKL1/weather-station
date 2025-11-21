@@ -7,7 +7,7 @@ public class HistogramDocument
 {
     [JsonProperty("dat")]
     [JsonPropertyName("dat")]
-    public Dictionary<int, float> Data { get; set; }
+    public required Dictionary<int, float> Data { get; set; }
 
     [JsonProperty("sec")]
     [JsonPropertyName("sec")]
