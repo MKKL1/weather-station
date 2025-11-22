@@ -5,6 +5,7 @@ using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Worker;
 using Worker.Domain;
 using Worker.Infrastructure;
 using Worker.Mappers;
@@ -26,8 +27,10 @@ builder.Services.AddSingleton<CosmosDbConfiguration>(sp =>
                  ?? throw new InvalidOperationException("COSMOS_DATABASE not set");
     var containerName = Environment.GetEnvironmentVariable("COSMOS_VIEWS_CONTAINER")
                         ?? throw new InvalidOperationException("COSMOS_VIEWS_CONTAINER not set");
-
-    return new CosmosDbConfiguration(conn, dbName, containerName);
+    var telemetryContainerName = Environment.GetEnvironmentVariable("COSMOS_TELEMETRY_CONTAINER")
+                                 ?? throw new InvalidOperationException("COSMOS_TELEMETRY_CONTAINER not set");
+    
+    return new CosmosDbConfiguration(conn, dbName, containerName, telemetryContainerName);
 });
 
 builder.Services.AddSingleton<CosmosClient>(sp =>
@@ -51,8 +54,7 @@ builder.Services.AddSingleton<RawTelemetryContainer>(sp =>
 {
     var config = sp.GetRequiredService<CosmosDbConfiguration>();
     var client = sp.GetRequiredService<CosmosClient>();
-    var containerName = "telemetry-raw"; //TODO set with config
-    var container = client.GetDatabase(config.DatabaseName).GetContainer(containerName);
+    var container = client.GetDatabase(config.DatabaseName).GetContainer(config.TelemetryContainerName);
     return new RawTelemetryContainer(container);
 });
 
@@ -70,8 +72,3 @@ builder.Services.AddValidatorsFromAssemblyContaining<Program>();
 builder.Services.AddSingleton(TimeProvider.System);
 
 builder.Build().Run();
-
-public record CosmosDbConfiguration(
-    string ConnectionString,
-    string DatabaseName,
-    string ViewsContainerName);

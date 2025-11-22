@@ -47,6 +47,7 @@ resource "azurerm_function_app_flex_consumption" "main_function" {
     COSMOS_DATABASE                           = azurerm_cosmosdb_sql_database.telemetry_db.name
     COSMOS_CONTAINER                          = azurerm_cosmosdb_sql_container.telemetry_container.name
     COSMOS_VIEWS_CONTAINER                    = azurerm_cosmosdb_sql_container.telemetry_views.name
+    COSMOS_TELEMETRY_CONTAINER                = azurerm_cosmosdb_sql_container.telemetry_raw.name
     APPLICATIONINSIGHTS_CONNECTION_STRING     = azurerm_application_insights.backend_tracing.connection_string
     ApplicationInsightsAgent_EXTENSION_VERSION = "~3"
   }
