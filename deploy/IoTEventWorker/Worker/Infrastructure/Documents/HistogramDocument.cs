@@ -3,17 +3,21 @@ using Newtonsoft.Json;
 
 namespace Worker.Infrastructure.Documents;
 
-public class HistogramDocument<T>
+public class HistogramDocument
 {
-    [JsonProperty("data")]
-    [JsonPropertyName("data")]
-    public List<T> Data { get; set; }
+    [JsonProperty("dat")]
+    [JsonPropertyName("dat")]
+    public required Dictionary<int, float> Data { get; set; }
 
-    [JsonProperty("slotSecs")]
-    [JsonPropertyName("slotSecs")]
+    [JsonProperty("sec")]
+    [JsonPropertyName("sec")]
     public int SlotSecs { get; set; }
 
-    [JsonProperty("startTime")]
-    [JsonPropertyName("startTime")]
-    public DateTimeOffset StartTime { get; set; }
+    [JsonProperty("sts")]
+    [JsonPropertyName("sts")]
+    public long StartTime { get; set; }
+    
+    [JsonProperty("n")]
+    [JsonPropertyName("n")]
+    public int SlotCount { get; set; }
 }

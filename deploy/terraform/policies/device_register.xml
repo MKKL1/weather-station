@@ -1,0 +1,52 @@
+<policies>
+  <inbound>
+    <base />
+    <!-- Validate provisioning JWT from device -->
+    <validate-jwt header-name="Authorization" failed-validation-httpcode="401" failed-validation-error-message="Invalid or expired provisioning token" require-expiration-time="false">
+      <openid-config url="{{access_token_issuer_url}}/provisioning/.well-known/openid-configuration" />
+      <audiences>
+        <audience>provisioning-api</audience>
+      </audiences>
+      <issuers>
+        <issuer>{{access_token_issuer_url}}/provisioning</issuer>
+      </issuers>
+      <required-claims>
+        <claim name="sub" match="any" />
+      </required-claims>
+    </validate-jwt>
+    
+    <!-- Extract device ID from JWT sub claim and store in variable -->
+    <set-variable name="device-id" value="@{
+      var jwt = context.Request.Headers.GetValueOrDefault("Authorization", "").Split(' ').Last();
+      Jwt token;
+      if (jwt.TryParseJwt(out token)) {
+        return token.Claims.GetValueOrDefault("sub", "unknown");
+      }
+      return "unknown";
+    }" />
+    
+    <!-- Get managed identity token for Function App authentication -->
+    <authentication-managed-identity resource="{{function-app-client-id}}" output-token-variable-name="msi-access-token" ignore-error="false" />
+
+    <!-- Replace Authorization header with managed identity token -->
+    <set-header name="Authorization" exists-action="override">
+      <value>@("Bearer " + (string)context.Variables["msi-access-token"])</value>
+    </set-header>
+    
+    <!-- Set device ID header from validated JWT -->
+    <set-header name="X-Device-ID" exists-action="override">
+      <value>@((string)context.Variables["device-id"])</value>
+    </set-header>
+    
+    <set-backend-service backend-id="auth-backend" />
+  </inbound>
+  <backend>
+    <base />
+  </backend>
+  <outbound>
+    <base />
+  </outbound>
+  <on-error>
+    <base />
+  </on-error>
+</policies>

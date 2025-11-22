@@ -1,12 +1,14 @@
+using System.Globalization;
+using FluentValidation;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Functions.Worker;
 using Microsoft.Azure.Functions.Worker.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Worker;
+using Worker.Domain;
 using Worker.Infrastructure;
 using Worker.Mappers;
-using Worker.Repositories;
 using Worker.Services;
 
 var builder = FunctionsApplication.CreateBuilder(args);
@@ -17,30 +19,56 @@ builder.Services
     .AddApplicationInsightsTelemetryWorkerService()
     .ConfigureFunctionsApplicationInsights();
 
-var conn = Environment.GetEnvironmentVariable("COSMOS_CONNECTION")
-           ?? throw new InvalidOperationException("COSMOS_CONNECTION is not set.");
-var dbName = Environment.GetEnvironmentVariable("COSMOS_DATABASE")
-           ?? throw new InvalidOperationException("COSMOS_DATABASE is not set.");
-var containerName = Environment.GetEnvironmentVariable("COSMOS_VIEWS_CONTAINER")
-           ?? throw new InvalidOperationException("COSMOS_VIEWS_CONTAINER is not set.");
+builder.Services.AddSingleton<CosmosDbConfiguration>(sp =>
+{
+    var conn = Environment.GetEnvironmentVariable("COSMOS_CONNECTION")
+               ?? throw new InvalidOperationException("COSMOS_CONNECTION not set");
+    var dbName = Environment.GetEnvironmentVariable("COSMOS_DATABASE")
+                 ?? throw new InvalidOperationException("COSMOS_DATABASE not set");
+    var containerName = Environment.GetEnvironmentVariable("COSMOS_VIEWS_CONTAINER")
+                        ?? throw new InvalidOperationException("COSMOS_VIEWS_CONTAINER not set");
+    var telemetryContainerName = Environment.GetEnvironmentVariable("COSMOS_TELEMETRY_CONTAINER")
+                                 ?? throw new InvalidOperationException("COSMOS_TELEMETRY_CONTAINER not set");
+    
+    return new CosmosDbConfiguration(conn, dbName, containerName, telemetryContainerName);
+});
 
+builder.Services.AddSingleton<CosmosClient>(sp =>
+{
+    var config = sp.GetRequiredService<CosmosDbConfiguration>();
+    return new CosmosClient(config.ConnectionString, new CosmosClientOptions()
+    {
+        AllowBulkExecution = true 
+    });
+});
 
-builder.Services.AddSingleton<IViewRepository, CosmosDbViewRepository>(_ =>
-    new CosmosDbViewRepository(new CosmosClient(conn).GetContainer(dbName, containerName),
-        new CosmosDbModelMapper()));
+builder.Services.AddSingleton<WeatherViewsContainer>(sp =>
+{
+    var config = sp.GetRequiredService<CosmosDbConfiguration>();
+    var client = sp.GetRequiredService<CosmosClient>();
+    var container = client.GetDatabase(config.DatabaseName).GetContainer(config.ViewsContainerName);
+    return new WeatherViewsContainer(container);
+});
 
-builder.Services.AddSingleton<IViewIdService, ViewIdService>(_ => new ViewIdService());
-builder.Services.AddSingleton<IHistogramConverter, HistogramConverter>(_ => new HistogramConverter());
-builder.Services.AddSingleton<IHistogramProcessor, HistogramProcessor>(_ => new HistogramProcessor());
-builder.Services.AddSingleton<IProtoModelMapper, ProtoModelMapper>(_ => new ProtoModelMapper());
+builder.Services.AddSingleton<RawTelemetryContainer>(sp =>
+{
+    var config = sp.GetRequiredService<CosmosDbConfiguration>();
+    var client = sp.GetRequiredService<CosmosClient>();
+    var container = client.GetDatabase(config.DatabaseName).GetContainer(config.TelemetryContainerName);
+    return new RawTelemetryContainer(container);
+});
 
-builder.Services.AddSingleton<IWeatherAggregationService, WeatherAggregationService>(sp =>
-    new WeatherAggregationService(
-        sp.GetRequiredService<IViewRepository>(), 
-        sp.GetRequiredService<IViewIdService>(), 
-        sp.GetRequiredService<IHistogramConverter>(),
-        sp.GetRequiredService<IHistogramProcessor>()));
+builder.Services.AddSingleton<IWeatherRepository, CosmosWeatherRepository>();
 
+builder.Services.AddSingleton<WeatherIngestionService>();
+builder.Services.AddSingleton<WeatherAggregationService>();
 
+builder.Services.AddSingleton<TelemetryMapper>();
+builder.Services.AddSingleton<DocumentMapper>();
+
+ValidatorOptions.Global.LanguageManager.Culture = new CultureInfo("en-US");
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+
+builder.Services.AddSingleton(TimeProvider.System);
 
 builder.Build().Run();
