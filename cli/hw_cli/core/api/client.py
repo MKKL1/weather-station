@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 
 import httpx
 
@@ -15,15 +16,27 @@ class WeatherIoTClient:
     def __init__(self, device: DeviceConfig, timeout: float = 30.0):
         self.device = device
         self.timeout = timeout
-        self._client: httpx.AsyncClient | None = None
-        self._api_gateway: WeatherApiGateway | None = None
-        self._token_manager: TokenManager | None = None
+        self._client: Optional[httpx.AsyncClient] = None
+        self._api_gateway: Optional[WeatherApiGateway] = None
+        self._token_manager: Optional[TokenManager] = None
 
     async def __aenter__(self):
+        """Initialize HTTP client and API gateway only."""
         self._client = httpx.AsyncClient(timeout=self.timeout)
         self._api_gateway = WeatherApiGateway(self.device.api_base_url, self._client)
 
-        if self.device.hmac_secret:
+        self._init_token_manager_if_registered()
+
+        return self
+
+    async def __aexit__(self, *args):
+        if self._client:
+            await self._client.aclose()
+            self._client = None
+
+    def _init_token_manager_if_registered(self) -> None:
+        """Initialize token manager if device has HMAC secret."""
+        if self.device.hmac_secret and self._api_gateway:
             authenticator = DeviceAuthenticator(
                 self.device.device_id,
                 self.device.hmac_secret
@@ -34,16 +47,13 @@ class WeatherIoTClient:
                 authenticator,
                 self._api_gateway
             )
+            logger.debug(f"Token manager initialized for device {self.device.device_id}")
 
-        return self
-
-    async def __aexit__(self, *args):
-        if self._client:
-            await self._client.aclose()
-            self._client = None
+    def update_device(self, device: DeviceConfig) -> None:
+        self.device = device
+        self._init_token_manager_if_registered()
 
     async def register(self) -> str:
-        """Register device and return HMAC secret."""
         if not self._api_gateway:
             raise RuntimeError("Client not initialized. Use async with.")
 
@@ -55,9 +65,13 @@ class WeatherIoTClient:
         return secret
 
     async def send_telemetry(self, telemetry: TelemetryData) -> None:
-        """Send telemetry data."""
-        if not self._api_gateway or not self._token_manager:
-            raise RuntimeError("Client not initialized or device not registered.")
+        if not self._api_gateway:
+            raise RuntimeError("Client not initialized. Use async with.")
+
+        if not self._token_manager:
+            raise RuntimeError(
+                "Device not registered. Call register() and update_device() first."
+            )
 
         token = await self._token_manager.get_token()
 

@@ -15,7 +15,7 @@ class DeviceAuthenticator:
         """Generate HMAC-SHA256 signature for auth challenge."""
         message = f"{self.device_id}:{timestamp}"
         sig = hmac.new(
-            bytes.fromhex(self.hmac_secret),
+            self.hmac_secret.encode(),
             message.encode(),
             hashlib.sha256
         ).hexdigest()

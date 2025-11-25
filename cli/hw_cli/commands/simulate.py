@@ -20,12 +20,10 @@ def _get_device(device_ref: Optional[str]) -> DeviceConfig:
     """Resolve device by name/ID or get default."""
     mgr = DeviceManager()
     if device_ref:
-        # Try by name first
         device = mgr.get_device_by_name(device_ref)
         if device:
             return device
 
-        # Try by device_id
         device = mgr.get_device_by_id(device_ref)
         if device:
             return device
@@ -40,15 +38,17 @@ def _get_device(device_ref: Optional[str]) -> DeviceConfig:
     return device
 
 
-async def _ensure_registered(client, device: DeviceConfig) -> DeviceConfig:
-    """Ensure device is registered, return updated config."""
+async def _ensure_registered(client, device: DeviceConfig, device_manager: DeviceManager) -> DeviceConfig:
     if device.is_registered:
         return device
 
     print_info("Device not registered, registering...")
     secret = await client.register()
     device.hmac_secret = secret
-    DeviceManager().update_device(device)
+    device_manager.update_device(device)
+
+    client.update_device(device)
+
     print_success("Device registered")
     return device
 
@@ -70,6 +70,7 @@ def simulate_once(
 
     async def run():
         device = _get_device(device_id)
+        device_manager = DeviceManager()
         generator = DataGenerator()
         data = generator.generate(device)
 
@@ -82,8 +83,7 @@ def simulate_once(
             if force_token:
                 client.invalidate_token()
 
-            updated = await _ensure_registered(client, device)
-            client.device = updated
+            device = await _ensure_registered(client, device, device_manager)
             await client.send_telemetry(data)
 
         print_success("Telemetry sent")
@@ -126,6 +126,7 @@ def simulate_loop(
 
     async def run():
         device = _get_device(device_id)
+        device_manager = DeviceManager()
         generator = DataGenerator(seed=seed)
         sent_count = 0
 
@@ -145,23 +146,24 @@ def simulate_loop(
                 print_error(f"Too many consecutive errors ({consecutive_errors}). Exiting.")
                 sys.exit(1)
 
-            # 1. Generate Data
+            # Generate data
             data = generator.generate(device)
 
-            # 2. Send Data
+            # Send data
             if dry_run:
                 sent_count += 1
                 print_info(f"[{sent_count}] Generated (dry run)")
                 _print_telemetry(data, format)
-                consecutive_errors = 0  # Reset on success
+                consecutive_errors = 0
             else:
                 try:
                     async with WeatherIoTClient(device) as client:
-                        updated = await _ensure_registered(client, device)
-                        client.device = updated
+                        # Ensure registered (only happens once on first iteration)
+                        device = await _ensure_registered(client, device, device_manager)
+
                         await client.send_telemetry(data)
                         sent_count += 1
-                        consecutive_errors = 0  # Reset on success
+                        consecutive_errors = 0
                         print_info(f"[{sent_count}] Sent @ ts={data.timestamp}")
                 except httpx.HTTPStatusError as e:
                     consecutive_errors += 1
@@ -176,14 +178,9 @@ def simulate_loop(
             if max_messages and sent_count >= max_messages:
                 break
 
-            # 3. Calculate Sleep
             target_next_time = loop_start_time + (sent_count * interval)
             current_time = time.time()
-            sleep_secs = target_next_time - current_time
-
-            # Add jitter
-            jitter_amount = random.uniform(-jitter, jitter)
-            sleep_secs += jitter_amount
+            sleep_secs = target_next_time - current_time + random.uniform(-jitter, jitter)
 
             if sleep_secs > 0:
                 await asyncio.sleep(sleep_secs)
