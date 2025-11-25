@@ -30,7 +30,6 @@ def show_config():
     rich_print(f"  Status: {'loaded' if exists else 'using defaults'}", file=sys.stderr)
     rich_print(file=sys.stderr)
 
-    # Print config to stdout (this is data output)
     print(json.dumps(config.to_dict(), indent=2))
 
 
@@ -84,7 +83,6 @@ def config_path():
 
     app_dir = get_app_dir()
     config_file = mgr.resolve_path()
-    # FIX: Updated to use .db_path from the new Database class
     data_file = get_data().db_path
 
     rich_print(f"[bold cyan]Storage Directory:[/bold cyan] {app_dir}", file=sys.stderr)
