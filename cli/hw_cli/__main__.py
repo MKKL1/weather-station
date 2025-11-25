@@ -1,144 +1,174 @@
 import logging
 import sys
-
-import typer
-from typer import Context
-from typing import Optional
 from pathlib import Path
+from typing import Optional
 
-if any(arg == "?" for arg in sys.argv[1:]):
-    sys.argv = [sys.argv[0]] + ["--help" if arg == "?" else arg for arg in sys.argv[1:]]
+import click
+import typer
+from click.exceptions import UsageError, Exit
+from click_repl import repl, ClickCompleter
+from prompt_toolkit.history import FileHistory
+from rich import print as rich_print
 
-from hw_cli.commands import simulate, devices, enrollment
-from hw_cli.commands.cache import cache_app
-from hw_cli.commands.config_cmd import config_app  # NEW IMPORT
-from hw_cli.core.config import get_config_manager, AppConfig  # NEW IMPORT
+from hw_cli.commands import devices, simulate
+from hw_cli.commands.cache import app as cache_app
+from hw_cli.commands.config_cmd import app as config_app
+from hw_cli.core.config import AppConfig
+from hw_cli.core.config import load_config
+from hw_cli.core.storage import get_app_dir
 
-app = typer.Typer(
-    name="ws-cli",
-    help="Weather Station CLI - A tool for simulating weather telemetry data",
-    add_completion=True,
-    rich_markup_mode="rich",
-    no_args_is_help=True,
-    pretty_exceptions_enable=True,
+from importlib.metadata import version as get_package_version, PackageNotFoundError
+
+logging.basicConfig(
+    level=logging.ERROR,
+    format="%(asctime)s %(levelname)-8s [%(name)s] %(message)s",
+    datefmt="%H:%M:%S",
 )
 
+app = typer.Typer(
+    name="hw",
+    help="Heavy Weather CLI - Weather station telemetry tool",
+    no_args_is_help=True,
+)
+
+app.add_typer(devices.app, name="devices", help="Device management")
 app.add_typer(simulate.app, name="simulate", help="Simulation commands")
-app.add_typer(devices.app, name="devices", help="Device management commands")
-app.add_typer(cache_app, name="cache", help="Cache management commands")
-app.add_typer(enrollment.app, name="enrollment", help="Enrollment management commands")
-app.add_typer(config_app, name="config", help="Configuration management commands")  # NEW LINE
+app.add_typer(cache_app, name="cache", help="Token cache management")
+app.add_typer(config_app, name="config", help="Configuration management")
 
 
-def _configure_logging(verbose: bool, config: Optional[AppConfig] = None) -> None:
-    """Set up the root logger using config values (safe to call multiple times)."""
-    root = logging.getLogger()
-
-    # If no handlers exist, create a basic console handler.
-    if not root.handlers:
-        handler = logging.StreamHandler()
-
-        # Use config format if available
-        if config and config.logging.format:
-            formatter = logging.Formatter(
-                config.logging.format,
-                datefmt=config.logging.date_format,
-            )
-        else:
-            formatter = logging.Formatter(
-                "%(asctime)s %(levelname)-8s [%(name)s] %(message)s",
-                datefmt="%Y-%m-%d %H:%M:%S",
-            )
-        handler.setFormatter(formatter)
-        root.addHandler(handler)
-
-    # Set level: verbose flag takes precedence, otherwise default to WARNING
-    if verbose:
-        root.setLevel(logging.DEBUG)
-    else:
-        # Default to WARNING when not verbose to avoid library INFO spam
-        # Config logging level only applies when verbose is True
-        root.setLevel(logging.WARNING)
+class SafeCompleter(ClickCompleter):
+    def get_completions(self, document, complete_event):
+        try:
+            yield from super().get_completions(document, complete_event)
+        except (UsageError, Exit):
+            pass
 
 
-def verbose_callback(ctx: typer.Context, param, value: bool):
-    # Click/Typer often supplies `ctx.resilient_parsing` while
-    # building shell completion or showing help; ignore in that case.
-    if ctx.resilient_parsing:
-        return value
-    # Note: We'll do the actual logging configuration in main() after loading config
-    return value
+def _setup_logging(config: AppConfig):
+    """Setup logging based on config object."""
+    level = logging.DEBUG if config.verbose else getattr(logging, config.logging.level, logging.ERROR)
 
+    logging.basicConfig(
+        level=level,
+        format=config.logging.format,
+        datefmt=config.logging.date_format,
+        force=True
+    )
+
+    logging.getLogger().setLevel(level)
+
+def get_version() -> str:
+    try:
+        return get_package_version("heavyweather-cli")
+    except PackageNotFoundError:
+        # Fallback for local development if not installed via pip/poetry
+        return "unknown"
 
 def version_callback(value: bool):
     if value:
-        from hw_cli.utils.console import print_success
-        print_success("Weather Station CLI v0.1.0")
+        app_version = get_version()
+        rich_print(f"[green]Heavy Weather CLI v{app_version}[/green]", file=sys.stderr)
         raise typer.Exit()
 
 
 @app.callback()
 def main(
-        ctx: Context,
+        ctx: typer.Context,
         version: Optional[bool] = typer.Option(
-            None,
-            "--version",
-            "-v",
-            help="Show version and exit",
-            callback=version_callback,
-            is_eager=True,
+            None, "--version", "-v", callback=version_callback, is_eager=True, help="Show version"
         ),
-        config: Optional[Path] = typer.Option(
-            None,
-            "--config",
-            "-c",
-            help="Configuration file path (defaults to config.json)",
-            envvar="hw_cli_CONFIG",
+        config_file: Optional[Path] = typer.Option(
+            None, "--config", "-c", help="Config file path", envvar="HW_CLI_CONFIG"
         ),
-        verbose: bool = typer.Option(
-            False,
-            "--verbose",
-            help="Enable verbose output",
-            callback=verbose_callback,
-            is_eager=True,
-        ),
+        verbose: bool = typer.Option(False, "--verbose", help="Enable verbose logging"),
 ):
-    """
-    Weather Station CLI - Simulate weather telemetry for Azure IoT Hub
-    """
-    from hw_cli.utils.console import print_info
+    """Heavy Weather CLI - Weather station telemetry tool."""
+    if ctx.resilient_parsing:
+        return
 
-    # Initialize context
-    if ctx.obj is None:
-        ctx.obj = {}
+    config = load_config(config_file)
+    if verbose:
+        config.verbose = True
 
-    # Load configuration
-    config_manager = get_config_manager()
-    app_config = config_manager.load_config(config)
+    _setup_logging(config)
+    ctx.obj = {
+        "config": config,
+        "verbose": config.verbose
+    }
 
-    # Override config verbose setting with CLI flag if provided
-    if verbose and not app_config.verbose:
-        app_config.verbose = True
 
-    # Store config and verbose in context for other commands
-    ctx.obj["config"] = app_config
-    ctx.obj["verbose"] = app_config.verbose or verbose
+@app.command()
+def console(
+        ctx: typer.Context,
+        config_file: Optional[Path] = typer.Option(
+            None, "--config", "-c", help="Config file path", envvar="HW_CLI_CONFIG"
+        ),
+        verbose: bool = typer.Option(False, "--verbose", help="Enable verbose logging"),
+):
+    """Interactive CLI mode."""
+    config = load_config(config_file)
 
-    # Configure logging with config settings
-    _configure_logging(app_config.verbose or verbose, app_config)
+    if verbose:
+        config.verbose = True
 
-    # Show config info if verbose
-    if app_config.verbose or verbose:
-        config_path = config_manager._config_path
-        if config_path:
-            if config_path.exists():
-                print_info(f"Using config file: {config_path}")
-            else:
-                print_info(f"Config file not found: {config_path}")
-                print_info("Using default configuration")
-        else:
-            print_info("Using default configuration")
-        print_info("Verbose mode enabled")
+    _setup_logging(config)
+
+    rich_print("[bold blue]-------- Heavy Weather Console ------[/bold blue]", file=sys.stderr)
+    rich_print("[cyan]Welcome to the interactive shell.[/cyan]", file=sys.stderr)
+    rich_print("Type [bold green]help[/bold green] to see commands or [bold green]exit[/bold green] to quit.",
+               file=sys.stderr)
+    rich_print("-" * 37, file=sys.stderr)
+
+    click_obj = typer.main.get_command(app)
+
+    if not isinstance(click_obj, click.Group):
+        rich_print("[red]Error: Unable to create interactive console[/red]", file=sys.stderr)
+        raise typer.Exit(1)
+
+    class ExitREPL(Exception):
+        pass
+
+    @click.command(name='exit')
+    @click.pass_context
+    def exit_cmd(ctx):
+        """Exit the interactive shell."""
+        rich_print("[cyan]Goodbye![/cyan]", file=sys.stderr)
+        raise ExitREPL()
+
+    click_obj.add_command(exit_cmd)
+    click_obj.add_command(exit_cmd, name='quit')
+    click_obj.add_command(exit_cmd, name='q')
+
+    click_ctx = click.Context(
+        click_obj,
+        obj={"config": config, "verbose": config.verbose}
+    )
+    completer = SafeCompleter(click_obj, click_ctx)
+    prompt_kwargs = {
+        "prompt_kwargs": {
+            "message": "hw> ",
+            "completer": completer,
+        }
+    }
+    app_dir = get_app_dir()
+    app_dir.mkdir(parents=True, exist_ok=True)
+    history_file = app_dir / ".hw_cli_history"
+
+    try:
+        prompt_kwargs["prompt_kwargs"]["history"] = FileHistory(str(history_file))
+    except Exception:
+        pass
+
+    try:
+        repl(click_ctx, prompt_kwargs=prompt_kwargs["prompt_kwargs"])
+    except ExitREPL:
+        pass
+    except (EOFError, KeyboardInterrupt):
+        rich_print("\n[cyan]Goodbye![/cyan]", file=sys.stderr)
+    except Exception as e:
+        rich_print(f"[red]Error in REPL: {e}[/red]", file=sys.stderr)
+        raise typer.Exit(1)
 
 
 if __name__ == "__main__":

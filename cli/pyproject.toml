@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "heavyweather-cli"
-version = "0.2.1"
+version = "0.3.0"
 description = "Heavy Weather CLI"
 authors = ["MKKL1"]
 readme = "README.md"
@@ -8,9 +8,8 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = ">=3.9,<4.0"
 typer = {extras = ["rich"], version = "^0.17.4"}
-azure-iot-device = "^2.14.0"
-protobuf = "^6.32.1"
-pyyaml = "^6.0.2"
+httpx = "^0.28.0"
+click-repl = "^0.3.0"
 
 [[tool.poetry.packages]]
 include = "hw_cli"
@@ -21,6 +20,7 @@ hw = "hw_cli.__main__:app"
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
 [dependency-groups]
 dev = [
     "pytest (>=8.4.2,<9.0.0)"
