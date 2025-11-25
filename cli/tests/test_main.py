@@ -1,13 +1,21 @@
+import pytest
+from typer.testing import CliRunner
 from hw_cli.__main__ import app
 
+@pytest.fixture
+def runner():
+    return CliRunner()
+
 def test_help(runner):
+    """Test the main help command."""
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    assert "Weather Station CLI" in result.stdout
+    assert "Heavy Weather CLI" in result.stdout
+    assert "devices" in result.stdout
+    assert "simulate" in result.stdout
 
-def test_version(runner, monkeypatch):
-    # Patch print_success to avoid fancy console output breaking the test
-    monkeypatch.setattr("hw_cli.utils.console.print_success", lambda msg: print(msg))
+def test_version(runner):
+    """Test the version flag."""
     result = runner.invoke(app, ["--version"])
     assert result.exit_code == 0
-    assert "Weather Station CLI v" in result.stdout
+    assert "Heavy Weather CLI v" in result.stdout

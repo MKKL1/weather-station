@@ -1,20 +1,22 @@
-"""
-Weather Station CLI - Console Output Utilities
-"""
-from rich import print
+import sys
+from rich import print as rich_print
 
-def print_info(message: str):
-    """Print an informational message."""
-    print(f"[bold blue]INFO[/bold blue]: {message}")
 
-def print_success(message: str):
-    """Print a success message."""
-    print(f"[bold green]SUCCESS[/bold green]: {message}")
+def print_info(msg: str):
+    """Print info message to stderr."""
+    rich_print(f"[blue]INFO[/blue]: {msg}", file=sys.stderr)
 
-def print_warning(message: str):
-    """Print a warning message."""
-    print(f"[bold yellow]WARNING[/bold yellow]: {message}")
 
-def print_error(message: str):
-    """Print an error message."""
-    print(f"[bold red]ERROR[/bold red]: {message}")
+def print_success(msg: str):
+    """Print success message to stderr."""
+    rich_print(f"[green]SUCCESS[/green]: {msg}", file=sys.stderr)
+
+
+def print_warning(msg: str):
+    """Print warning message to stderr."""
+    rich_print(f"[yellow]WARNING[/yellow]: {msg}", file=sys.stderr)
+
+
+def print_error(msg: str):
+    """Print error message to stderr."""
+    rich_print(f"[red]ERROR[/red]: {msg}", file=sys.stderr)

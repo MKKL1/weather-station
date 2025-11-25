@@ -1,73 +1,77 @@
-from typing import Optional, List
+from typing import List, Optional
+
+from hw_cli.core.models import DeviceConfig
 from hw_cli.core.storage import get_data
-from hw_cli.core.models.models import Device
 
 
 class DeviceManager:
-    """Manages storage and retrieval of device configurations."""
+    """
+    Manages device CRUD operations using the SQLite storage backend.
+    """
 
     def __init__(self):
-        self._storage = get_data()
-        self._devices = self._storage.section("devices")
+        # This now returns the Database class instance
+        self._db = get_data()
 
-    def add_device(self, device: Device) -> None:
-        """Add or update a device configuration."""
-        self._devices.set_item(device.device_id, device.to_dict())
+    def add_device(self, device: DeviceConfig) -> None:
+        self._db.save_device(device.device_id, device.to_dict())
+
+    def update_device(self, device: DeviceConfig) -> None:
+        self._db.save_device(device.device_id, device.to_dict())
 
     def remove_device(self, device_id: str) -> bool:
-        """Remove a device configuration."""
-        if not self.device_exists(device_id):
+        if not self.device_exists_by_id(device_id):
             return False
 
-        self._devices.delete_item(device_id)
+        # Remove the device record
+        deleted = self._db.delete_device(device_id)
 
-        # Unset default if the removed device was the default
-        if self.get_default_device_id() == device_id:
-            self._storage.delete("default_device")
+        # If this was the default device, unset the default
+        if deleted and self.get_default_device_id() == device_id:
+            self._db.delete_setting("default_device")
 
-        return True
+        return deleted
 
-    def get_device(self, device_id: str) -> Optional[Device]:
-        """Get a device by its ID."""
-        device_data = self._devices.get_item(device_id)
-        if device_data:
-            return Device.from_dict(device_data)
+    def get_device_by_id(self, device_id: str) -> Optional[DeviceConfig]:
+        """Get device by device_id (actual ID from JWT)."""
+        data = self._db.get_device(device_id)
+        return DeviceConfig.from_dict(data) if data else None
+
+    def get_device_by_name(self, name: str) -> Optional[DeviceConfig]:
+        """Get device by friendly name."""
+        for device in self.get_devices():
+            if device.name == name:
+                return device
         return None
 
-    def device_exists(self, device_id: str) -> bool:
-        """Check if a device with the given ID exists."""
-        return self._devices.exists(device_id)
+    def device_exists_by_id(self, device_id: str) -> bool:
+        """Check if device exists by device_id."""
+        return self._db.device_exists(device_id)
 
-    def get_devices(self) -> List[Device]:
-        """List all configured devices."""
-        devices_dict = self._devices.get()
-        return [Device.from_dict(device_data) for device_data in devices_dict.values()]
+    def device_exists_by_name(self, name: str) -> bool:
+        """Check if device exists by friendly name."""
+        return self.get_device_by_name(name) is not None
+
+    def get_devices(self) -> List[DeviceConfig]:
+        raw_list = self._db.get_all_devices()
+        return [DeviceConfig.from_dict(d) for d in raw_list]
 
     def set_default_device(self, device_id: str) -> None:
-        """Set the default device."""
-        if not self.device_exists(device_id):
-            raise ValueError(f"Device '{device_id}' not found.")
-        self._storage.set("default_device", device_id)
+        if not self.device_exists_by_id(device_id):
+            raise ValueError(f"Device with device_id '{device_id}' not found")
+        self._db.set_setting("default_device", device_id)
 
     def get_default_device_id(self) -> Optional[str]:
-        """Get the ID of the default device."""
-        return self._storage.get("default_device")
+        return self._db.get_setting("default_device")
 
-    def get_default_device(self) -> Optional[Device]:
-        """Get the default device configuration."""
+    def get_default_device(self) -> Optional[DeviceConfig]:
         device_id = self.get_default_device_id()
         if device_id:
-            return self.get_device(device_id)
+            return self.get_device_by_id(device_id)
 
-        # If no default is set, return the first device in the list
+        # Fallback: return the first available device
         devices = self.get_devices()
         return devices[0] if devices else None
 
-    def get_device_count(self) -> int:
-        """Get the total number of configured devices."""
-        return len(self._devices.get())
-
-    def clear_all_devices(self) -> None:
-        """Remove all device configurations and clear default."""
-        self._devices.set({})
-        self._storage.delete("default_device")
+    def get_storage_path(self) -> str:
+        return str(self._db.db_path)

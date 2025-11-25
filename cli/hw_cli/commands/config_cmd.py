@@ -1,124 +1,99 @@
-# hw_cli/commands/config_cmd.py
 import json
+import os
+import subprocess
 import sys
-from typing import Optional
 from pathlib import Path
+from typing import Optional
 
 import typer
-from rich import print
+from rich import print as rich_print
 from rich.prompt import Confirm
 
-from hw_cli.core.config import get_config_manager
-from hw_cli.core.storage import APP_DIR
-from hw_cli.utils.console import print_info, print_success, print_error
+from hw_cli.core.config import ConfigManager
+from hw_cli.core.storage import get_app_dir, get_data
+from hw_cli.utils.console import print_error, print_info, print_success
 
-config_app = typer.Typer(help="Configuration management commands")
+app = typer.Typer(help="Configuration management commands", no_args_is_help=True)
 
 
-@config_app.command("show")
+@app.command("show")
 def show_config():
     """Show current configuration."""
-    try:
-        config_manager = get_config_manager()
-        config = config_manager.get_config()
+    mgr = ConfigManager()
+    config = mgr.load()
 
-        print(f"[bold cyan]Configuration[/bold cyan]")
+    cfg_path = mgr.resolve_path()
+    exists = cfg_path.exists()
 
-        # Prefer showing the resolved absolute path if available, otherwise show
-        # the default path that will be used (APP_DIR/config.json).
-        cfg_path = config_manager.config_path
-        if cfg_path:
-            try:
-                shown_path = str(Path(cfg_path).resolve())
-            except Exception:
-                shown_path = str(cfg_path)
-        else:
-            shown_path = str((APP_DIR / "config.json").resolve())
+    rich_print("[cyan]Configuration[/cyan]", file=sys.stderr)
+    rich_print(f"  File: {cfg_path}", file=sys.stderr)
+    rich_print(f"  Status: {'loaded' if exists else 'using defaults'}", file=sys.stderr)
+    rich_print(file=sys.stderr)
 
-        print(f"Config file: {shown_path}")
-        print()
-
-        # Create a nice display of the config
-        config_dict = config.to_dict()
-        print(json.dumps(config_dict, indent=2))
-
-    except Exception as e:
-        print_error(f"Failed to show config: {e}")
-        raise typer.Exit(1)
+    print(json.dumps(config.to_dict(), indent=2))
 
 
-@config_app.command("create")
+@app.command("create")
 def create_config(
-    path: Optional[Path] = typer.Option(
-        None,
-        "--path",
-        "-p",
-        help="Path for config file (defaults to config.json in app directory)"
-    ),
-    force: bool = typer.Option(
-        False,
-        "--force",
-        "-f",
-        help="Overwrite existing config file"
-    )
+        path: Optional[Path] = typer.Option(None, "--path", "-p", help="Config file path"),
+        force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing"),
 ):
     """Create a default configuration file."""
-    try:
-        config_manager = get_config_manager()
+    mgr = ConfigManager()
+    cfg_path = mgr.resolve_path(path)
 
-        # Determine the target path in a safe way:
-        if path:
-            config_path = Path(path).resolve()
-        else:
-            # prefer the currently loaded config path, otherwise use APP_DIR/config.json
-            cfg = config_manager.config_path
-            config_path = Path(cfg).resolve() if cfg else (APP_DIR / "config.json").resolve()
-
-        if config_path.exists() and not force:
-            print_error(f"Config file already exists: {config_path}")
-            if Confirm.ask("Overwrite existing file?"):
-                force = True
-            else:
-                print_info("Cancelled")
-                raise typer.Exit(0)
-
-        created_path = config_manager.create_default_config(config_path)
-        try:
-            created_path = Path(created_path).resolve()
-        except Exception:
-            created_path = Path(created_path)
-
-        print_success(f"Created configuration file: {created_path}")
-
-    except Exception as e:
-        print_error(f"Failed to create config: {e}")
-        raise typer.Exit(1)
-
-
-@config_app.command("edit")
-def edit_config():
-    """Open config file in default editor."""
-    import os
-    import subprocess
-
-    try:
-        config_manager = get_config_manager()
-        config_path = config_manager.config_path
-
-        if not config_path or not Path(config_path).exists():
-            print_error("No config file found. Use 'ws-cli config create' first.")
+    if cfg_path.exists() and not force:
+        print_error(f"Config exists: {cfg_path}")
+        if not Confirm.ask("Overwrite?"):
+            print_info("Cancelled")
             raise typer.Exit(1)
 
-        resolved = str(Path(config_path).resolve())
+    created = mgr.create_default(cfg_path)
+    print_success(f"Created config: {created}")
 
-        # Try to open with system default
-        if os.name == 'nt':  # Windows
-            os.startfile(resolved)
-        elif os.name == 'posix':  # macOS and Linux
-            subprocess.call(['open' if sys.platform == 'darwin' else 'xdg-open', resolved])
-        else:
-            print_info(f"Please edit the config file manually: {resolved}")
 
-    except Exception as e:
-        print_error(f"Failed to open config file: {e}")
+@app.command("edit")
+def edit_config():
+    """Open config file in default editor."""
+    mgr = ConfigManager()
+    cfg_path = mgr.resolve_path()
+
+    if not cfg_path.exists():
+        print_error("No config file. Use 'hw config create' first.")
         raise typer.Exit(1)
+
+    path_str = str(cfg_path.resolve())
+
+    try:
+        if os.name == "nt":
+            os.startfile(path_str)
+        elif sys.platform == "darwin":
+            subprocess.call(["open", path_str])
+        else:
+            subprocess.call(["xdg-open", path_str])
+    except Exception as e:
+        print_error(f"Failed to open editor: {e}")
+        print_info(f"Edit manually: {path_str}")
+
+
+@app.command("path")
+def config_path():
+    """Show storage paths and file status."""
+    mgr = ConfigManager()
+
+    app_dir = get_app_dir()
+    config_file = mgr.resolve_path()
+    data_file = get_data().db_path
+
+    rich_print(f"[bold cyan]Storage Directory:[/bold cyan] {app_dir}", file=sys.stderr)
+    rich_print(f"  Exists: {'[green]Yes[/green]' if app_dir.exists() else '[red]No[/red]'}", file=sys.stderr)
+
+    rich_print(f"\n[bold cyan]Configuration File:[/bold cyan] {config_file}", file=sys.stderr)
+    rich_print(
+        f"  Status: {'[green]Found[/green]' if config_file.exists() else '[yellow]Not created (using defaults)[/yellow]'}",
+        file=sys.stderr
+    )
+
+    rich_print(f"\n[bold cyan]Data Storage:[/bold cyan] {data_file}", file=sys.stderr)
+    rich_print(f"  Status: {'[green]Found[/green]' if data_file.exists() else '[yellow]Empty[/yellow]'}",
+               file=sys.stderr)

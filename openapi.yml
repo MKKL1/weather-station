@@ -1,0 +1,204 @@
+openapi: 3.0.3
+info:
+  title: Weather IoT Ingestion API
+  description: |
+    Ingestion API for weather station devices.
+  
+    ## Authentication Flow
+    1. Devices self-register using a factory-installed `Provisioning Token`.
+    2. The device exchanges its `HMAC secret` (obtained during registration) for a short-lived `Access Token` (RSA-signed JWT).
+    3. Telemetry data is sent using the `Access Token`.
+  version: 1.0.0
+servers:
+  - url: https://apim-weather-app-dev.azure-api.net
+    description: Development Environment
+
+components:
+  securitySchemes:
+    ProvisioningAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Factory provisioning token or expired device token used for identification.
+
+    DeviceJwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: RSA-signed JWT obtained from the /device/auth/token endpoint.
+
+  schemas:
+    RegistrationResponse:
+      type: object
+      properties:
+        hmac_secret:
+          type: string
+          description: The shared secret used to sign authentication challenges.
+          example: "c50c19d1cfe63cb95bb1bfa084db1307a32e3a55e51e2f451997352480151692"
+    
+    AuthChallengeRequest:
+      type: object
+      required:
+        - timestamp
+        - signature
+      properties:
+        timestamp:
+          type: integer
+          format: int64
+          description: Unix timestamp (seconds) of the request.
+          example: 1763756825
+        signature:
+          type: string
+          description: >
+            HMAC-SHA256 signature of the string "{deviceId}:{timestamp}" 
+            using the device's hmac_secret.
+          example: "c50c19d1cfe63cb95bb1bfa084db1307a32e3a55e51e2f451997352480151692"
+
+    TokenResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: The RSA-signed JWT to be used for telemetry ingestion.
+          example: header.payload.signature
+        expiresIn:
+          type: integer
+          description: Validity duration in seconds.
+          example: 86400
+        tokenType:
+          type: string
+          example: Bearer
+
+    TelemetryRequest:
+      type: object
+      required:
+        - ts
+        - dat
+      properties:
+        ts:
+          type: integer
+          format: int64
+          description: Unix timestamp (seconds) when the reading was taken.
+          example: 1763731390
+        dat:
+          $ref: '#/components/schemas/WeatherReading'
+
+    WeatherReading:
+      type: object
+      properties:
+        tmp:
+          type: number
+          format: float
+          description: Ambient temperature in Celsius.
+          example: 22.35
+        prs:
+          type: number
+          format: float
+          description: Atmospheric pressure in hPa.
+          example: 1013.5
+        hum:
+          type: number
+          format: float
+          description: Relative humidity percentage (0-100).
+          example: 45.3
+        mmpt:
+          type: number
+          format: float
+          description: Instantaneous precipitation (mm).
+          example: 0.2
+        rain:
+          $ref: '#/components/schemas/RainfallHistogram'
+
+    RainfallHistogram:
+      type: object
+      description: Rain gauge bucket tip data.
+      properties:
+        dat:
+          type: object
+          description: >
+            Sparse map of rain bucket tips. 
+            Key = offset index, Value = count of tips.
+          additionalProperties:
+            type: integer
+          example:
+            "2": 1
+            "3": 5
+            "4": 2
+        sec:
+          type: integer
+          description: Duration of the measurement bucket in seconds.
+          example: 120
+        sts:
+          type: integer
+          format: int64
+          description: Start timestamp, in unix seconds, of the rain histogram (ts - n * sec).
+          example: 1763730780
+        n:
+          type: integer
+          description: Number of buckets included.
+          example: 5
+
+paths:
+  /provisioning/register:
+    post:
+      summary: Register Device
+      description: >
+        Registers a new device using the Factory Provisioning Token. 
+        Returns the HMAC secret required for future authentication.
+      operationId: registerDevice
+      security:
+        - ProvisioningAuth: []
+      responses:
+        '200':
+          description: Device successfully registered.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrationResponse'
+        '401':
+          description: Invalid Provisioning Token.
+
+  /device/auth/token:
+    post:
+      summary: Refresh Access Token
+      description: >
+        Exchanges a signed challenge for a temporary access JWT.
+        The client must sign the string `{deviceId}:{timestamp}` using the `hmac_secret` obtained during registration. 
+        The `ProvisioningAuth` is used for identification.
+      operationId: getAuthToken
+      security:
+        - ProvisioningAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthChallengeRequest'
+      responses:
+        '200':
+          description: Authentication successful.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '401':
+          description: Invalid signature or timestamp outside of allowed drift.
+
+  /device/telemetry:
+    post:
+      summary: Send Telemetry
+      description: Ingests sensor data from the weather station.
+      operationId: sendTelemetry
+      security:
+        - DeviceJwt: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TelemetryRequest'
+      responses:
+        '201':
+          description: Telemetry processed.
+        '401':
+          description: Invalid or expired Device JWT.

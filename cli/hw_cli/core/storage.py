@@ -1,151 +1,185 @@
-# storage.py - Single file for all storage needs
 import json
-import yaml
+import logging
 import os
+import sqlite3
+import time
 from pathlib import Path
-from typing import Dict, Any, Optional
-import typer
+from typing import Any, Dict, List, Optional
 
-# Allow override via environment variable
+logger = logging.getLogger(__name__)
+
+DB_FILENAME = "hw.db"
+
 def get_app_dir() -> Path:
-    """Get application directory from env or use default user app dir."""
+    """Get the application data directory."""
     env_path = os.getenv("HW_CLI_DATA_DIR")
-    
     if env_path:
         return Path(env_path).expanduser().resolve()
-    
-    # Default to user app directory
-    return Path(typer.get_app_dir("ws-cli", roaming=False)).expanduser()
-
-APP_DIR = get_app_dir()
+    return Path.home() / ".hw-cli"
 
 
-def ensure_app_dir():
-    """Ensure app directory exists."""
-    APP_DIR.mkdir(parents=True, exist_ok=True)
+class Database:
+    """
+    SQLite database wrapper for application data (Devices, Tokens, State).
+    Replaces the previous file-locked JSON storage.
+    """
+
+    def __init__(self):
+        self.app_dir = get_app_dir()
+        self.app_dir.mkdir(parents=True, exist_ok=True)
+        self.db_path = self.app_dir / DB_FILENAME
+        self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
+        self._conn.row_factory = sqlite3.Row  # Allow accessing columns by name
+        self._init_schema()
+
+    def _init_schema(self):
+        """Initialize SQL tables."""
+        with self._conn:
+            # 1. Devices Table
+            # We store the bulk of the config as a JSON blob to maintain compatibility
+            # with the flexible Python dictionary model without strict schema migration.
+            self._conn.execute("""
+                CREATE TABLE IF NOT EXISTS devices (
+                    device_id TEXT PRIMARY KEY,
+                    data TEXT NOT NULL
+                )
+            """)
+
+            # 2. Token Cache Table
+            # Native columns for expiry allow us to query 'expired' tokens efficiently.
+            self._conn.execute("""
+                CREATE TABLE IF NOT EXISTS tokens (
+                    device_id TEXT PRIMARY KEY,
+                    token TEXT NOT NULL,
+                    expires_at INTEGER NOT NULL,
+                    cached_at INTEGER NOT NULL,
+                    expires_in INTEGER NOT NULL
+                )
+            """)
+
+            # 3. App Settings (Key-Value)
+            # Used for things like 'default_device_id'
+            self._conn.execute("""
+                CREATE TABLE IF NOT EXISTS settings (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                )
+            """)
+
+    def close(self):
+        self._conn.close()
+
+    # --- Generic Settings Methods ---
+
+    def get_setting(self, key: str) -> Optional[str]:
+        cur = self._conn.execute("SELECT value FROM settings WHERE key = ?", (key,))
+        row = cur.fetchone()
+        return row["value"] if row else None
+
+    def set_setting(self, key: str, value: str) -> None:
+        with self._conn:
+            self._conn.execute(
+                "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
+                (key, value)
+            )
+
+    def delete_setting(self, key: str) -> None:
+        with self._conn:
+            self._conn.execute("DELETE FROM settings WHERE key = ?", (key,))
+
+    # --- Device Methods ---
+
+    def get_device(self, device_id: str) -> Optional[Dict[str, Any]]:
+        cur = self._conn.execute("SELECT data FROM devices WHERE device_id = ?", (device_id,))
+        row = cur.fetchone()
+        if row:
+            try:
+                return json.loads(row["data"])
+            except json.JSONDecodeError:
+                logger.error(f"Corrupted JSON for device {device_id}")
+                return None
+        return None
+
+    def get_all_devices(self) -> List[Dict[str, Any]]:
+        cur = self._conn.execute("SELECT data FROM devices")
+        results = []
+        for row in cur:
+            try:
+                results.append(json.loads(row["data"]))
+            except json.JSONDecodeError:
+                continue
+        return results
+
+    def save_device(self, device_id: str, data: Dict[str, Any]) -> None:
+        json_str = json.dumps(data)
+        with self._conn:
+            self._conn.execute(
+                "INSERT OR REPLACE INTO devices (device_id, data) VALUES (?, ?)",
+                (device_id, json_str)
+            )
+
+    def delete_device(self, device_id: str) -> bool:
+        with self._conn:
+            cur = self._conn.execute("DELETE FROM devices WHERE device_id = ?", (device_id,))
+            return cur.rowcount > 0
+
+    def device_exists(self, device_id: str) -> bool:
+        cur = self._conn.execute("SELECT 1 FROM devices WHERE device_id = ?", (device_id,))
+        return cur.fetchone() is not None
+
+    # --- Token Cache Methods ---
+
+    def get_token_entry(self, device_id: str) -> Optional[Dict[str, Any]]:
+        cur = self._conn.execute(
+            "SELECT token, expires_at, cached_at, expires_in FROM tokens WHERE device_id = ?",
+            (device_id,)
+        )
+        row = cur.fetchone()
+        if row:
+            return dict(row)
+        return None
+
+    def save_token(self, device_id: str, token: str, expires_at: int, cached_at: int, expires_in: int) -> None:
+        with self._conn:
+            self._conn.execute(
+                """
+                INSERT OR REPLACE INTO tokens (device_id, token, expires_at, cached_at, expires_in)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (device_id, token, expires_at, cached_at, expires_in)
+            )
+
+    def delete_token(self, device_id: str) -> bool:
+        with self._conn:
+            cur = self._conn.execute("DELETE FROM tokens WHERE device_id = ?", (device_id,))
+            return cur.rowcount > 0
+
+    def get_all_tokens(self) -> Dict[str, Dict[str, Any]]:
+        """Returns a dict format compatible with the existing CLI view logic."""
+        cur = self._conn.execute("SELECT * FROM tokens")
+        result = {}
+        for row in cur:
+            result[row["device_id"]] = dict(row)
+        return result
+
+    def delete_expired_tokens(self) -> int:
+        now = int(time.time())
+        with self._conn:
+            cur = self._conn.execute("DELETE FROM tokens WHERE expires_at <= ?", (now,))
+            return cur.rowcount
+
+    def clear_all_tokens(self) -> int:
+        with self._conn:
+            cur = self._conn.execute("DELETE FROM tokens")
+            return cur.rowcount
 
 
-class Storage:
-    """Simple file-based storage with auto-save."""
+# Singleton instance
+_db_instance: Optional[Database] = None
 
-    def __init__(self, filename: str, file_format: str = "json"):
-        ensure_app_dir()
-        self.path = APP_DIR / filename
-        self.format = file_format
-        self._data: Optional[Dict[str, Any]] = None
-
-    def _load(self) -> Dict[str, Any]:
-        """Load data from file."""
-        if not self.path.exists():
-            return {}
-
-        try:
-            with self.path.open("r", encoding="utf-8") as f:
-                if self.format == "json":
-                    return json.load(f) or {}
-                elif self.format == "yaml":
-                    return yaml.safe_load(f) or {}
-        except (json.JSONDecodeError, yaml.YAMLError, IOError):
-            return {}
-
-    def _save(self) -> None:
-        """Save data to file."""
-        if self._data is None:
-            return
-
-        with self.path.open("w", encoding="utf-8") as f:
-            if self.format == "json":
-                json.dump(self._data, f, indent=2)
-            elif self.format == "yaml":
-                yaml.safe_dump(self._data, f, default_flow_style=False)
-
-    @property
-    def data(self) -> Dict[str, Any]:
-        """Get all data, loading if necessary."""
-        if self._data is None:
-            self._data = self._load()
-        return self._data
-
-    def get(self, key: str, default: Any = None) -> Any:
-        """Get a value."""
-        return self.data.get(key, default)
-
-    def set(self, key: str, value: Any) -> None:
-        """Set a value and save."""
-        self.data[key] = value
-        self._save()
-
-    def delete(self, key: str) -> bool:
-        """Delete a key and save."""
-        if key in self.data:
-            del self.data[key]
-            self._save()
-            return True
-        return False
-
-    def update(self, updates: Dict[str, Any]) -> None:
-        """Update multiple values and save."""
-        self.data.update(updates)
-        self._save()
-
-    def section(self, key: str) -> "StorageSection":
-        """Get a section helper for nested data."""
-        return StorageSection(self, key)
-
-
-class StorageSection:
-    """Helper for working with nested dictionary sections."""
-
-    def __init__(self, storage: Storage, section_key: str):
-        self.storage = storage
-        self.key = section_key
-
-    def get(self, default: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Get the section data."""
-        section = self.storage.get(self.key, default or {})
-        return section if isinstance(section, dict) else {}
-
-    def set(self, value: Dict[str, Any]) -> None:
-        """Set the entire section."""
-        self.storage.set(self.key, value)
-
-    def get_item(self, item_key: str, default: Any = None) -> Any:
-        """Get an item from the section."""
-        return self.get().get(item_key, default)
-
-    def set_item(self, item_key: str, value: Any) -> None:
-        """Set an item in the section."""
-        section = self.get()
-        section[item_key] = value
-        self.set(section)
-
-    def delete_item(self, item_key: str) -> bool:
-        """Delete an item from the section."""
-        section = self.get()
-        if item_key in section:
-            del section[item_key]
-            self.set(section)
-            return True
-        return False
-
-    def exists(self, item_key: str) -> bool:
-        """Check if an item exists in the section."""
-        return item_key in self.get()
-
-
-_config_instance: Optional[Storage] = None
-_data_instance: Optional[Storage] = None
-
-def get_config() -> Storage:
-    """Get config storage (YAML) - singleton."""
-    global _config_instance
-    if _config_instance is None:
-        _config_instance = Storage("config.yaml", "yaml")
-    return _config_instance
-
-def get_data() -> Storage:
-    """Get data storage (JSON) - singleton."""
-    global _data_instance
-    if _data_instance is None:
-        _data_instance = Storage("data.json", "json")
-    return _data_instance
+def get_data() -> Database:
+    """Get the database singleton."""
+    global _db_instance
+    if _db_instance is None:
+        _db_instance = Database()
+    return _db_instance

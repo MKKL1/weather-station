@@ -1,403 +1,399 @@
-# hw_cli/commands/simulate.py
 import asyncio
+import json
 import random
-import signal
-import sys
-import threading
 import time
-from pathlib import Path
-from typing import Optional, Dict
+from contextlib import asynccontextmanager
+from typing import Optional, Any
 
+import httpx
 import typer
+from rich import print as rich_print
+from rich.console import Group
+from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.rule import Rule
+from rich.syntax import Syntax
+from rich.table import Table
 
+from hw_cli.core.api.client import WeatherIoTClient
+from hw_cli.core.data_generator import DataGenerator
 from hw_cli.core.device_manager import DeviceManager
-from hw_cli.core.publisher.azure_publisher import AzureDataPublisher
-from hw_cli.core.publisher.fake_data_publisher import FakeDataPublisher
-from hw_cli.core.simulation.sim_data_gen import SimulatedDataGenerator
-from hw_cli.utils.console import print_info, print_success, print_error, print_warning
+from hw_cli.core.models import DeviceConfig
+from hw_cli.utils.console import print_error, print_info, print_success, print_warning
 
-app = typer.Typer(help="Simulation commands")
+app = typer.Typer(help="Simulation commands", no_args_is_help=True)
 
 
-def create_publisher(device, dry_run: bool, force_provision: bool = False,
-                     progress=None, task_id=None):
-    """Create appropriate publisher based on dry_run flag."""
-    if dry_run:
-        return FakeDataPublisher(progress=progress, task_id=task_id)
-    else:
-        if not device.dps_config:
-            raise ValueError("Device missing DPS configuration for Azure transmission")
+def _get_device(device_ref: Optional[str]) -> DeviceConfig:
+    """Resolve device by name/ID or get default."""
+    mgr = DeviceManager()
+    if device_ref:
+        device = mgr.get_device_by_name(device_ref) or mgr.get_device_by_id(device_ref)
+        if device:
+            return device
+        print_error(f"Device '{device_ref}' not found")
+        raise typer.Exit(1)
 
-        return AzureDataPublisher(
-            device_cfg=device,
-            force_provision=force_provision,
-            progress=progress,
-            task_id=task_id
+    device = mgr.get_default_device()
+    if not device:
+        print_error("No default device. Use --device-id or 'hw devices set-default'")
+        raise typer.Exit(1)
+    return device
+
+
+def _patch_data_for_api(data: Any) -> Any:
+    """
+    Ensure generated data passes strict API validation.
+    Patches empty rain histograms which cause HTTP 400 errors.
+    """
+    if data.reading.rain is not None:
+        if not data.reading.rain.data:
+            data.reading.rain.data = {"0": 0}
+    return data
+
+
+def _print_telemetry_table(data: Any, format_type: str = "text") -> None:
+    """Print telemetry data summary in the requested format."""
+    if format_type == "json":
+        rich_print(json.dumps(data.to_api_payload(), indent=2))
+        return
+
+    r = data.reading
+    rain_tips = sum(r.rain.data.values()) if r.rain and r.rain.data else 0
+
+    table = Table(show_header=True, header_style="bold magenta", box=None)
+    table.add_column("Metric", style="dim")
+    table.add_column("Value")
+    table.add_column("Unit")
+
+    table.add_row("Timestamp", str(data.timestamp), "")
+    table.add_row("Temperature", f"{r.temperature:.2f}", "°C")
+    table.add_row("Humidity", f"{r.humidity:.1f}", "%")
+    table.add_row("Pressure", f"{r.pressure:.1f}", "hPa")
+    table.add_row("Rain Tips", str(rain_tips), "count")
+
+    rich_print(Panel(table, title="Telemetry Summary", expand=False))
+
+
+def _print_debug_info(req: httpx.Request, res: Optional[httpx.Response], format_type: str) -> None:
+    """
+    Print raw request/response details with strict separation of Headers and Body.
+    Handles JSON decoding safely and falls back to text/string representations.
+    """
+    debug_data = {
+        "request": {
+            "method": req.method,
+            "url": str(req.url),
+            "headers": dict(req.headers),
+            "body": None
+        },
+        "response": None
+    }
+
+    try:
+        if req.content:
+            debug_data["request"]["body"] = json.loads(req.content)
+        else:
+            debug_data["request"]["body"] = None
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        debug_data["request"]["body"] = req.content.decode('utf-8', errors='replace') if req.content else None
+
+    if res:
+        debug_data["response"] = {
+            "status_code": res.status_code,
+            "headers": dict(res.headers),
+            "body": None
+        }
+        try:
+            debug_data["response"]["body"] = res.json()
+        except (json.JSONDecodeError, ValueError):
+            debug_data["response"]["body"] = res.text
+
+    if format_type == "json":
+        rich_print(json.dumps(debug_data))
+        return
+
+    def render_body(content: Any, style_theme: str = "monokai") -> Any:
+        if isinstance(content, (dict, list)):
+            return Syntax(json.dumps(content, indent=2), "json", theme=style_theme, word_wrap=True)
+        return str(content) if content else "[dim]Empty Body[/dim]"
+
+    req_headers = "\n".join([f"[cyan]{k}[/cyan]: {v}" for k, v in debug_data["request"]["headers"].items()])
+    req_group = Group(
+        f"[bold]{req.method}[/bold] [green]{req.url}[/green]",
+        Rule(style="dim"),
+        Panel(req_headers, title="Request Headers", border_style="dim"),
+        Panel(render_body(debug_data["request"]["body"]), title="Request Body", border_style="blue"),
+    )
+    rich_print(Panel(req_group, title="[bold blue]HTTP REQUEST[/bold blue]", expand=True))
+
+    if res:
+        status_color = "green" if res.status_code < 400 else "red"
+        res_headers = "\n".join([f"[cyan]{k}[/cyan]: {v}" for k, v in debug_data["response"]["headers"].items()])
+        res_group = Group(
+            f"Status: [bold {status_color}]{res.status_code} {res.reason_phrase}[/bold {status_color}]",
+            Rule(style="dim"),
+            Panel(res_headers, title="Response Headers", border_style="dim"),
+            Panel(render_body(debug_data["response"]["body"]), title="Response Body", border_style=status_color),
         )
+        rich_print(Panel(res_group, title=f"[bold {status_color}]HTTP RESPONSE[/bold {status_color}]", expand=True))
+    else:
+        rich_print(Panel("[dim]No response received[/dim]", title="HTTP RESPONSE", border_style="dim"))
+
+
+@asynccontextmanager
+async def _debug_hooks(client: WeatherIoTClient, enabled: bool):
+    """
+    Context manager to attach/detach debug hooks to the underlying HTTP client.
+    """
+    captured = {"req": [], "res": []}
+
+    #TODO access thru getter
+    if not enabled or not client._client:
+        yield captured
+        return
+
+    async def on_request(request: httpx.Request):
+        captured["req"].append(request)
+
+    async def on_response(response: httpx.Response):
+        # Must read stream to ensure body is available for printing
+        await response.aread()
+        captured["res"].append(response)
+
+    client._client.event_hooks['request'].append(on_request)
+    client._client.event_hooks['response'].append(on_response)
+
+    try:
+        yield captured
+    finally:
+        if client._client:
+            try:
+                client._client.event_hooks['request'].remove(on_request)
+                client._client.event_hooks['response'].remove(on_response)
+            except ValueError:
+                pass
+
+
+async def _ensure_registered(client: WeatherIoTClient, device: DeviceConfig,
+                             device_manager: DeviceManager, progress: Optional[Progress] = None) -> DeviceConfig:
+    if device.is_registered:
+        return device
+
+    msg = "Device not registered, registering..."
+    if progress:
+        progress.update(progress.task_ids[0], description=msg)
+    else:
+        print_info(msg)
+
+    secret = await client.register()
+    device.hmac_secret = secret
+    device_manager.update_device(device)
+    client.update_device(device)
+
+    if not progress:
+        print_success("Device registered successfully")
+    return device
+
+
+async def _send_telemetry_safe(
+        client: WeatherIoTClient,
+        data: Any,
+        debug: bool,
+        format_type: str,
+        dry_run: bool = False,
+        quiet: bool = False,
+) -> None:
+    if dry_run:
+        if debug:
+            req = httpx.Request("POST", f"{client.device.api_base_url}/telemetry", json=data.to_api_payload())
+            _print_debug_info(req, None, format_type)
+        elif not quiet:
+            if format_type == "json":
+                _print_telemetry_table(data, "json")
+            else:
+                rich_print("[yellow]Generated (Dry Run)[/yellow]")
+                _print_telemetry_table(data, "text")
+        return
+
+    async with _debug_hooks(client, debug) as captured:
+        try:
+            await client.send_telemetry(data)
+
+            if debug and captured["req"]:
+                _print_debug_info(captured["req"][-1], captured["res"][-1] if captured["res"] else None, format_type)
+            elif not debug and not quiet:  # Only print if not quiet
+                if format_type == "text":
+                    print_success("✓ Telemetry sent successfully")
+                    _print_telemetry_table(data, "text")
+                else:
+                    _print_telemetry_table(data, "json")
+
+        except httpx.HTTPStatusError as e:
+            if debug:
+                req = captured["req"][-1] if captured["req"] else e.request
+                res = captured["res"][-1] if captured["res"] else e.response
+                _print_debug_info(req, res, format_type)
+            else:
+                print_error(f"HTTP Error {e.response.status_code}: {e.response.text}")
+            raise
 
 
 @app.command("once")
 def simulate_once(
-        device_id: Optional[str] = typer.Option(
-            None,
-            "--device-id",
-            "-d",
-            help="Device ID to use (defaults to configured default device)",
-        ),
-        config: Optional[Path] = typer.Option(
-            None,
-            "--config",
-            "-c",
-            help="Configuration file",
-            exists=True,
-            file_okay=True,
-            dir_okay=False,
-        ),
-        dry_run: bool = typer.Option(
-            False,
-            "--dry-run",
-            help="Simulate without actually sending data",
-        ),
-        force_provision: bool = typer.Option(
-            False,
-            "--force-provision",
-            help="Force re-provisioning even if cached DPS identity exists",
-        ),
+        device_id: Optional[str] = typer.Option(None, "--device-id", "-d", help="Device name or device_id"),
+        dry_run: bool = typer.Option(False, "--dry-run", help="Print data without sending"),
+        force_token: bool = typer.Option(False, "--force-token", help="Force new token (ignore cache)"),
+        format: str = typer.Option("text", "--format", "-f", help="Output format: text or json"),
+        debug: bool = typer.Option(False, "--debug", help="Print full request/response headers and body"),
 ):
     """
-    Send exactly one telemetry message and exit.
-
-    Examples:
-        ws-cli simulate once
-        ws-cli simulate once --device-id sim-001 --dry-run
-        ws-cli simulate once --force-provision  # Ignore DPS cache
+    Send a single telemetry message and exit.
     """
+    if format not in ["text", "json"]:
+        print_error("Format must be 'text' or 'json'")
+        raise typer.Exit(1)
 
-    async def send_once(progress_, task_id):
-        """Send a single telemetry message."""
-        publisher = create_publisher(device, dry_run, force_provision, progress_, task_id)
-        generator = SimulatedDataGenerator()
+    async def run():
+        device = _get_device(device_id)
+        device_manager = DeviceManager()
+        generator = DataGenerator()
+
+        print_info(f"Using device: [bold]{device.name}[/bold] ({device.device_id})")
+        data = _patch_data_for_api(generator.generate(device))
 
         try:
-            await asyncio.wait_for(publisher.connect(), timeout=30.0)
-            data = generator.generate(device)
-            await asyncio.wait_for(publisher.send(data), timeout=30.0)
-        except asyncio.TimeoutError:
-            print_error("Operation timed out")
-            raise
+            use_spinner = (not debug) and (format == "text") and (not dry_run)
+
+            async with WeatherIoTClient(device) as client:
+                if force_token:
+                    client.invalidate_token()
+
+                if use_spinner:
+                    with Progress(SpinnerColumn(), TextColumn("{task.description}"), transient=True) as progress:
+                        task = progress.add_task("Connecting...", total=None)
+                        await _ensure_registered(client, device, device_manager, progress)
+                        progress.update(task, description="Sending telemetry...")
+
+                        await _send_telemetry_safe(client, data, debug, format, dry_run, quiet=True)
+
+                    print_success("✓ Telemetry sent successfully")
+                    _print_telemetry_table(data, format)
+                else:
+                    if not dry_run:
+                        await _ensure_registered(client, device, device_manager)
+                    await _send_telemetry_safe(client, data, debug, format, dry_run, quiet=False)
+
+        except httpx.HTTPStatusError:
+            raise typer.Exit(1)
         except Exception as e:
-            # Try cache invalidation for Azure failures
-            if not dry_run and hasattr(publisher, 'invalidate_cache_and_reconnect'):
-                try:
-                    print_warning("Transmission failed, attempting cache invalidation and retry...")
-                    await asyncio.wait_for(publisher.invalidate_cache_and_reconnect(), timeout=30.0)
-                    data = generator.generate(device)
-                    await asyncio.wait_for(publisher.send(data), timeout=30.0)
-                except Exception as retry_e:
-                    print_error(f"Retry after cache invalidation failed: {retry_e}")
-                    raise retry_e
-            else:
-                raise e
-        finally:
-            try:
-                await asyncio.wait_for(publisher.disconnect(), timeout=10.0)
-            except asyncio.TimeoutError:
-                print_warning("Disconnect timed out")
+            print_error(f"Failed: {e}")
+            raise typer.Exit(1)
 
     try:
-        # Get device
-        device_manager = DeviceManager()
-        device = get_device(device_manager, device_id)
-
-        print_info(f"Using device: [bold]{device.device_id}[/bold]")
-
-        if dry_run:
-            print_warning("DRY RUN MODE - No data will be sent")
-        if force_provision:
-            print_info("Force provisioning enabled - will ignore DPS cache")
-
-        # Send telemetry with progress
-        with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                transient=True,
-        ) as progress:
-            task = progress.add_task(description="Initializing...", total=None)
-            asyncio.run(send_once(progress, task))
-
-        print_success("✓ Telemetry sent successfully")
-
+        asyncio.run(run())
     except KeyboardInterrupt:
         print_warning("\nOperation cancelled by user")
         raise typer.Exit(130)
-    except Exception as e:
-        print_error(f"Failed to send telemetry: {e}")
-        raise typer.Exit(1)
 
 
 @app.command("loop")
-def simulate_continuous(
-        device_id: Optional[str] = typer.Option(
-            None,
-            "--device-id",
-            "-d",
-            help="Device ID to use",
-        ),
-        interval: int = typer.Option(
-            1800,
-            "--interval",
-            "-i",
-            help="Interval between messages in seconds",
-            min=1,
-        ),
-        jitter: float = typer.Option(
-            5.0,
-            "--jitter",
-            "-j",
-            help="Random jitter in seconds (0 to disable)",
-            min=0.0,
-        ),
-        max_messages: Optional[int] = typer.Option(
-            None,
-            "--max-messages",
-            "-m",
-            help="Maximum number of messages to send",
-            min=1,
-        ),
-        seed: Optional[int] = typer.Option(
-            None,
-            "--seed",
-            "-s",
-            help="Random seed for deterministic behavior",
-        ),
-        dry_run: bool = typer.Option(
-            False,
-            "--dry-run",
-            help="Simulate without actually sending data",
-        ),
-        force_provision: bool = typer.Option(
-            False,
-            "--force-provision",
-            help="Force re-provisioning even if cached DPS identity exists",
-        ),
+def simulate_loop(
+        device_id: Optional[str] = typer.Option(None, "--device-id", "-d", help="Device name or device_id"),
+        interval: int = typer.Option(1800, "--interval", "-i", help="Interval in seconds", min=1),
+        jitter: float = typer.Option(5.0, "--jitter", "-j", help="Random jitter seconds", min=0),
+        max_messages: Optional[int] = typer.Option(None, "--max-messages", "-m", help="Max messages to send", min=1),
+        seed: Optional[int] = typer.Option(None, "--seed", "-s", help="Random seed for deterministic data"),
+        dry_run: bool = typer.Option(False, "--dry-run", help="Print without sending"),
+        force_token: bool = typer.Option(False, "--force-token", help="Force new token (ignore cache)"),
+        format: str = typer.Option("text", "--format", "-f", help="Output format: text or json"),
+        debug: bool = typer.Option(False, "--debug", help="Print full request/response"),
 ):
     """
-    Run continuous simulation until stopped or limit reached.
-
-    Examples:
-        ws-cli simulate loop
-        ws-cli simulate loop --interval 60 --max-messages 10
-        ws-cli simulate loop --device-id sim-001 --seed 42
-        ws-cli simulate loop --force-provision  # Ignore DPS cache
+    Run continuous telemetry simulation.
     """
-
-    try:
-        # Get device and setup
-        device_manager = DeviceManager()
-        device = get_device(device_manager, device_id)
-
-        print_info(f"Starting continuous simulation for device: [bold]{device.device_id}[/bold]")
-        print_info(f"Interval: {interval}s, Jitter: ±{jitter}s")
-
-        if max_messages:
-            print_info(f"Will send {max_messages} messages")
-        else:
-            print_info("Press Ctrl+C or 'q' to stop")
-
-        if seed is not None:
-            print_info(f"Using random seed: {seed}")
-            random.seed(seed)
-
-        if dry_run:
-            print_warning("DRY RUN MODE - No data will be sent")
-        if force_provision:
-            print_info("Force provisioning enabled - will ignore DPS cache")
-
-        # Stats tracking
-        stats = {'messages': 0, 'start_time': 0.0, 'elapsed': None}
-
-        # Run simulation loop
-        try:
-            asyncio.run(run_simulation_loop(
-                device=device,
-                interval=interval,
-                jitter=jitter,
-                max_messages=max_messages,
-                dry_run=dry_run,
-                force_provision=force_provision,
-                stats=stats,
-            ))
-            print_info("Simulation completed!")
-            print_info(f"Sent {int(stats['messages'])} messages in {format_elapsed(stats['elapsed'])}")
-        except KeyboardInterrupt:
-            if stats['elapsed'] is None:
-                stats['elapsed'] = time.time() - stats['start_time']
-            print_info("Simulation canceled!")
-            print_info(f"Sent {int(stats['messages'])} messages in {format_elapsed(stats['elapsed'])}")
-            raise typer.Exit(0)
-
-    except Exception as e:
-        print_error(f"Simulation failed: {e}")
+    if jitter >= interval:
+        print_error(f"Jitter ({jitter}s) must be less than interval ({interval}s)")
         raise typer.Exit(1)
 
+    async def run():
+        device = _get_device(device_id)
+        device_manager = DeviceManager()
+        generator = DataGenerator(seed=seed)
 
-async def run_simulation_loop(device, interval: int, jitter: float,
-                              max_messages: Optional[int], dry_run: bool,
-                              force_provision: bool, stats: Dict):
-    """Main simulation loop with cancellation handling."""
-    from rich import print
-    import threading
-    import sys
+        stats = {'sent': 0, 'errors': 0, 'start_time': time.time()}
+        consecutive_errors = 0
+        MAX_CONSECUTIVE_ERRORS = 5
 
-    messages_sent = 0
-    generator = SimulatedDataGenerator()
-    publisher = None
-    shutdown_event = asyncio.Event()
+        print_info(f"Starting continuous simulation for: [bold]{device.name}[/bold]")
+        print_info(f"Interval: {interval}s (±{jitter}s jitter)")
+        if debug:
+            print_warning("DEBUG MODE ENABLED: Output will be verbose")
 
-    stats['start_time'] = time.time()
+        async with WeatherIoTClient(device) as client:
+            if force_token:
+                client.invalidate_token()
 
-    # Key monitoring thread
-    key_thread = start_key_monitor(shutdown_event)
+            if not dry_run:
+                try:
+                    await _ensure_registered(client, device, device_manager)
+                except Exception as e:
+                    print_error(f"Initial registration failed: {e}")
+                    raise typer.Exit(1)
+
+            while max_messages is None or stats['sent'] < max_messages:
+                data = _patch_data_for_api(generator.generate(device))
+
+                try:
+                    await _send_telemetry_safe(client, data, debug, format, dry_run, quiet=True)
+
+                    stats['sent'] += 1
+                    consecutive_errors = 0
+
+                    if not debug:
+                        if format == "text":
+                            status = "[green]✓ Sent[/green]" if not dry_run else "[yellow]Generated (Dry Run)[/yellow]"
+                            rich_print(f"[dim][{stats['sent']}][/dim] {status} @ {data.timestamp}")
+                        elif format == "json":
+                            rich_print(json.dumps(data.to_api_payload(), indent=None))
+
+                except (httpx.HTTPStatusError, Exception) as e:
+                    consecutive_errors += 1
+                    stats['errors'] += 1
+
+                    if not debug:
+                        print_error(f"Send failed: {e}")
+
+                    if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
+                        print_error(f"Aborting: {MAX_CONSECUTIVE_ERRORS} consecutive errors.")
+                        break
+
+                if max_messages and stats['sent'] >= max_messages:
+                    break
+
+                target_timestamp = stats['start_time'] + (stats['sent'] * interval)
+                target_timestamp += random.uniform(-jitter, jitter)
+
+                now = time.time()
+                sleep_secs = target_timestamp - now
+
+                if sleep_secs < 0:
+                    sleep_secs = 0.1
+
+                remaining = sleep_secs
+                while remaining > 0:
+                    chunk = min(0.1, remaining)
+                    await asyncio.sleep(chunk)
+                    remaining -= chunk
+
+        elapsed = time.time() - stats['start_time']
+        print_info("\nSimulation stopped!")
+        rich_print(f"Sent: [bold]{stats['sent']}[/bold] | Errors: [red]{stats['errors']}[/red] | Time: {elapsed:.1f}s")
 
     try:
-        # Create publisher and connect
-        publisher = create_publisher(device, dry_run, force_provision)
-        await asyncio.wait_for(publisher.connect(), timeout=30.0)
-
-        while not shutdown_event.is_set():
-            # Check message limit
-            if max_messages and messages_sent >= max_messages:
-                print(f"✓ Sent {messages_sent} messages (limit reached)")
-                break
-
-            try:
-                # Generate and send
-                data = generator.generate(device)
-                await asyncio.wait_for(publisher.send(data), timeout=30.0)
-                messages_sent += 1
-                stats['messages'] = float(messages_sent)
-
-                status = "Generated (DRY RUN)" if dry_run else "Sent successfully"
-                print(f"Message {messages_sent}: {status}")
-
-            except asyncio.TimeoutError:
-                print(f"Message {messages_sent + 1}: Timeout during send")
-                continue
-            except asyncio.CancelledError:
-                break
-            except Exception as e:
-                print(f"Error sending message {messages_sent + 1}: {e}")
-
-                # Try cache invalidation for Azure failures
-                if not dry_run and hasattr(publisher, 'invalidate_cache_and_reconnect'):
-                    try:
-                        await asyncio.wait_for(publisher.invalidate_cache_and_reconnect(), timeout=30.0)
-                        continue
-                    except:
-                        pass
-
-            # Wait for next interval with cancellation check
-            if (max_messages is None or messages_sent < max_messages) and not shutdown_event.is_set():
-                jitter_amount = random.uniform(-jitter, jitter) if jitter > 0 else 0
-                wait_time = max(1, interval + jitter_amount)
-
-                # Sleep in chunks to be responsive to cancellation
-                remaining = wait_time
-                while remaining > 0 and not shutdown_event.is_set():
-                    sleep_chunk = min(0.1, remaining)
-                    await asyncio.sleep(sleep_chunk)
-                    remaining -= sleep_chunk
-
-        stats['elapsed'] = time.time() - stats['start_time']
-
-    except asyncio.CancelledError:
-        stats['elapsed'] = time.time() - stats['start_time']
-        raise
+        asyncio.run(run())
+    except KeyboardInterrupt:
+        pass
     except Exception as e:
-        print(f"Error in simulation loop: {e}")
-        raise
-    finally:
-        # Cleanup
-        cleanup_tasks = asyncio.all_tasks() - {asyncio.current_task()}
-        for task in cleanup_tasks:
-            task.cancel()
-        if cleanup_tasks:
-            await asyncio.gather(*cleanup_tasks, return_exceptions=True)
-
-        if publisher:
-            try:
-                await asyncio.wait_for(publisher.disconnect(), timeout=10.0)
-            except Exception:
-                pass
-
-        shutdown_event.set()
-
-
-def start_key_monitor(shutdown_event):
-    """Start key monitoring thread for 'q' key press."""
-
-    def key_monitor():
-        try:
-            if sys.platform == "win32":
-                import msvcrt
-                while not shutdown_event.is_set():
-                    if msvcrt.kbhit():
-                        key = msvcrt.getch().decode('utf-8', errors='ignore')
-                        if key.lower() == 'q':
-                            shutdown_event.set()
-                            break
-                    threading.Event().wait(0.1)
-            else:
-                import termios, tty, select
-                old_settings = termios.tcgetattr(sys.stdin)
-                tty.setraw(sys.stdin.fileno())
-
-                while not shutdown_event.is_set():
-                    if select.select([sys.stdin], [], [], 0.1) == ([sys.stdin], [], []):
-                        key = sys.stdin.read(1)
-                        if key.lower() == 'q':
-                            shutdown_event.set()
-                            break
-
-                termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
-        except:
-            pass  # Continue without key monitoring if it fails
-
-    try:
-        thread = threading.Thread(target=key_monitor, daemon=True)
-        thread.start()
-        return thread
-    except:
-        return None
-
-
-def get_device(device_manager, device_id: Optional[str]):
-    """Get device by ID or return default device."""
-    if device_id:
-        device = device_manager.get_device(device_id)
-        if not device:
-            print_error(f"Device '{device_id}' not found")
-            print_info("Run 'ws-cli devices list' to see available devices")
-            raise typer.Exit(1)
-    else:
-        device = device_manager.get_default_device()
-        if not device:
-            print_error("No default device is set. Use --device-id or 'ws-cli devices set-default'")
-            raise typer.Exit(1)
-
-    return device
-
-
-def format_elapsed(seconds: float) -> str:
-    """Format elapsed time in a human-readable way."""
-    if seconds < 60:
-        return f"{int(seconds)}s"
-    elif seconds < 3600:
-        mins = int(seconds / 60)
-        secs = int(seconds % 60)
-        return f"{mins}m {secs}s"
-    else:
-        hours = int(seconds / 3600)
-        mins = int((seconds % 3600) / 60)
-        return f"{hours}h {mins}m"
+        print_error(f"Fatal error: {e}")
+        raise typer.Exit(1)
