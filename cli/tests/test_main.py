@@ -1,5 +1,10 @@
+import pytest
 from typer.testing import CliRunner
 from hw_cli.__main__ import app
+
+@pytest.fixture
+def runner():
+    return CliRunner()
 
 def test_help(runner):
     """Test the main help command."""
