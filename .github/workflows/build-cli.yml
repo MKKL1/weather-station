@@ -100,7 +100,7 @@ jobs:
           python-version: '3.11'
       
       - name: Download build artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: cli-dist
           path: ./dist/
