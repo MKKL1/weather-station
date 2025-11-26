@@ -1,4 +1,4 @@
-name: Build and Test server
+name: Build and Test Server
 
 on:
   push:
@@ -11,36 +11,33 @@ on:
     paths:
       - 'server/**'
       - '.github/workflows/build-server.yml'
-  workflow_dispatch:
-  workflow_call:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
-    name: Build Solution 
     runs-on: ubuntu-latest
-
     defaults:
       run:
         working-directory: server
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: List server files
-        run: ls -la
+      - uses: actions/checkout@v5
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 9.0.x
           cache: true
-          cache-dependency-path: |
-            server/WeatherStation.sln
-            server/src/**/*.csproj
-            server/tests/**/*.csproj
+          cache-dependency-path: server/WeatherStation.sln
 
       - name: Restore dependencies
         run: dotnet restore WeatherStation.sln
+
+      - name: Verify Code Formatting
+        run: dotnet format --verify-no-changes
 
       - name: Build
         run: dotnet build --no-restore --configuration Release
