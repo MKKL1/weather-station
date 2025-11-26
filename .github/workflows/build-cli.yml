@@ -28,6 +28,7 @@ jobs:
         uses: chartboost/ruff-action@v1
         with:
           src: "./cli"
+          args: check --output-format=github
 
   test:
     needs: quality
