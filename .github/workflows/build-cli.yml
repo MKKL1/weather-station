@@ -46,6 +46,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
           cache: 'poetry'
+          cache-dependency-path: cli/poetry.lock
       
       - name: Install dependencies
         working-directory: ./cli
