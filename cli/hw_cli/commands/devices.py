@@ -4,7 +4,6 @@ import os
 import sys
 from typing import Optional
 
-import click
 import typer
 from rich import print as rich_print
 from rich.prompt import Confirm, Prompt
