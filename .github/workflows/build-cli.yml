@@ -41,6 +41,9 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       
+      - name: Install Poetry
+        run: pipx install poetry
+      
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v6
         with:
@@ -50,9 +53,7 @@ jobs:
       
       - name: Install dependencies
         working-directory: ./cli
-        run: |
-          pip install poetry
-          poetry install --no-interaction
+        run: poetry install --no-interaction
       
       - name: Run tests
         working-directory: ./cli
