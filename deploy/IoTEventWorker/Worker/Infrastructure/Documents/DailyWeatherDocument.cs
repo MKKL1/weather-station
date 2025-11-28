@@ -8,18 +8,30 @@ public class DailyWeatherDocument
     [JsonProperty("id")]
     [JsonPropertyName("id")]
     public required string id { get; set; }
+    
     [JsonProperty("deviceId")]
     [JsonPropertyName("deviceId")]
     public required string DeviceId { get; set; }
+    
     [JsonProperty("typ")]
     [JsonPropertyName("typ")]
     public required string DocType { get; set; }
+    
+    [JsonProperty("dayTs")]
+    [JsonPropertyName("dayTs")]
+    public long DayTimestampEpoch { get; set; }
+    
     [JsonProperty("dat")]
     [JsonPropertyName("dat")]
     public required PayloadRecord Payload { get; set; }
+    
     [JsonProperty("ttl")]
     [JsonPropertyName("ttl")]
     public int Ttl { get; set; }
+    
+    [JsonProperty("_etag")]
+    [JsonPropertyName("_etag")]
+    public string? ETag { get; set; }
     
     public class PayloadRecord
     {

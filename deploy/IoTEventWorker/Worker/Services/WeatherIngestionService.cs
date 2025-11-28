@@ -28,11 +28,15 @@ public class WeatherIngestionService
     {
         try
         {
-            await _repository.SaveRawTelemetry(dto, deviceId);
+            // 1. Save Raw (Audit) - Updated method name
+            await _repository.SaveRaw(dto, deviceId);
             
+            // 2. Process Domain Logic
             var reading = _mapper.ToDomain(dto, deviceId);
             var aggregationResult = await _aggregationService.ProcessReading(reading);
-            await _repository.SaveStateUpdate(aggregationResult);
+            
+            // 3. Save State (Hot Path) - Updated method name
+            await _repository.SaveState(aggregationResult);
 
             _logger.LogInformation("Ingested reading for {DeviceId} at {Timestamp}",
                 deviceId, reading.Timestamp);

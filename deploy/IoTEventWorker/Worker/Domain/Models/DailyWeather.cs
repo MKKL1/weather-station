@@ -5,7 +5,7 @@ namespace Worker.Domain.Models;
 
 public class DailyWeather
 {
-    private const int BucketSizeSeconds = 300; // 5 minutes
+    private const int BucketSizeSeconds = 300; 
     public string DeviceId { get; }
     public DateTimeOffset DayTimestamp { get; }
     public RainfallAccumulator? Rain { get; set; }
@@ -19,8 +19,8 @@ public class DailyWeather
     
     public List<DateTimeOffset> IncludedTimestamps { get; set; } = [];
 
-    //TODO make process that finalizes it
-    public bool IsFinalized { get; set; } = false;
+    public bool IsFinalized { get; internal set; } = false;
+    public string? Version { get; set; }
 
     public DailyWeather(string deviceId, DateTimeOffset dayTimestamp)
     {
@@ -30,14 +30,17 @@ public class DailyWeather
     
     public void AddReading(WeatherReading reading)
     {
+        if (IsFinalized)
+        {
+            return;
+        }
+
         if (reading.RainfallVo != null)
         {
             Rain ??= RainfallAccumulator.FromDuration(DayTimestamp, BucketSizeSeconds, 86400);
             Rain.Add(reading.RainfallVo.Value);
         }
         
-        // Check if this specific point in time belongs to this day.
-        // If this is the "Yesterday" aggregate handling a "Today" reading (due to rain overlap), skip this part.
         IncludedTimestamps.Add(reading.Timestamp);
         if (!BelongsToThisDay(reading.Timestamp))
         {
@@ -46,14 +49,14 @@ public class DailyWeather
         var hour = reading.Timestamp.Hour;
         if (reading.TemperatureVo != null)
         {
-            UpdateOrCreate(Temperature, reading.TemperatureVo.Value);
+            Temperature = UpdateOrCreate(Temperature, reading.TemperatureVo.Value);
             HourlyTemperature ??= new Dictionary<int, MetricAggregate>();
             UpdateHourly(HourlyTemperature, hour, reading.TemperatureVo.Value);
         }
             
         if (reading.HumidityVo != null)
         {
-            UpdateOrCreate(Humidity, reading.HumidityVo.Value);
+            Humidity = UpdateOrCreate(Humidity, reading.HumidityVo.Value);
             HourlyHumidity ??= new Dictionary<int, MetricAggregate>();
             UpdateHourly(HourlyHumidity, hour, reading.HumidityVo.Value);
         }
@@ -64,7 +67,44 @@ public class DailyWeather
             HourlyPressure ??= new Dictionary<int, MetricAggregate>();
             UpdateHourly(HourlyPressure, hour, reading.PressureVo.Value);
         }
+    }
 
+    public void Finalize()
+    {
+        if (IsFinalized)
+        {
+            throw new InvalidOperationException($"DailyWeather for {DeviceId} on {DayTimestamp:yyyy-MM-dd} is already finalized");
+        }
+
+        Temperature?.FinalizeAggregate();
+        Humidity?.FinalizeAggregate();
+        Pressure?.FinalizeAggregate();
+
+        if (HourlyTemperature != null)
+        {
+            foreach (var agg in HourlyTemperature.Values)
+            {
+                agg.FinalizeAggregate();
+            }
+        }
+
+        if (HourlyHumidity != null)
+        {
+            foreach (var agg in HourlyHumidity.Values)
+            {
+                agg.FinalizeAggregate();
+            }
+        }
+
+        if (HourlyPressure != null)
+        {
+            foreach (var agg in HourlyPressure.Values)
+            {
+                agg.FinalizeAggregate();
+            }
+        }
+
+        IsFinalized = true;
     }
 
     private static MetricAggregate UpdateOrCreate(MetricAggregate? aggregate, float reading)
