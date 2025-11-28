@@ -64,12 +64,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+
+      - name: Install Poetry
+        run: pipx install poetry
       
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
           python-version: '3.11'
           cache: 'poetry'
+          cache-dependency-path: cli/poetry.lock
       
       - name: Install build tools
         working-directory: ./cli
