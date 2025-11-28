@@ -5,7 +5,6 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-import typer
 from hw_cli.core.storage import get_app_dir
 
 logger = logging.getLogger(__name__)

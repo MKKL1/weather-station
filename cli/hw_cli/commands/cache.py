@@ -108,7 +108,7 @@ def cache_stats():
     cache = get_token_cache()
     stats = cache.get_stats()
 
-    rich_print(f"[cyan]Token Cache Statistics[/cyan]", file=sys.stderr)
+    rich_print("[cyan]Token Cache Statistics[/cyan]", file=sys.stderr)
     rich_print(f"  Total entries: {stats['total']}", file=sys.stderr)
     rich_print(f"  Valid: {stats['valid']}", file=sys.stderr)
     rich_print(f"  Expired: {stats['expired']}", file=sys.stderr)
