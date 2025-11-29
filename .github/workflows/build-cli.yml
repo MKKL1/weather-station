@@ -23,7 +23,7 @@ jobs:
     name: Code Quality
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Run Ruff (Linting)
         uses: chartboost/ruff-action@v1
         with:
@@ -39,7 +39,7 @@ jobs:
         python-version: ['3.12']
     
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       
       - name: Install Poetry
         run: pipx install poetry
@@ -63,7 +63,7 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
 
       - name: Install Poetry
         run: pipx install poetry
