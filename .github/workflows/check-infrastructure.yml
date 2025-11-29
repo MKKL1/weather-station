@@ -4,11 +4,11 @@ on:
   push:
     branches: [ main ]
     paths:
-      - 'deploy/terraform/**'
+      - 'deploy/**'
   pull_request:
     branches: [ main ]
     paths:
-      - 'deploy/terraform/**'
+      - 'deploy/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./deploy/terraform
+        working-directory: ./deploy
 
     steps:
       - uses: actions/checkout@v5

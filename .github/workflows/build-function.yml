@@ -1,15 +1,15 @@
-name: Build and Test IoTEventWorker
+name: Build and Test TelemetryWorker
 
 on:
   push:
     branches: [ main ]
     paths:
-      - 'deploy/IoTEventWorker/**'
+      - 'telemetry-worker/**'
       - '.github/workflows/build-function.yml'
   pull_request:
     branches: [ main ]
     paths:
-      - 'deploy/IoTEventWorker/**'
+      - 'telemetry-worker/**'
       - '.github/workflows/build-function.yml'
   workflow_dispatch:
   workflow_call:
@@ -29,7 +29,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: deploy/IoTEventWorker
+        working-directory: telemetry-worker
 
     steps:
       - name: Checkout
@@ -41,14 +41,14 @@ jobs:
           dotnet-version: '8.0.x'
           cache: true
           cache-dependency-path: |
-            deploy/IoTEventWorker/IoTEventWorker.sln
-            deploy/IoTEventWorker/**/**/*.csproj
+            telemetry-worker/TelemetryWorker.sln
+            telemetry-worker/**/**/*.csproj
 
       - name: Restore solution
-        run: dotnet restore IoTEventWorker.sln
+        run: dotnet restore TelemetryWorker.sln
 
       - name: Build (Release)
-        run: dotnet build IoTEventWorker.sln --no-restore -c Release
+        run: dotnet build TelemetryWorker.sln --no-restore -c Release
 
       - name: Test
         run: dotnet test --no-build -c Release
@@ -62,4 +62,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: function-app
-          path: ${{ github.workspace }}/deploy/IoTEventWorker/output
+          path: ${{ github.workspace }}/telemetry-worker/output

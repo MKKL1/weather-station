@@ -18,8 +18,8 @@ resource "azurerm_function_app_flex_consumption" "main_function" {
   storage_authentication_type = "StorageAccountConnectionString"
   storage_access_key          = azurerm_storage_account.backend_storage.primary_access_key
 
-  runtime_name    = "dotnet-isolated"
-  runtime_version = "8.0"
+  runtime_name           = "dotnet-isolated"
+  runtime_version        = "8.0"
   maximum_instance_count = 40
   instance_memory_in_mb  = 512
   site_config {}
@@ -42,13 +42,13 @@ resource "azurerm_function_app_flex_consumption" "main_function" {
   }
 
   app_settings = {
-    AzureWebJobsStorage                       = azurerm_storage_account.backend_storage.primary_connection_string
-    COSMOS_CONNECTION                         = azurerm_cosmosdb_account.iot_database_account.primary_sql_connection_string
-    COSMOS_DATABASE                           = azurerm_cosmosdb_sql_database.telemetry_db.name
-    COSMOS_CONTAINER                          = azurerm_cosmosdb_sql_container.telemetry_container.name
-    COSMOS_VIEWS_CONTAINER                    = azurerm_cosmosdb_sql_container.telemetry_views.name
-    COSMOS_TELEMETRY_CONTAINER                = azurerm_cosmosdb_sql_container.telemetry_raw.name
-    APPLICATIONINSIGHTS_CONNECTION_STRING     = azurerm_application_insights.backend_tracing.connection_string
+    AzureWebJobsStorage                        = azurerm_storage_account.backend_storage.primary_connection_string
+    COSMOS_CONNECTION                          = azurerm_cosmosdb_account.iot_database_account.primary_sql_connection_string
+    COSMOS_DATABASE                            = azurerm_cosmosdb_sql_database.telemetry_db.name
+    COSMOS_CONTAINER                           = azurerm_cosmosdb_sql_container.telemetry_container.name
+    COSMOS_VIEWS_CONTAINER                     = azurerm_cosmosdb_sql_container.telemetry_views.name
+    COSMOS_TELEMETRY_CONTAINER                 = azurerm_cosmosdb_sql_container.telemetry_raw.name
+    APPLICATIONINSIGHTS_CONNECTION_STRING      = azurerm_application_insights.backend_tracing.connection_string
     ApplicationInsightsAgent_EXTENSION_VERSION = "~3"
   }
 
@@ -75,8 +75,8 @@ resource "azurerm_function_app_flex_consumption" "provisioning_function" {
   storage_authentication_type = "StorageAccountConnectionString"
   storage_access_key          = azurerm_storage_account.backend_storage.primary_access_key
 
-  runtime_name    = "custom"
-  runtime_version = "1.0"
+  runtime_name           = "custom"
+  runtime_version        = "1.0"
   maximum_instance_count = 40
   instance_memory_in_mb  = 512
   site_config {}
@@ -99,15 +99,15 @@ resource "azurerm_function_app_flex_consumption" "provisioning_function" {
   }
 
   app_settings = {
-    AzureWebJobsStorage                       = azurerm_storage_account.backend_storage.primary_connection_string
-    COSMOS_CONNECTION                         = azurerm_cosmosdb_account.iot_database_account.primary_sql_connection_string
-    COSMOS_DATABASE                           = azurerm_cosmosdb_sql_database.telemetry_db.name
-    COSMOS_CONTAINER                          = azurerm_cosmosdb_sql_container.telemetry_container.name
-    JWT_ISSUER                                = "https://${azurerm_static_web_app.public_keys_host.default_host_name}/device"
-    WEBSITE_AUTH_AAD_ALLOWED_TENANTS          = data.azurerm_client_config.current.tenant_id
-    APPLICATIONINSIGHTS_CONNECTION_STRING     = azurerm_application_insights.backend_tracing.connection_string
+    AzureWebJobsStorage                        = azurerm_storage_account.backend_storage.primary_connection_string
+    COSMOS_CONNECTION                          = azurerm_cosmosdb_account.iot_database_account.primary_sql_connection_string
+    COSMOS_DATABASE                            = azurerm_cosmosdb_sql_database.telemetry_db.name
+    COSMOS_CONTAINER                           = azurerm_cosmosdb_sql_container.telemetry_container.name
+    JWT_ISSUER                                 = "https://${azurerm_static_web_app.public_keys_host.default_host_name}/device"
+    WEBSITE_AUTH_AAD_ALLOWED_TENANTS           = data.azurerm_client_config.current.tenant_id
+    APPLICATIONINSIGHTS_CONNECTION_STRING      = azurerm_application_insights.backend_tracing.connection_string
     ApplicationInsightsAgent_EXTENSION_VERSION = "~3"
-    
+
     ACCESS_TOKEN_PRIVATE_KEY_B64 = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.token_signing_key.id})"
   }
 
