@@ -56,13 +56,21 @@ public class CosmosWeatherRepository(
         string? continuationToken)
     {
         var query = new QueryDefinition(
-            "SELECT * FROM c WHERE c.typ = 'daily' AND c.dat.fin = false AND c.dayTs < @cutoff"
+            @"SELECT * FROM c 
+          WHERE c.typ = 'daily' 
+            AND c.dat.fin = false 
+            AND c.dayTs < @cutoff
+          ORDER BY c.dayTs ASC"
         ).WithParameter("@cutoff", cutoff.ToUnixTimeSeconds());
 
         var iterator = _viewsContainer.GetItemQueryIterator<DailyWeatherDocument>(
             query,
             continuationToken,
-            new QueryRequestOptions { MaxItemCount = limit }
+            new QueryRequestOptions 
+            { 
+                MaxItemCount = limit,
+                MaxConcurrency = -1
+            }
         );
 
         if (iterator.HasMoreResults)

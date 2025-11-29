@@ -69,7 +69,7 @@ public class DailyWeather
         }
     }
 
-    public void Finalize()
+    public void FinalizeReading()
     {
         if (IsFinalized)
         {

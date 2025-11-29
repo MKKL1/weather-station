@@ -5,6 +5,9 @@ using Worker.Domain.Models;
 
 namespace Worker.Services;
 
+/// <summary>
+/// Service responsible for finalizing daily weather aggregates and triggering weekly rollups.
+/// </summary>
 public class DailyFinalizationService(
     ILogger<DailyFinalizationService> logger,
     IWeatherRepository repository,
@@ -12,69 +15,101 @@ public class DailyFinalizationService(
     WeeklyAggregationService weeklyService)
 {
     private readonly TimeSpan _maxRunTime = TimeSpan.FromMinutes(9);
-
-    public async Task<FinalizationResult> Execute(int lookbackHours = 24)
+    private const int BatchSize = 100;
+    
+    public async Task<FinalizationResult> Execute(int gracePeriodHours = 24)
     {
         var stopwatch = Stopwatch.StartNew();
-        var cutoff = new DateTimeOffset(timeProvider.GetUtcNow().Date, TimeSpan.Zero).AddHours(-lookbackHours);
+        
+        var now = timeProvider.GetUtcNow();
+        var cutoffDate = now.Date.AddHours(-gracePeriodHours);
+        var cutoff = new DateTimeOffset(cutoffDate, TimeSpan.Zero);
         
         string? continuationToken = null;
         int totalProcessed = 0;
         int totalFailed = 0;
 
-        logger.LogInformation("Starting Finalization. Days older than: {Cutoff}", cutoff);
+        logger.LogInformation(
+            "Starting daily finalization. Cutoff: {Cutoff} UTC (grace period: {Hours}h)", 
+            cutoff, gracePeriodHours);
 
         do
         {
             if (stopwatch.Elapsed > _maxRunTime)
             {
-                logger.LogWarning("Time budget exceeded. Stopping gracefully.");
+                logger.LogWarning(
+                    "Time budget exceeded after {Elapsed}. Processed: {Total}, Failed: {Failed}. " +
+                    "Remaining items will be processed in next run.",
+                    stopwatch.Elapsed, totalProcessed, totalFailed);
                 break;
             }
-
-            var (batch, newToken) = await repository.GetUnfinalizedBatch(cutoff, 100, continuationToken);
+            
+            var (batch, newToken) = await repository.GetUnfinalizedBatch(
+                cutoff, 
+                BatchSize, 
+                continuationToken);
+            
             continuationToken = newToken;
 
-            if (batch.Count == 0) break; 
-
+            if (batch.Count == 0)
+            {
+                logger.LogInformation("No more unfinalized days found.");
+                break;
+            }
+            
             var validFinalizedDays = new List<DailyWeather>();
             
             foreach (var day in batch)
             {
                 try
                 {
-                    day.Finalize(); 
+                    day.FinalizeReading();
                     validFinalizedDays.Add(day);
+                }
+                catch (InvalidOperationException ex)
+                {
+                    logger.LogWarning(ex, 
+                        "Day {DeviceId}|{Date} is already finalized. Skipping.", 
+                        day.DeviceId, day.DayTimestamp);
+                    totalFailed++;
                 }
                 catch (Exception ex)
                 {
+                    logger.LogError(ex, 
+                        "Failed to finalize {DeviceId}|{Date}. This record will be skipped.", 
+                        day.DeviceId, day.DayTimestamp);
                     totalFailed++;
-                    logger.LogError(ex, "Poison pill detected: {DeviceId}|{Date}", day.DeviceId, day.DayTimestamp);
                 }
             }
-
+            
             if (validFinalizedDays.Count > 0)
             {
                 try
                 {
-                    // 1. Update Weekly Aggregates
                     await weeklyService.SyncDaysToWeeksAsync(validFinalizedDays);
-
-                    // 2. Mark Days as Finalized in DB
+                    
                     await repository.SaveDailyBatch(validFinalizedDays);
 
                     totalProcessed += validFinalizedDays.Count;
+                    
+                    logger.LogInformation(
+                        "Finalized batch of {Count} days. Running total: {Total} processed, {Failed} failed",
+                        validFinalizedDays.Count, totalProcessed, totalFailed);
                 }
                 catch (Exception ex)
                 {
-                    logger.LogError(ex, "Batch persistence failed. Aborting run to preserve integrity.");
-                    return FinalizationResult.CriticalFailure($"Batch failed: {ex.Message}");
+                    logger.LogError(ex, 
+                        "Critical error persisting finalized batch. Aborting run to preserve data integrity.");
+                    return FinalizationResult.CriticalFailure(
+                        $"Batch persistence failed: {ex.Message}");
                 }
             }
 
-            logger.LogInformation("Processed batch of {Count}. Total so far: {Total}", validFinalizedDays.Count, totalProcessed);
-
         } while (continuationToken != null);
+
+        logger.LogInformation(
+            "Finalization completed. Total processed: {Processed}, Failed: {Failed}, Duration: {Elapsed}",
+            totalProcessed, totalFailed, stopwatch.Elapsed);
 
         return FinalizationResult.Success(totalProcessed, totalFailed);
     }

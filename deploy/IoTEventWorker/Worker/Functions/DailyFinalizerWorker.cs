@@ -39,7 +39,7 @@ public class DailyFinalizerWorker
 
         try
         {
-            var result = await _finalizationService.Execute(lookbackHours: 24);
+            var result = await _finalizationService.Execute();
 
             if (result.IsSuccess)
             {
