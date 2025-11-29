@@ -7,13 +7,14 @@ Heavy Weather is an end-to-end weather monitoring solution designed for scalabil
 ![Infrastructure diagram](docs/infrastructure.png)
 
 ## Modules
-|Directory|Description|
-|-|-|
+| Directory | Description |
+| - | - |
 | **cli** | Python tool (`hw`) that simulates a weather station device. |
-| **deploy/terraform** | Reusable terraform module defining azure infrastructure|
-| **deploy/IoTEventWorker** | Two Azure Functions |
-| **firmware** | PlatformIO project for the ESP32 |
-| **server** | .NET 8 backend  |
+| **deploy** | Reusable Terraform module defining Azure infrastructure. |
+| **firmware** | PlatformIO project for the ESP32. |
+| **provisioning-service** | Go service for device registration and JWT issuance. |
+| **server** | .NET 8 backend API. |
+| **telemetry-worker** | Azure Functions worker for telemetry ingestion and processing. |
 
 ## Getting started
 ...Link to physical station instructions
