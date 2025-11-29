@@ -1,4 +1,4 @@
-name: Build and deploy IoTEventWorker to Azure Function App
+name: Build and deploy TelemetryWorker to Azure Function App
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_FUNCTIONAPP_PACKAGE_PATH: 'deploy/IoTEventWorker'
+  AZURE_FUNCTIONAPP_PACKAGE_PATH: 'telemetry-worker'
   DOTNET_VERSION: '8.0'
 
 permissions:
@@ -35,14 +35,14 @@ jobs:
       - name: 'Create Release Archive'
         run: |
           cd '${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}/output'
-          zip -r ../../IoTEventWorker-${{ github.ref_name }}.zip .
+          zip -r ../../TelemetryWorker-${{ github.ref_name }}.zip .
           cd ../..
       
       - name: 'Upload to Release'
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: IoTEventWorker-${{ github.ref_name }}.zip
+          files: TelemetryWorker-${{ github.ref_name }}.zip
           generate_release_notes: true
       
       - name: Login to Azure
