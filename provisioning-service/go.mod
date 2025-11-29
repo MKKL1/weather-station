@@ -3,7 +3,7 @@ module provisioning-service
 go 1.25
 
 require (
-	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.19.1
+	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.20.0
 	github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos v1.4.1
 	github.com/bytedance/sonic v1.14.2
 	github.com/go-chi/chi/v5 v5.2.3
