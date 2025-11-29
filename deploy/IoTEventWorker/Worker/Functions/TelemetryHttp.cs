@@ -8,7 +8,7 @@ using Worker.Dto;
 using Worker.Mappers;
 using Worker.Services;
 
-namespace Worker;
+namespace Worker.Functions;
 
 public class TelemetryHttp(
     ILogger<TelemetryHttp> logger,

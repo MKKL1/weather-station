@@ -11,6 +11,7 @@ public class WeatherAggregationService(IWeatherRepository repository)
         var start = reading.Timestamp;
         var end = reading.Timestamp;
 
+        // If it's a rain reading (histogram), it might span across midnight, affecting two days.
         if (reading.RainfallVo != null)
         {
             start = reading.RainfallVo.Value.StartTime;
@@ -19,7 +20,8 @@ public class WeatherAggregationService(IWeatherRepository repository)
         
         var affectedDates = GetUniqueDays(start, end);
         
-        var foundAggregates = await repository.GetDailyBatch(reading.DeviceId, affectedDates);
+        // Updated to use the new Repository Method
+        var foundAggregates = await repository.GetManyDaily(reading.DeviceId, affectedDates);
         
         var aggregateMap = foundAggregates.ToDictionary(d => d.DayTimestamp);
         var finalAggregates = new List<DailyWeather>();
