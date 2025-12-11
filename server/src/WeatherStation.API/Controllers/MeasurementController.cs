@@ -1,8 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WeatherStation.API.Responses;
-using WeatherStation.Application.Enums;
-using WeatherStation.Application.Services;
+using WeatherStation.Core.Enums;
+using WeatherStation.Core.Services;
 using WeatherStation.Domain.Entities;
 
 namespace WeatherStation.API.Controllers;
@@ -54,7 +54,7 @@ public class MeasurementController : ControllerBase
         [FromQuery] TimeInterval interval,
         [FromQuery] IEnumerable<MetricType> metrics) //TODO: handle this by single string, to handle multiple comma separated metrics (but remember to also keep repeated parameter name logic as it works rn)
     {
-        IEnumerable<Measurement?> data;
+        IEnumerable<ReadingSnapshot?> data;
         try
         {
             data = await _measurementQueryService.GetRange(deviceId, startTime, endTime, interval, metrics);

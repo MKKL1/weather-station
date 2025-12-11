@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WeatherStation.API.Responses;
-using WeatherStation.Application.Services;
+using WeatherStation.Core.Services;
 
 namespace WeatherStation.API.Controllers;
 

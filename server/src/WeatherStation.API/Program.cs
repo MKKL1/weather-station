@@ -6,7 +6,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using WeatherStation.API.Options;
-using WeatherStation.Application.Services;
+using WeatherStation.Core.Services;
 using WeatherStation.Domain.Repositories;
 using WeatherStation.Infrastructure;
 using WeatherStation.Infrastructure.Mappers;
@@ -67,7 +67,7 @@ builder.Services.AddScoped<IDeviceMapper, DeviceMapper>();
 builder.Services.AddScoped<IDeviceService, DeviceService>();
 builder.Services.AddScoped<IDeviceRepository, DeviceRepositoryImpl>();
 builder.Services.AddScoped<IUserService, UserService>();
-builder.Services.AddScoped<IUserRepository, UserRepositoryImpl>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IMeasurementQueryService, MeasurementQueryService>();
 builder.Services.AddScoped<IInfluxDbClientFactory, InfluxDbClientFactory>(sp =>
 {

@@ -1,5 +1,5 @@
 using WeatherStation.Domain.Entities;
-using WeatherStation.Application.Enums;
+using WeatherStation.Core.Enums;
 using System.Collections.ObjectModel;
 
 namespace WeatherStation.API.Responses;
@@ -14,7 +14,7 @@ public class DataResponse
 
 
 
-    public DataResponse(string deviceId, DateTime startTime, DateTime endTime, TimeInterval interval, IEnumerable<Measurement?> measurements, IEnumerable<MetricType> requestedMetrics)
+    public DataResponse(string deviceId, DateTime startTime, DateTime endTime, TimeInterval interval, IEnumerable<ReadingSnapshot?> measurements, IEnumerable<MetricType> requestedMetrics)
     {
         DeviceId = deviceId;
         StartTime = startTime;

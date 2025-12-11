@@ -9,19 +9,19 @@ public class WeatherStationDbContext : DbContext
     {
     }
 
-    public DbSet<DeviceDao> Devices { get; set; }
-    public DbSet<UserDao> Users { get; set; }
+    public DbSet<DeviceDb> Devices { get; set; }
+    public DbSet<UserDb> Users { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
         
-        modelBuilder.Entity<DeviceDao>( e =>
+        modelBuilder.Entity<DeviceDb>( e =>
         {
             e.HasKey(d => d.Id);
             e.Property(d => d.Id).ValueGeneratedNever();
             
-            e.HasOne(d => d.UserDao)
+            e.HasOne(d => d.UserDb)
             .WithMany(u => u.Devices)
             .HasForeignKey(d => d.UserId)
             .OnDelete(DeleteBehavior.Cascade);
@@ -29,7 +29,7 @@ public class WeatherStationDbContext : DbContext
             e.HasIndex(d => d.Id).IsUnique(); //This is pretty much our PK
         });
 
-        modelBuilder.Entity<UserDao>(e =>
+        modelBuilder.Entity<UserDb>(e =>
         {
             e.HasKey(u => u.Id);
             

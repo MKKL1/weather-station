@@ -1,4 +1,6 @@
-﻿namespace WeatherStation.Domain.Entities;
+﻿using WeatherStation.Domain.ValueObjects;
+
+namespace WeatherStation.Domain.Entities;
 
 public readonly record struct Location(double Latitude, double Longitude);
 
