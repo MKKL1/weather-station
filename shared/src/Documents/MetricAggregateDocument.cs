@@ -1,7 +1,7 @@
-﻿using System.Text.Json.Serialization;
+using System.Text.Json.Serialization;
 using Newtonsoft.Json;
 
-namespace Worker.Infrastructure.Documents;
+namespace WeatherStation.Shared.Documents;
 
 public class MetricAggregateDocument
 {

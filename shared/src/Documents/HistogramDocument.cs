@@ -1,9 +1,9 @@
-﻿using System.Text.Json.Serialization;
+using System.Collections.Generic;
+using System.Text.Json.Serialization;
 using Newtonsoft.Json;
 
-namespace WeatherStation.Infrastructure.Tables;
+namespace WeatherStation.Shared.Documents;
 
-//Copied from Telemetry Worker
 public class HistogramDocument
 {
     [JsonProperty("dat")]

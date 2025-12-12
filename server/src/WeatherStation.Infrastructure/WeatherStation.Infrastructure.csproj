@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\WeatherStation.Core\WeatherStation.Core.csproj" />
+    <ProjectReference Include="..\..\..\shared\WeatherStation.Shared.csproj" />
   </ItemGroup>
 
   <ItemGroup>

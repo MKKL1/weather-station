@@ -3,6 +3,8 @@ using Microsoft.Azure.Cosmos;
 using Worker.Domain;
 using Worker.Domain.Models;
 using Worker.Dto;
+using WeatherStation.Shared.Documents;
+using WeatherStation.Shared.Cosmos;
 using Worker.Infrastructure.Documents;
 
 namespace Worker.Infrastructure;

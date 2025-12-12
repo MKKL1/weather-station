@@ -1,6 +1,7 @@
-namespace WeatherStation.Infrastructure.Cosmos;
+using System;
 
-//Copied from Telemetry Worker
+namespace WeatherStation.Shared.Cosmos;
+
 public static class IdBuilder
 {
     public static string BuildLatest(string deviceId)

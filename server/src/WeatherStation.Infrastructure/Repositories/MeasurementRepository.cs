@@ -4,7 +4,8 @@ using WeatherStation.Core.Entities;
 
 using Microsoft.Azure.Cosmos;
 using WeatherStation.Infrastructure.Cosmos;
-using WeatherStation.Infrastructure.Tables;
+using WeatherStation.Shared.Documents;
+using WeatherStation.Shared.Cosmos;
 
 namespace WeatherStation.Infrastructure.Repositories;
 

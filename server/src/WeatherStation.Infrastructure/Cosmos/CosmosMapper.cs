@@ -1,6 +1,6 @@
 using WeatherStation.Core;
 using WeatherStation.Core.Entities;
-using WeatherStation.Infrastructure.Tables;
+using WeatherStation.Shared.Documents;
 
 namespace WeatherStation.Infrastructure.Cosmos;
 
