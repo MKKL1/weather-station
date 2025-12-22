@@ -7,7 +7,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.9,<4.0"
-typer = {extras = ["rich"], version = "^0.17.4"}
+typer = {extras = ["rich"], version = ">=0.17.4,<0.21.0"}
 httpx = "^0.28.0"
 click-repl = "^0.3.0"
 
