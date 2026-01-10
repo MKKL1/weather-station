@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using WeatherStation.Infrastructure;
@@ -11,9 +12,11 @@ using WeatherStation.Infrastructure;
 namespace WeatherStation.Infrastructure.Migrations
 {
     [DbContext(typeof(WeatherStationDbContext))]
-    partial class WeatherStationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251215175817_AddClaimingFields")]
+    partial class AddClaimingFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -25,6 +28,9 @@ namespace WeatherStation.Infrastructure.Migrations
             modelBuilder.Entity("WeatherStation.Infrastructure.Tables.DeviceDb", b =>
                 {
                     b.Property<string>("Id")
+                        .HasColumnType("text");
+
+                    b.Property<string>("HmacSecret")
                         .HasColumnType("text");
 
                     b.Property<string>("Status")

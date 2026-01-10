@@ -6,4 +6,9 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <ItemGroup>
+    <PackageReference Include="BIP39-NET" Version="1.0.1" />
+    <PackageReference Include="SimpleBase" Version="5.6.0" />
+  </ItemGroup>
+
 </Project>

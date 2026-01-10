@@ -27,6 +27,9 @@ public class WeatherStationDbContext : DbContext
             .OnDelete(DeleteBehavior.Cascade);
 
             e.HasIndex(d => d.Id).IsUnique(); //This is pretty much our PK
+
+            e.Property(d => d.Status)
+                .HasConversion<string>();
         });
 
         modelBuilder.Entity<UserDb>(e =>

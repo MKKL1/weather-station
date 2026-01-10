@@ -13,9 +13,10 @@ using WeatherStation.Core;
 using Container = Microsoft.Azure.Cosmos.Container;
 using Microsoft.Extensions.Options;
 using WeatherStation.API.Options;
-
-
-//TODO program.cs is becoming polluted, it will be useful to split it into multiple files
+using WeatherStation.Infrastructure.Services;
+using WeatherStation.Infrastructure.External;
+using WeatherStation.Core.Dto;
+using WeatherStation.Core.Interfaces;
 
 DotNetEnv.Env.Load();
 
@@ -35,8 +36,6 @@ builder.Services.AddDbContext<WeatherStationDbContext>(options =>
 
 
 builder.Services.AddControllers();
-
-// builder.Services.AddOpenApi();
 
 builder.Services.AddSwaggerGen(c =>
 {
@@ -68,26 +67,16 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-// builder.Services.AddAutoMapper(_ => {}, typeof(UserMappingProfile));
-// builder.Services.AddAutoMapper(_ => { }, typeof(DeviceMappingProfile));
-
-// builder.Services.AddScoped<IDeviceMapper, DeviceMapper>();
-// builder.Services.AddScoped<IDeviceService, DeviceService>();
-// builder.Services.AddScoped<IDeviceRepository, DeviceRepositoryImpl>();
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<UserMapper>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
-// builder.Services.AddScoped<IInfluxDbClientFactory, InfluxDbClientFactory>(sp =>
-// {
-//     var opts = sp.GetRequiredService<IOptions<InfluxDbOptions>>().Value;
-//     return new InfluxDbClientFactory(opts.Url, opts.Token);
-// });
-// builder.Services.AddScoped<IMeasurementRepository, InfluxDbMeasurementRepository>(sp =>
-// {
-//     var opts = sp.GetRequiredService<IOptions<InfluxDbOptions>>().Value;
-//     var clientFactory = sp.GetRequiredService<IInfluxDbClientFactory>();
-//     return new InfluxDbMeasurementRepository(clientFactory, opts.Bucket, opts.Org);
-// });
+builder.Services.AddScoped<IDeviceRepository, DeviceRepository>();
+// builder.Services.AddScoped<DeviceClaimService>(); // Removed legacy service
+builder.Services.AddSingleton<IClaimTokenStore, InMemoryClaimTokenStore>();
+// builder.Services.AddScoped<IProvisioningServiceGateway, MockProvisioningServiceGateway>(); // Removed legacy service
+builder.Services.AddScoped<HomeDeviceClaimService>();
+builder.Services.AddScoped<ICloudGateway, MockCloudGateway>();
+
 
 builder.Services.AddOptions<CosmosDbOptions>()
     .Bind(builder.Configuration.GetSection(CosmosDbOptions.SectionName))
@@ -122,101 +111,91 @@ builder.Services.AddSingleton<Container>(sp =>
 builder.Services.AddSingleton<CosmosMapper>();
 builder.Services.AddScoped<IMeasurementRepository, MeasurementRepository>();
 builder.Services.AddScoped<MeasurementService>();
-// builder.Services.AddAuthentication(options =>
-//     {
-//         options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-//         options.DefaultChallengeScheme    = JwtBearerDefaults.AuthenticationScheme;
-//     })
-//     .AddJwtBearer(options =>
-//     {
-//         var keycloakOptions = builder.Configuration.GetSection(KeycloakOptions.SectionName).Get<KeycloakOptions>();
-//         
-//         // Fallback if options can't be bound immediately here (though they should be via DI usually, 
-//         // but Configure callback runs late. Better to use IOption injection or bind directly here).
-//         // Since we are inside AddJwtBearer lambda, we can access builder.Configuration.
-//         
-//         if (keycloakOptions == null) throw new InvalidOperationException("Keycloak configuration is missing");
-//
-//         options.Authority = keycloakOptions.Authority;
-//         options.Audience  = keycloakOptions.Audience;
-//         options.RequireHttpsMetadata = keycloakOptions.RequireHttpsMetadata;
-//         options.TokenValidationParameters = new TokenValidationParameters
-//         {
-//             RoleClaimType = keycloakOptions.RoleClaimType,
-//             NameClaimType = keycloakOptions.NameClaimType,
-//         };
-//         
-//         options.Events = new JwtBearerEvents()
-//         {
-//             OnTokenValidated = async ctx =>
-//             {
-//                 var principal = ctx.Principal!;
-//                 //TODO it should be moved in different place
-//                 //TODO check if email is verified
-//                 
-//                 //TODO on second though, we may go back to identifying by identity provider's id, but then we would have to ensure
-//                 //that migration from one idp to another is possible
-//                 
-//                 var email = principal.FindFirst(ClaimTypes.Email)?.Value;
-//                 var name = principal
-//                                .FindFirst("preferred_username")?.Value
-//                            ?? principal.FindFirst(JwtRegisteredClaimNames.Name)?.Value
-//                            ?? principal.FindFirst("name")?.Value
-//                            ?? principal.FindFirst("given_name")?.Value
-//                            ?? principal.FindFirst(ClaimTypes.Name)?.Value;
-//
-//                 if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(name))
-//                 {
-//                     //TODO log/provide user with information that something may be wrong with given token
-//                     ctx.Fail("Required claim(s) missing: email or name.");
-//                     return;
-//                 }
-//                 
-//                 var userService = ctx.HttpContext.RequestServices.GetRequiredService<UserService>();
-//                 var user = await userService.GetUserByEmail(email, ctx.HttpContext.RequestAborted);
-//                 if (user == null) 
-//                 {
-//                      //create if not exists logic was in GetOrCreateUser which might be in UserService, checking UserService content again
-//                      //Wait, UserService.cs (Step 62) has GetUserByEmail and CreateUser, but NOT GetOrCreateUser.
-//                      //The original code called GetOrCreateUser.
-//                      //I need to check if I should implement GetOrCreateUser in UserService or do it here.
-//                      //For now, let's assume I'll add GetOrCreateUser to UserService or composing it here.
-//                      //Actually, original UserService might have had it but the view_file showed it? 
-//                      //Step 62 shown: GetUserByEmail and CreateUser. It missed GetOrCreateUser.
-//                      //Wait, the original Program.cs called `GetOrCreateUser`. 
-//                      //I will implement GetOrCreateUser in UserService later if missing, or compose it here.
-//                      //Let's compose it here for safety or check UserService again.
-//                      //For now, let's just use concrete UserService and call GetUserByEmail and CreateUser.
-//                      
-//                      await userService.CreateUser(new WeatherStation.Core.Dto.CreateUserRequest(email, name), ctx.HttpContext.RequestAborted);
-//                      user = await userService.GetUserByEmail(email, ctx.HttpContext.RequestAborted);
-//                 }
-//                 
-//                 //Inject user id for further use
-//                 var idIdentity = new ClaimsIdentity();
-//                 idIdentity.AddClaim(new Claim("app_user_id", user.Id.ToString()));
-//                 principal.AddIdentity(idIdentity);
-//             }
-//         };
-//     });
+
+builder.Services.AddAuthentication(options =>
+    {
+        options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme    = JwtBearerDefaults.AuthenticationScheme;
+    })
+    .AddJwtBearer(options =>
+    {
+        var keycloakOptions = builder.Configuration.GetSection(KeycloakOptions.SectionName).Get<KeycloakOptions>();
+        
+        if (keycloakOptions == null) throw new InvalidOperationException("Keycloak configuration is missing");
+
+        options.Authority = keycloakOptions.Authority;
+        options.Audience  = keycloakOptions.Audience;
+        options.RequireHttpsMetadata = keycloakOptions.RequireHttpsMetadata;
+        
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidIssuer = options.Authority, // Ensure this matches "http://localhost:8082/realms/weather-server"
+
+            // Fix for the NEXT error (Audience):
+            ValidateAudience = true,
+            ValidAudience = options.Audience, // Ensure this matches what Keycloak sends (see step 2 below)
+
+            RoleClaimType = keycloakOptions.RoleClaimType, // usually "realm_access.roles" or "roles"
+            NameClaimType = keycloakOptions.NameClaimType, // usually "preferred_username"
+        
+            // Optional: Clock skew allowance for slight time differences between Docker/Host
+            ClockSkew = TimeSpan.Zero
+        };
+        
+        options.Events = new JwtBearerEvents()
+        {
+            OnTokenValidated = async ctx =>
+            {
+                var principal = ctx.Principal!;
+                
+                var email = principal.FindFirst(ClaimTypes.Email)?.Value;
+                var name = principal
+                               .FindFirst("preferred_username")?.Value
+                           ?? principal.FindFirst(JwtRegisteredClaimNames.Name)?.Value
+                           ?? principal.FindFirst("name")?.Value
+                           ?? principal.FindFirst("given_name")?.Value
+                           ?? principal.FindFirst(ClaimTypes.Name)?.Value;
+
+                if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(name))
+                {
+                    ctx.Fail("Required claim(s) missing: email or name.");
+                    return;
+                }
+                
+                var userService = ctx.HttpContext.RequestServices.GetRequiredService<UserService>();
+                var user = await userService.GetUserByEmail(email, ctx.HttpContext.RequestAborted);
+                if (user == null) 
+                {
+                     await userService.CreateUser(new CreateUserRequest(email, name), ctx.HttpContext.RequestAborted);
+                     user = await userService.GetUserByEmail(email, ctx.HttpContext.RequestAborted);
+                }
+                
+                var idIdentity = new ClaimsIdentity();
+                idIdentity.AddClaim(new Claim("app_user_id", user.Id.ToString()));
+                principal.AddIdentity(idIdentity);
+            }
+        };
+    });
 
 
 var app = builder.Build();
+app.UseExceptionHandler();
 
 if (app.Environment.IsDevelopment())
 {
     // app.MapOpenApi();
-    app.UseSwagger();                            // serve /swagger/v1/swagger.json
+    app.UseSwagger();
     app.UseSwaggerUI(c => {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "WeatherStation API v1");
-        c.RoutePrefix = "";                      // serve the UI at root (e.g. https://localhost:5001/)
+        c.RoutePrefix = "";
     });
 }
 
 app.UseHttpsRedirection();
 app.UseRouting();
-// app.UseAuthentication(); 
-// app.UseAuthorization();
+app.UseAuthentication(); 
+app.UseAuthorization();
 app.MapControllers();
 
 using (var scope = app.Services.CreateScope())

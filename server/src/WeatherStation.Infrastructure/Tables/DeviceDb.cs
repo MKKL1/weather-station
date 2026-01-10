@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using WeatherStation.Core.Entities;
 
 namespace WeatherStation.Infrastructure.Tables;
 
@@ -12,4 +13,6 @@ public class DeviceDb
     public string Id { get; set; } //PK
     public Guid UserId { get; set; } //FK
     public UserDb UserDb { get; set; }
+    
+    public DeviceState Status { get; set; } = DeviceState.Unclaimed;
 }
