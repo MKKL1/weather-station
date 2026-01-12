@@ -13,10 +13,8 @@ using WeatherStation.Core;
 using Container = Microsoft.Azure.Cosmos.Container;
 using Microsoft.Extensions.Options;
 using WeatherStation.API.Options;
-using WeatherStation.Infrastructure.Services;
-using WeatherStation.Infrastructure.External;
 using WeatherStation.Core.Dto;
-using WeatherStation.Core.Interfaces;
+using WeatherStation.Infrastructure.External;
 
 DotNetEnv.Env.Load();
 
@@ -71,11 +69,6 @@ builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<UserMapper>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IDeviceRepository, DeviceRepository>();
-// builder.Services.AddScoped<DeviceClaimService>(); // Removed legacy service
-builder.Services.AddSingleton<IClaimTokenStore, InMemoryClaimTokenStore>();
-// builder.Services.AddScoped<IProvisioningServiceGateway, MockProvisioningServiceGateway>(); // Removed legacy service
-builder.Services.AddScoped<HomeDeviceClaimService>();
-builder.Services.AddScoped<ICloudGateway, MockCloudGateway>();
 
 
 builder.Services.AddOptions<CosmosDbOptions>()
@@ -111,6 +104,13 @@ builder.Services.AddSingleton<Container>(sp =>
 builder.Services.AddSingleton<CosmosMapper>();
 builder.Services.AddScoped<IMeasurementRepository, MeasurementRepository>();
 builder.Services.AddScoped<MeasurementService>();
+builder.Services.AddScoped<IDeviceAuthGateway, DeviceAuthGateway>(_ => new DeviceAuthGateway());
+builder.Services.AddScoped<DeviceService>(sp => new DeviceService(sp.GetRequiredService<IDeviceRepository>()));
+builder.Services.AddScoped<DeviceAuthenticationService>(_ => new DeviceAuthenticationService());
+builder.Services.AddScoped<DeviceClaimService>(sp => new DeviceClaimService(
+    sp.GetRequiredService<IDeviceAuthGateway>(),
+    sp.GetRequiredService<DeviceAuthenticationService>(),
+    sp.GetRequiredService<IDeviceRepository>()));
 
 builder.Services.AddAuthentication(options =>
     {

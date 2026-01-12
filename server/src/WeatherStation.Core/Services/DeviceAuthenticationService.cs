@@ -7,7 +7,7 @@ public class DeviceAuthenticationService
 {
     //Handles 12 words device authentication.
     //Verifies if bip39 words form given device id (initial proof of possession)
-    public bool VerfiyDeviceIdAgainstWords(string deviceId, string words)
+    public bool VerifyDeviceIdAgainstWords(string deviceId, string words)
     {
         var seed = BIP39.GetSeedBytes(words);
         var rawHash = seed[..12];
