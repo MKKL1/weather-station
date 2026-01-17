@@ -12,6 +12,7 @@ using Microsoft.Azure.Cosmos;
 using WeatherStation.Core;
 using Container = Microsoft.Azure.Cosmos.Container;
 using Microsoft.Extensions.Options;
+using WeatherStation.API;
 using WeatherStation.API.Options;
 using WeatherStation.Core.Dto;
 using WeatherStation.Infrastructure.External;
@@ -178,9 +179,11 @@ builder.Services.AddAuthentication(options =>
         };
     });
 
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
 var app = builder.Build();
-app.UseExceptionHandler();
+app.UseExceptionHandler("/error");
+app.UseMiddleware<DomainExceptionMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {

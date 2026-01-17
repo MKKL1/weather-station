@@ -14,8 +14,13 @@ public class DeviceRepository(WeatherStationDbContext context) : IDeviceReposito
 
     public async Task Save(DeviceEntity device, CancellationToken ct)
     {
-        var entry = context.Entry(device);
-        if (entry.State == EntityState.Detached)
+        var existing = await context.Devices.FindAsync([device.Id], ct);
+        if (existing != null)
+        {
+            existing.UserId = device.OwnerId;
+            existing.Status = device.Status;
+        }
+        else
         {
             await context.Devices.AddAsync(ToDb(device), ct);
         }
