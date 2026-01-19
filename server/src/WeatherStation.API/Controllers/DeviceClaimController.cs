@@ -6,15 +6,14 @@ using WeatherStation.Core.Services;
 namespace WeatherStation.API.Controllers;
 
 [ApiController]
-[Route("api/v1/claim")]
 [Authorize]
 public class DeviceClaimController(DeviceClaimService service) : ControllerBase
 {
-    [HttpPost]
-    public async Task<ActionResult> ClaimDevice([FromBody] DeviceClaimRequest request, CancellationToken ct)
+    [HttpPost("api/v1/devices/{deviceId}/claim")]
+    public async Task<ActionResult> ClaimDevice([FromBody] ClaimDeviceRequest request, [FromRoute] string deviceId, CancellationToken ct)
     {
         var userId = User.GetUserId() ?? throw new UnauthorizedAccessException();
-        await service.ClaimDevice(userId, request, ct);
+        await service.ClaimDevice(userId, deviceId, request, ct);
         
         return Ok(new { Success = true });
     }

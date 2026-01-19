@@ -41,12 +41,12 @@ public class DeviceRepository(WeatherStationDbContext context) : IDeviceReposito
             .ToListAsync(cancellationToken: ct);
     }
 
-    private DeviceEntity ToEntity(DeviceDb deviceDb)
+    private static DeviceEntity ToEntity(DeviceDb deviceDb)
     {
         return new DeviceEntity(deviceDb.Id, deviceDb.UserId, deviceDb.Status);
     }
     
-    private DeviceDb ToDb(DeviceEntity deviceEntity)
+    private static DeviceDb ToDb(DeviceEntity deviceEntity)
     {
         return new DeviceDb
         {

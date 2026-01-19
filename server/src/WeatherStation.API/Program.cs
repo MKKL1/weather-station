@@ -168,7 +168,7 @@ builder.Services.AddAuthentication(options =>
                 var user = await userService.GetUserByEmail(email, ctx.HttpContext.RequestAborted);
                 if (user == null) 
                 {
-                     await userService.CreateUser(new CreateUserRequest(email, name), ctx.HttpContext.RequestAborted);
+                     await userService.CreateUser(new CreateUserRequest {Name = name, Email = email}, ctx.HttpContext.RequestAborted);
                      user = await userService.GetUserByEmail(email, ctx.HttpContext.RequestAborted);
                 }
                 

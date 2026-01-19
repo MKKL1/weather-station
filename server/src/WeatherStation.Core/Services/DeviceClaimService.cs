@@ -17,15 +17,15 @@ public class DeviceClaimService
         _deviceRepository = deviceRepository;
     }
 
-    public async Task ClaimDevice(Guid userId, DeviceClaimRequest request, CancellationToken ct)
+    public async Task ClaimDevice(Guid userId, string deviceId, ClaimDeviceRequest request, CancellationToken ct)
     {
-        if (!_deviceAuthService.VerifyDeviceIdAgainstWords(request.DeviceId, request.WordsKey))
+        if (!_deviceAuthService.VerifyDeviceIdAgainstWords(deviceId, request.Key))
         {
-            throw new InvalidClaimWordsException(request.DeviceId);
+            throw new InvalidClaimWordsException(deviceId);
         }
         
         var res = await _deviceAuthGateway
-            .ClaimDevice(new IDeviceAuthGateway.ClaimRequest(request.DeviceId, request.ClaimCode));
+            .ClaimDevice(new IDeviceAuthGateway.ClaimRequest(deviceId, request.ClaimCode));
         
         switch (res)
         {
@@ -34,7 +34,7 @@ public class DeviceClaimService
             case IDeviceAuthGateway.ClaimStatus.AlreadyClaimed:
                 //TODO if already claimed, we can check local database to ensure it's true
                 //for now throwing already claimed exception
-                throw new DeviceAlreadyClaimedByOtherException(request.DeviceId);
+                throw new DeviceAlreadyClaimedByOtherException(deviceId);
             case IDeviceAuthGateway.ClaimStatus.Success:
                 break;
             default:
@@ -42,20 +42,20 @@ public class DeviceClaimService
         }
         
         //first let's check if it's already claimed
-        var device = await _deviceRepository.GetById(request.DeviceId, ct);
+        var device = await _deviceRepository.GetById(deviceId, ct);
         
         //device can be null at this point (it will be created in local database
         if (device != null && device.Status == DeviceState.Claimed)
         {
             if (device.OwnerId == userId)
             {
-                throw new DeviceAlreadyClaimedBySelfException(request.DeviceId);
+                throw new DeviceAlreadyClaimedBySelfException(deviceId);
             }
-            throw new DeviceAlreadyClaimedByOtherException(request.DeviceId);
+            throw new DeviceAlreadyClaimedByOtherException(deviceId);
         }
         
         //create from provided device id (VerifyDeviceIdAgainstWords ensures it's valid)
-        device ??= new DeviceEntity(request.DeviceId, userId, DeviceState.Claimed);
+        device ??= new DeviceEntity(deviceId, userId, DeviceState.Claimed);
 
         device.OwnerId = userId;
         await _deviceRepository.Save(device, ct);

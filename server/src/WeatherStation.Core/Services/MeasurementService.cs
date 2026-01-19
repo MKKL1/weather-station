@@ -1,36 +1,54 @@
 using WeatherStation.Core.Dto;
 using WeatherStation.Core.Entities;
+using WeatherStation.Core.Exceptions;
 
 namespace WeatherStation.Core.Services;
 
-public class MeasurementService(IMeasurementRepository repo)
+public class MeasurementService
 {
-    /// <summary>
-    /// Gets the single most recent reading (for the "Current Status" card).
-    /// </summary>
-    public async Task<MeasurementSnapshotDto?> GetLatestReading(string deviceId, CancellationToken ct)
+    private readonly IMeasurementRepository _repository;
+
+    public MeasurementService(IMeasurementRepository repository)
     {
-        var doc = await repo.GetLatest(deviceId, ct);
-        if (doc == null) return null;
-        
-        return new MeasurementSnapshotDto(
-            doc.Timestamp, 
-            doc.Temperature, 
-            doc.Humidity, 
-            doc.Pressure,
-            doc.Precipitation
-        );
+        _repository = repository;
     }
 
-    /// <summary>
-    /// Gets historical data flattened for charting (e.g. "Last 7 Days").
-    /// Handles the logic of stitching multiple Daily documents together.
-    /// </summary>
-    public Task<IEnumerable<MeasurementSnapshotDto>> GetHistory(
-        string deviceId,
-        HistoryRequest request,
-        CancellationToken ct)
+    public async Task<MeasurementSnapshotResponse> GetLatest(Guid userId, string deviceId, CancellationToken ct)
     {
-        throw new NotImplementedException();
+        //Can user access device?
+        
+        var entity = await _repository.GetLatest(deviceId, ct);
+        if (entity == null)
+        {
+            //I decided to throw an error instead of providing default values to prevent caching of invalid data
+            throw new MeasurementNotFound();
+        }
+
+        return ToDto(entity);
+    }
+
+    public async Task<MeasurementHistoryResponse> GetHistory(Guid userId, string deviceId, CancellationToken ct)
+    {
+        var entity = 
+    }
+
+    public MeasurementSnapshotResponse ToDto(WeatherReadingEntity entity)
+    {
+        var rainResponse = entity.Precipitation == null
+            ? null
+            : new RainReadingResponse(
+                entity.Precipitation.StartTime,
+                entity.Precipitation.IntervalSeconds,
+                entity.Precipitation.SlotCount,
+                entity.Precipitation.Data);
+
+        return new MeasurementSnapshotResponse(
+            entity.Timestamp,
+            new Measurements(
+                entity.Temperature,
+                entity.Humidity,
+                entity.Pressure,
+                rainResponse)
+            );
     }
 }

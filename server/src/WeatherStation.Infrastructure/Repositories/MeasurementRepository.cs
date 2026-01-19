@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using WeatherStation.Core;
 using WeatherStation.Core.Entities;
@@ -26,8 +27,29 @@ public class MeasurementRepository(Container viewContainer, CosmosMapper mapper)
         }
     }
 
-    public Task<IEnumerable<DailyWeatherEntity>> GetRange(string deviceId, DateTime requestStart, DateTime requestEnd, CancellationToken ct)
+    public async Task<IEnumerable<DailyWeatherEntity>> GetRange(string deviceId, DateTime requestStart, DateTime requestEnd, CancellationToken ct)
     {
-        throw new NotImplementedException();
+        var partitionKey = new PartitionKey(deviceId);
+        var itemsToFetch = Enumerable.Range(0, requestEnd.Subtract(requestStart).Days + 1)
+            .Select(offset => requestStart.AddDays(offset))
+            .Select(day => GetIsoWeek(day))
+            .Select(x => IdBuilder.BuildWeekly(deviceId, x.Year, x.Week))
+            .Select(id => (id, partitionKey))
+            .ToList();
+        
+        try
+        {
+            var items = await viewContainer.ReadManyItemsAsync<DailyWeatherDocument>(itemsToFetch, null, ct);
+            return items == null ? [] : items.Select(mapper.ToEntity);
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            return [];
+        }
+    }
+    
+    private static (int Year, int Week) GetIsoWeek(DateTimeOffset date)
+    {
+        return (ISOWeek.GetYear(date.DateTime), ISOWeek.GetWeekOfYear(date.DateTime));
     }
 }

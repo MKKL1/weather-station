@@ -5,7 +5,7 @@ namespace WeatherStation.Core.Services;
 
 public class UserService(IUserRepository repo)
 {
-    public async Task<User?> GetUserByEmail(string email, CancellationToken ct)
+    public async Task<UserResponse?> GetUserByEmail(string email, CancellationToken ct)
     {
         var entity = await repo.GetByEmail(email, ct);
 
@@ -14,12 +14,7 @@ public class UserService(IUserRepository repo)
             return null;
         }
 
-        return new User
-        {
-            Id = entity.Id,
-            Email = entity.Email,
-            Name = entity.Name
-        };
+        return new UserResponse(entity.Id, entity.Email, entity.Name);
     }
     
     public async Task CreateUser(CreateUserRequest request, CancellationToken ct)

@@ -1,10 +1,11 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using WeatherStation.Core.Services;
 
 namespace WeatherStation.API.Controllers;
 
 [ApiController]
-[Route("api/v1/sensor/{deviceId}/data")]
+[Route("api/v1/devices/{deviceId}/measurements")]
 public class MeasurementController : ControllerBase
 {
     private readonly MeasurementService _measurementService;
@@ -13,64 +14,38 @@ public class MeasurementController : ControllerBase
     {
         _measurementService = measurementService;
     }
-
-    //TODO openapi
+    
     /// <summary>
     /// Endpoint that provides most recent data from device specified in url
     /// </summary>
-    // [Authorize]
-    [HttpGet("now")]
+    [Authorize]
+    [HttpGet("latest")]
     public async Task<IActionResult> GetDeviceSnapshot([FromRoute] string deviceId)
     {
-        var snapshot = await _measurementService.GetLatestReading(deviceId, HttpContext.RequestAborted);
-        if (snapshot is null)
+        var userId = User.GetUserId();
+        if (userId == null)
         {
-            return NotFound(new { Message = $"Snapshot for device {deviceId} not found" });
+            return Unauthorized();
         }
-        
-        return Ok(new {
-            DeviceId = deviceId,
-            snapshot.Timestamp,
-            Values = new Dictionary<string, object> {
-                { "temperature", snapshot.Temperature },
-                { "humidity", snapshot.Humidity },
-                { "pressure", snapshot.Pressure },
-                { "precipitation", snapshot.Participation }
-            }
-        });
+
+        var response = await _measurementService.GetLatest(userId.Value, deviceId, HttpContext.RequestAborted);
+        return Ok(response);
     }
 
     /// <summary>
     /// Endpoint that allows user to filter data from given device by query parameters (not raw data)
     /// </summary>
-    // [Authorize]
-    // [HttpGet("")]
-    // public async Task<IActionResult> GetMeasurementRange(
-    //     [FromRoute] string deviceId,
-    //     [FromQuery] DateTime startTime,
-    //     [FromQuery] DateTime endTime,
-    //     [FromQuery] TimeInterval interval,
-    //     [FromQuery] IEnumerable<MetricType> metrics) //TODO: handle this by single string, to handle multiple comma separated metrics (but remember to also keep repeated parameter name logic as it works rn)
-    // {
-    //     IEnumerable<ReadingSnapshot?> data;
-    //     try
-    //     {
-    //         data = await _measurementQueryService.GetRange(deviceId, startTime, endTime, interval, metrics);
-    //         
-    //         if (!data.Any())
-    //         {
-    //             return NotFound(new { Message = $"No data found for device {deviceId} in the specified range." });
-    //         }
-    //
-    //     } catch (ArgumentOutOfRangeException)
-    //     {
-    //         return BadRequest(new { Message = "Invalid time range or interval specified." });
-    //     }
-    //
-    //     var response = new DataResponse(deviceId, startTime, endTime, interval, data, metrics);
-    //
-    //     return Ok(response);
-    // }
+    [Authorize]
+    [HttpGet("history")]
+    public async Task<IActionResult> GetMeasurementRange(
+        [FromRoute] string deviceId,
+        [FromQuery] DateTime startTime,
+        [FromQuery] DateTime endTime,
+        string? granularity = "auto")
+    {
+        var response = await _measurementService.Get
+        return Ok();
+    }
 
     
 }
