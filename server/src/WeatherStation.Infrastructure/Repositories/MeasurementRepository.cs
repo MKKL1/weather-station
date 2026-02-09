@@ -27,13 +27,12 @@ public class MeasurementRepository(Container viewContainer, CosmosMapper mapper)
         }
     }
 
-    public async Task<IEnumerable<DailyWeatherEntity>> GetRange(string deviceId, DateTime requestStart, DateTime requestEnd, CancellationToken ct)
+    public async Task<IEnumerable<DailyWeatherEntity>> GetRange(string deviceId, DateTimeOffset requestStart, DateTimeOffset requestEnd, CancellationToken ct)
     {
         var partitionKey = new PartitionKey(deviceId);
         var itemsToFetch = Enumerable.Range(0, requestEnd.Subtract(requestStart).Days + 1)
             .Select(offset => requestStart.AddDays(offset))
-            .Select(day => GetIsoWeek(day))
-            .Select(x => IdBuilder.BuildWeekly(deviceId, x.Year, x.Week))
+            .Select(x => IdBuilder.BuildDaily(deviceId, x))
             .Select(id => (id, partitionKey))
             .ToList();
         
@@ -46,10 +45,5 @@ public class MeasurementRepository(Container viewContainer, CosmosMapper mapper)
         {
             return [];
         }
-    }
-    
-    private static (int Year, int Week) GetIsoWeek(DateTimeOffset date)
-    {
-        return (ISOWeek.GetYear(date.DateTime), ISOWeek.GetWeekOfYear(date.DateTime));
     }
 }

@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using WeatherStation.Core;
+using WeatherStation.Core.Dto;
 using WeatherStation.Core.Services;
 
 namespace WeatherStation.API.Controllers;
@@ -32,6 +34,7 @@ public class MeasurementController : ControllerBase
         return Ok(response);
     }
 
+    //TODO add an alias to metric type for rain
     /// <summary>
     /// Endpoint that allows user to filter data from given device by query parameters (not raw data)
     /// </summary>
@@ -39,12 +42,25 @@ public class MeasurementController : ControllerBase
     [HttpGet("history")]
     public async Task<IActionResult> GetMeasurementRange(
         [FromRoute] string deviceId,
-        [FromQuery] DateTime startTime,
-        [FromQuery] DateTime endTime,
-        string? granularity = "auto")
+        [FromQuery] GetHistoryQueryParams query)
     {
-        var response = await _measurementService.Get
-        return Ok();
+        var userId = User.GetUserId();
+        if (userId == null)
+        {
+            return Unauthorized();
+        }
+        
+        var serviceRequest = new GetHistoryRequest
+        {
+            DeviceId = deviceId,
+            Start = query.StartTime,
+            End = query.EndTime,
+            Granularity = query.Granularity,
+            Metrics = query.Metrics
+        };
+        
+        var response = await _measurementService.GetHistory(userId.Value, serviceRequest, HttpContext.RequestAborted);
+        return Ok(response);
     }
 
     
