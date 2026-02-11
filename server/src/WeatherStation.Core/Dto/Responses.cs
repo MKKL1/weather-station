@@ -42,11 +42,12 @@ public record MeasurementHistoryResponse(
     MeasurementTimeSeries TimeSeries
 );
 
+//Trading ease of use for type safety here. It could simply be a dictionary
 public record MeasurementTimeSeries(
     List<DataPoint>? Temperature,
     List<DataPoint>? Humidity,
     List<DataPoint>? Pressure,
-    List<DataPoint>? Rainfall
+    List<DataPoint>? Precipitation
 );
 
 public record DataPoint(
