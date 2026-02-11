@@ -36,9 +36,40 @@ public class MeasurementRepository(Container viewContainer, CosmosMapper mapper)
             .Select(id => (id, partitionKey))
             .ToList();
         
+        if (itemsToFetch.Count == 0) return [];
+        
         try
         {
             var items = await viewContainer.ReadManyItemsAsync<DailyWeatherDocument>(itemsToFetch, null, ct);
+            return items == null ? [] : items.Select(mapper.ToEntity);
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            return [];
+        }
+    }
+
+    public async Task<IEnumerable<WeeklyWeatherEntity>> GetWeeklyRange(string deviceId, DateTimeOffset requestStart, DateTimeOffset requestEnd, CancellationToken ct)
+    {
+        var partitionKey = new PartitionKey(deviceId);
+        var weeksToFetch = new HashSet<(int Year, int Week)>();
+        
+        for (var date = requestStart; date <= requestEnd; date = date.AddDays(1))
+        {
+            int year = ISOWeek.GetYear(date.DateTime);
+            int week = ISOWeek.GetWeekOfYear(date.DateTime);
+            weeksToFetch.Add((year, week));
+        }
+        var itemsToFetch = weeksToFetch
+            .Select(w => IdBuilder.BuildWeekly(deviceId, w.Year, w.Week)) 
+            .Select(id => (id, partitionKey))
+            .ToList();
+
+        if (itemsToFetch.Count == 0) return [];
+
+        try
+        {
+            var items = await viewContainer.ReadManyItemsAsync<WeeklyWeatherDocument>(itemsToFetch, null, ct);
             return items == null ? [] : items.Select(mapper.ToEntity);
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)

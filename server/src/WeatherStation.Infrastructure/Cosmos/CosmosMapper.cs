@@ -136,4 +136,58 @@ public class CosmosMapper
 
         return new StatSummary(min, max, avg);
     }
+    
+    public WeeklyWeatherEntity ToEntity(WeeklyWeatherDocument document)
+    {
+        return new WeeklyWeatherEntity
+        {
+            DeviceId = document.DeviceId,
+            Year = document.Year,
+            Week = document.Week,
+            Temperature = MapSummary(document.Payload.Temperature),
+            Humidity = MapSummary(document.Payload.Humidity),
+            Pressure = MapSummary(document.Payload.Pressure),
+            Precipitation = MapSummary(document.Payload.Rain),
+            Daily = MapDailyAggregates(document.Payload)
+        };
+    }
+
+    private List<DailyWeatherAggregate> MapDailyAggregates(WeeklyWeatherDocument.PayloadRecord payload)
+    {
+        var result = new List<DailyWeatherAggregate>();
+        
+        for (int i = 0; i < 7; i++)
+        {
+            var temp = payload.DailyTemperatures?.ElementAtOrDefault(i);
+            var hum = payload.DailyHumidities?.ElementAtOrDefault(i);
+            var press = payload.DailyPressures?.ElementAtOrDefault(i);
+            var rain = payload.DailyRainfall?.ElementAtOrDefault(i);
+            
+            if (temp == null && hum == null && press == null && rain == null)
+            {
+                continue;
+            }
+
+            result.Add(new DailyWeatherAggregate
+            {
+                DayIndex = i,
+                Temperature = MapSummary(temp),
+                Humidity = MapSummary(hum),
+                Pressure = MapSummary(press),
+                Precipitation = MapSummary(rain)
+            });
+        }
+
+        return result;
+    }
+    
+    private StatSummary MapSummary(StatSummaryDocument? metric)
+    {
+        if (metric == null)
+        {
+            return new StatSummary(0, 0, 0);
+        }
+
+        return new StatSummary(metric.Min, metric.Max, metric.Avg);
+    }
 }

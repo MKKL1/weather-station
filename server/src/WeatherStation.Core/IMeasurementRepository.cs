@@ -10,4 +10,8 @@ public interface IMeasurementRepository
         DateTimeOffset requestStart, 
         DateTimeOffset requestEnd, 
         CancellationToken ct);
+    Task<IEnumerable<WeeklyWeatherEntity>> GetWeeklyRange(string deviceId, 
+        DateTimeOffset requestStart,
+        DateTimeOffset requestEnd, 
+        CancellationToken ct);
 }

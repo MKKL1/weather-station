@@ -1,3 +1,4 @@
+using System.Globalization;
 using WeatherStation.Core.Dto;
 using WeatherStation.Core.Entities;
 using WeatherStation.Core.Exceptions;
@@ -37,137 +38,167 @@ public class MeasurementService
         //Check user access
         
         var end = request.End ?? DateTimeOffset.UtcNow;
-        var entities = await _repository.GetRange(
-            request.DeviceId, 
-            request.Start, 
-            end, 
-            ct);
-        
-        return MapToHistoryDto(
+        var granularity = request.Granularity == HistoryGranularity.Auto
+            ? CalculateGranularity(request.Start, end)
+            : request.Granularity;
+        var metricsToCheck = request.Metrics ?? Enum.GetValues<MetricTypes>().ToList();
+
+        if (granularity == HistoryGranularity.Weekly)
+        {
+            var data = (await _repository.GetWeeklyRange(request.DeviceId, request.Start, end, ct))
+                .OrderBy(x => x.Year)
+                .ThenBy(x => x.Week)
+                .ToList(); 
+            
+            return BuildHistoryResponse(
+                request, 
+                granularity,
+                metricsToCheck, 
+                data, 
+                MapWeeklyDataPoint
+            );
+        }
+        else
+        {
+            var data = (await _repository.GetRange(request.DeviceId, request.Start, end, ct))
+                .ToList();
+            
+            return BuildHistoryResponse(
+                request, 
+                granularity,
+                metricsToCheck, 
+                data, 
+                (entity, metric) => MapDailyOrHourlyDataPoints(entity, metric, granularity)
+            );
+        }
+    }
+
+    //Not sure if it should be private static, maybe move it to other class
+    private static HistoryGranularity CalculateGranularity(DateTimeOffset start, DateTimeOffset end)
+    {
+        var days = (end - start).Days;
+        return days switch
+        {
+            < 7 => HistoryGranularity.Hourly,
+            < 30 => HistoryGranularity.Daily,
+            _ => HistoryGranularity.Weekly
+        };
+    }
+    
+    private static MeasurementHistoryResponse BuildHistoryResponse<T>(
+        GetHistoryRequest request,
+        HistoryGranularity granularity,
+        List<MetricTypes> metrics,
+        IReadOnlyCollection<T> data, 
+        Func<T, MetricTypes, IEnumerable<DataPoint>> dataSelector)
+    {
+        return new MeasurementHistoryResponse(
             request.DeviceId,
             request.Start,
-            end,
-            request.Granularity,
-            request.Metrics,
-            entities);
-    }
-
-    private MeasurementHistoryResponse MapToHistoryDto(
-        string deviceId,
-        DateTimeOffset start,
-        DateTimeOffset end,
-        HistoryGranularity granularity,
-        List<MetricTypes>? requestedMetrics,
-        IEnumerable<DailyWeatherEntity> entities)
-    {
-        var dailyData = entities.ToList();
-        var metricsToInclude = new HashSet<MetricTypes>(requestedMetrics ?? Enum.GetValues<MetricTypes>().ToList());
-
-        return new MeasurementHistoryResponse(
-            deviceId,
-            start,
-            end,
+            request.End ?? DateTimeOffset.UtcNow,
             granularity.ToString(),
             new MeasurementTimeSeries(
-                Temperature: metricsToInclude.Contains(MetricTypes.Temperature) 
-                    ? MapStandardMetric(dailyData, granularity, d => d.Temperature, h => h.Temperature) 
-                    : null,
-                Humidity: metricsToInclude.Contains(MetricTypes.Humidity) 
-                    ? MapStandardMetric(dailyData, granularity, d => d.Humidity, h => h.Humidity) 
-                    : null,
-                Pressure: metricsToInclude.Contains(MetricTypes.Pressure) 
-                    ? MapStandardMetric(dailyData, granularity, d => d.Pressure, h => h.Pressure) 
-                    : null,
-                Rainfall: metricsToInclude.Contains(MetricTypes.Precipitation) 
-                    ? MapPrecipitationMetric(dailyData, granularity) 
-                    : null
+                Temperature: GetDataIfRequested(MetricTypes.Temperature),
+                Humidity:    GetDataIfRequested(MetricTypes.Humidity),
+                Pressure:    GetDataIfRequested(MetricTypes.Pressure),
+                Rainfall:    GetDataIfRequested(MetricTypes.Precipitation)
             )
         );
+
+        List<DataPoint>? GetDataIfRequested(MetricTypes type) => 
+            metrics.Contains(type) ? data.SelectMany(x => dataSelector(x, type)).ToList() : null;
     }
 
-    private static List<DataPoint> MapStandardMetric(
-        List<DailyWeatherEntity> entities,
-        HistoryGranularity granularity,
-        Func<DailyWeatherEntity, StatSummary> dailySelector,
-        Func<HourlyWeather, StatSummary> hourlySelector)
+    private static IEnumerable<DataPoint> MapWeeklyDataPoint(WeeklyWeatherEntity entity, MetricTypes metric)
     {
-        return granularity switch
+        var stat = metric switch
         {
-            HistoryGranularity.Hourly => MapHourlyData(entities, (day, hour) => CreateDataPoint(day.Date, hour.Hour, hourlySelector(hour))),
-            HistoryGranularity.Daily => MapDailyData(entities, day => CreateDataPoint(day.Date, dailySelector(day))),
-            _ => throw new ArgumentOutOfRangeException(nameof(granularity), granularity, "Unsupported granularity")
+            MetricTypes.Temperature => entity.Temperature,
+            MetricTypes.Humidity => entity.Humidity,
+            MetricTypes.Pressure => entity.Pressure,
+            MetricTypes.Precipitation => entity.Precipitation,
+            _ => null
         };
+
+        if (stat == null) yield break;
+        
+        var weekDate = ISOWeek.ToDateTime(entity.Year, entity.Week, DayOfWeek.Monday);
+        
+        yield return CreateDataPoint(new DateTimeOffset(weekDate, TimeSpan.Zero), stat);
     }
 
-    private static List<DataPoint> MapPrecipitationMetric(List<DailyWeatherEntity> entities, HistoryGranularity granularity)
+    private static IEnumerable<DataPoint> MapDailyOrHourlyDataPoints(DailyWeatherEntity entity, MetricTypes metric, HistoryGranularity granularity)
     {
-        return granularity switch
+        if (granularity == HistoryGranularity.Daily)
         {
-            HistoryGranularity.Hourly => MapHourlyData(entities, (day, hour) => new DataPoint(CreateTimestamp(day.Date, hour.Hour), Min: (float)hour.Precipitation, Max: (float)hour.Precipitation, Average: (float)hour.Precipitation)),
-            HistoryGranularity.Daily => MapDailyData(entities, day => CreateDataPoint(day.Date, day.Precipitation)),
-            _ => throw new ArgumentOutOfRangeException(nameof(granularity), granularity, "Unsupported granularity")
-        };
-    }
+            var stat = metric switch
+            {
+                MetricTypes.Temperature => entity.Temperature,
+                MetricTypes.Humidity => entity.Humidity,
+                MetricTypes.Pressure => entity.Pressure,
+                MetricTypes.Precipitation => entity.Precipitation,
+                _ => null
+            };
 
-    private static List<DataPoint> MapHourlyData(
-        List<DailyWeatherEntity> entities,
-        Func<DailyWeatherEntity, HourlyWeather, DataPoint> mapper)
-    {
-        return entities
-            .SelectMany(day => day.Hourly.Select(hour => mapper(day, hour)))
-            .ToList();
-    }
+            if (stat != null)
+            {
+                yield return CreateDataPoint(ToTimestamp(entity.Date), stat);
+            }
+            yield break;
+        }
+        
+        if (granularity == HistoryGranularity.Hourly)
+        {
+             foreach (var hour in entity.Hourly)
+             {
+                 var timestamp = ToTimestamp(entity.Date, hour.Hour);
+                 if (metric == MetricTypes.Precipitation)
+                 {
+                     yield return new DataPoint(timestamp, (float)hour.Precipitation, (float)hour.Precipitation, (float)hour.Precipitation);
+                     continue;
+                 }
 
-    private static List<DataPoint> MapDailyData(
-        List<DailyWeatherEntity> entities,
-        Func<DailyWeatherEntity, DataPoint> mapper)
-    {
-        return entities
-            .Select(mapper)
-            .ToList();
-    }
+                 var stat = metric switch
+                 {
+                     MetricTypes.Temperature => hour.Temperature,
+                     MetricTypes.Humidity => hour.Humidity,
+                     MetricTypes.Pressure => hour.Pressure,
+                     _ => null
+                 };
 
-    private static DataPoint CreateDataPoint(DateOnly date, StatSummary stats)
+                 if (stat != null)
+                 {
+                     yield return CreateDataPoint(timestamp, stat);
+                 }
+             }
+        }
+    }
+    
+    private static DataPoint CreateDataPoint(DateTimeOffset timestamp, StatSummary stats)
     {
         return new DataPoint(
-            CreateTimestamp(date, hour: 0),
+            timestamp,
             Min: (float)stats.Min,
             Max: (float)stats.Max,
             Average: (float)stats.Avg);
     }
-
-    private static DataPoint CreateDataPoint(DateOnly date, int hour, StatSummary stats)
-    {
-        return new DataPoint(
-            CreateTimestamp(date, hour),
-            Min: (float)stats.Min,
-            Max: (float)stats.Max,
-            Average: (float)stats.Avg);
-    }
-
-    private static DateTimeOffset CreateTimestamp(DateOnly date, int hour)
-    {
-        return new DateTimeOffset(
-            date.ToDateTime(new TimeOnly(hour, 0)), 
-            TimeSpan.Zero);
-    }
+    
+    private static DateTimeOffset ToTimestamp(DateOnly date, int hour = 0) 
+        => new(date.ToDateTime(new TimeOnly(hour, 0)), TimeSpan.Zero);
 
     private static MeasurementSnapshotResponse MapToSnapshotDto(WeatherReadingEntity entity)
     {
-        var rainfallResponse = entity.Precipitation == null
-            ? null
-            : new RainReadingResponse(
-                entity.Precipitation.StartTime,
-                entity.Precipitation.IntervalSeconds,
-                entity.Precipitation.SlotCount,
-                entity.Precipitation.Data);
-
         return new MeasurementSnapshotResponse(
             entity.Timestamp,
             new Measurements(
                 entity.Temperature,
                 entity.Humidity,
                 entity.Pressure,
-                rainfallResponse));
+                entity.Precipitation == null ? null : new RainReadingResponse(
+                    entity.Precipitation.StartTime,
+                    entity.Precipitation.IntervalSeconds,
+                    entity.Precipitation.SlotCount,
+                    entity.Precipitation.Data)
+            ));
     }
 }
