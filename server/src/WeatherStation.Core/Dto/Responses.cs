@@ -42,17 +42,48 @@ public record MeasurementHistoryResponse(
     MeasurementTimeSeries TimeSeries
 );
 
-//Trading ease of use for type safety here. It could simply be a dictionary
-public record MeasurementTimeSeries(
-    List<DataPoint>? Temperature,
-    List<DataPoint>? Humidity,
-    List<DataPoint>? Pressure,
-    List<DataPoint>? Precipitation
+public record MeasurementTimeSeries
+{
+    public required IReadOnlyList<DateTimeOffset> Timestamps { get; init; }
+    
+    public RangeMetricSeries? Temperature { get; init; }
+    public RangeMetricSeries? Humidity { get; init; }
+    public RangeMetricSeries? Pressure { get; init; }
+    public RangeMetricSeries? AirQuality { get; init; }
+    
+    public PrecipitationMetricSeries? Precipitation { get; init; }
+    
+    public WindSpeedMetricSeries? WindSpeed { get; init; }
+    public WindDirectionMetricSeries? WindDirection { get; init; }
+}
+
+public record RangeMetricSeries(
+    IReadOnlyList<double?> Min,
+    IReadOnlyList<double?> Max,
+    IReadOnlyList<double?> Avg
 );
 
-public record DataPoint(
-    DateTimeOffset Timestamp,
-    float? Min,
-    float? Max,
-    float? Average
+public record PrecipitationMetricSeries
+{
+    public required IReadOnlyList<double?> Total { get; init; }
+    public required IReadOnlyList<double?> MaxRate { get; init; }
+    public required IReadOnlyList<double?> DurationMinutes { get; init; }
+    public PrecipitationPatternSeries? Pattern { get; init; }
+}
+
+public record PrecipitationPatternSeries(
+    int IntervalMinutes,
+    IReadOnlyList<IReadOnlyList<double>?> Series
+);
+
+public record WindSpeedMetricSeries(
+    IReadOnlyList<double?> Min,
+    IReadOnlyList<double?> Max,
+    IReadOnlyList<double?> Avg,
+    IReadOnlyList<double?> Gust
+);
+
+public record WindDirectionMetricSeries(
+    IReadOnlyList<int?> Dominant,
+    IReadOnlyList<string?> Variability
 );

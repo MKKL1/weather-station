@@ -5,13 +5,10 @@ namespace WeatherStation.Core;
 
 public interface IMeasurementRepository
 {
-    Task<WeatherReadingEntity?> GetLatest(string deviceId, CancellationToken ct);
-    Task<IEnumerable<DailyWeatherEntity>> GetRange(string deviceId, 
+    Task<LatestMeasurement?> GetLatest(string deviceId, CancellationToken ct);
+    Task<IEnumerable<AggregatedMeasurement>> GetRange(string deviceId,
+        HistoryGranularity granularity,
         DateTimeOffset requestStart, 
-        DateTimeOffset requestEnd, 
-        CancellationToken ct);
-    Task<IEnumerable<WeeklyWeatherEntity>> GetWeeklyRange(string deviceId, 
-        DateTimeOffset requestStart,
         DateTimeOffset requestEnd, 
         CancellationToken ct);
 }

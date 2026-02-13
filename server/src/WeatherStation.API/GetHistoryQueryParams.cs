@@ -1,6 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
 using WeatherStation.Core;
+using WeatherStation.Core.Entities;
 
 namespace WeatherStation.API;
 
@@ -14,7 +15,7 @@ public class GetHistoryQueryParams
     public DateTimeOffset? EndTime { get; init; }
     
     [FromQuery(Name = "metrics")] 
-    public List<MetricTypes>? Metrics { get; init; }
+    public List<MetricType>? Metrics { get; init; }
     
     [FromQuery(Name = "granularity")] 
     public HistoryGranularity Granularity { get; init; } = HistoryGranularity.Auto;

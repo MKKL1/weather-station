@@ -107,7 +107,6 @@ builder.Services.AddSingleton<Container>(sp =>
     return client.GetDatabase(options.DatabaseName).GetContainer(options.ViewsContainerName);
 });
 
-builder.Services.AddSingleton<CosmosMapper>();
 builder.Services.AddScoped<IMeasurementRepository, MeasurementRepository>();
 builder.Services.AddScoped<MeasurementService>();
 builder.Services.AddScoped<IDeviceAuthGateway, DeviceAuthGateway>(_ => new DeviceAuthGateway());

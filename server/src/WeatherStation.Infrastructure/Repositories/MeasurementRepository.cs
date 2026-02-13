@@ -10,16 +10,16 @@ using WeatherStation.Shared.Cosmos;
 
 namespace WeatherStation.Infrastructure.Repositories;
 
-public class MeasurementRepository(Container viewContainer, CosmosMapper mapper): IMeasurementRepository
+public class MeasurementRepository(Container viewContainer): IMeasurementRepository
 {
-    public async Task<WeatherReadingEntity?> GetLatest(string deviceId, CancellationToken ct)
+    public async Task<LatestMeasurement?> GetLatest(string deviceId, CancellationToken ct)
     {
         try
         {
             var item = await viewContainer.ReadItemAsync<LatestWeatherDocument>(IdBuilder.BuildLatest(deviceId), 
                 new PartitionKey(deviceId), null, ct);
 
-            return item.Resource == null ? null : mapper.ToEntity(item.Resource);
+            return item.Resource == null ? null : LatestMeasurementCosmosMapper.ToEntity(item.Resource);
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
         {
@@ -27,7 +27,33 @@ public class MeasurementRepository(Container viewContainer, CosmosMapper mapper)
         }
     }
 
-    public async Task<IEnumerable<DailyWeatherEntity>> GetRange(string deviceId, DateTimeOffset requestStart, DateTimeOffset requestEnd, CancellationToken ct)
+    public Task<IEnumerable<AggregatedMeasurement>> GetRange(string deviceId,
+        HistoryGranularity granularity,
+        DateTimeOffset requestStart,
+        DateTimeOffset requestEnd,
+        CancellationToken ct)
+    {
+        //TODO for now it's simple switch, but there is big optimization possible.
+        //Weekly granularity provides daily data as well.
+        //It could be used to make large queries much more efficient.
+
+        return granularity switch
+        {
+            HistoryGranularity.Auto or HistoryGranularity.Daily => GetRange(deviceId, requestStart, requestEnd, true,
+                false, ct),
+            HistoryGranularity.Hourly => GetRange(deviceId, requestStart, requestEnd, false, true, ct),
+            HistoryGranularity.Weekly => GetWeeklyRange(deviceId, requestStart, requestEnd, true, ct),
+            _ => throw new ArgumentOutOfRangeException(nameof(granularity), granularity, null)
+        };
+    }
+
+    private async Task<IEnumerable<AggregatedMeasurement>> GetRange(
+        string deviceId, 
+        DateTimeOffset requestStart, 
+        DateTimeOffset requestEnd,
+        bool skipHourly,
+        bool skipDaily,
+        CancellationToken ct)
     {
         var partitionKey = new PartitionKey(deviceId);
         var itemsToFetch = Enumerable.Range(0, requestEnd.Subtract(requestStart).Days + 1)
@@ -41,7 +67,7 @@ public class MeasurementRepository(Container viewContainer, CosmosMapper mapper)
         try
         {
             var items = await viewContainer.ReadManyItemsAsync<DailyWeatherDocument>(itemsToFetch, null, ct);
-            return items == null ? [] : items.Select(mapper.ToEntity);
+            return items == null ? [] : items.SelectMany(x => AggregatedMeasurementCosmosMapper.ToEntity(x, skipHourly, skipDaily));
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
         {
@@ -49,7 +75,11 @@ public class MeasurementRepository(Container viewContainer, CosmosMapper mapper)
         }
     }
 
-    public async Task<IEnumerable<WeeklyWeatherEntity>> GetWeeklyRange(string deviceId, DateTimeOffset requestStart, DateTimeOffset requestEnd, CancellationToken ct)
+    private async Task<IEnumerable<AggregatedMeasurement>> GetWeeklyRange(string deviceId,
+        DateTimeOffset requestStart,
+        DateTimeOffset requestEnd,
+        bool skipDaily,
+        CancellationToken ct)
     {
         var partitionKey = new PartitionKey(deviceId);
         var weeksToFetch = new HashSet<(int Year, int Week)>();
@@ -70,7 +100,7 @@ public class MeasurementRepository(Container viewContainer, CosmosMapper mapper)
         try
         {
             var items = await viewContainer.ReadManyItemsAsync<WeeklyWeatherDocument>(itemsToFetch, null, ct);
-            return items == null ? [] : items.Select(mapper.ToEntity);
+            return items == null ? [] : items.SelectMany(x => AggregatedMeasurementCosmosMapper.ToEntity(x, skipDaily));
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
         {
