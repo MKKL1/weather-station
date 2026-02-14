@@ -1,5 +1,5 @@
 using Moq;
-using WeatherStation.Application.Services;
+using WeatherStation.Core.Services;
 using WeatherStation.Domain.Entities;
 using WeatherStation.Domain.Repositories;
 

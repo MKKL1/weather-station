@@ -147,3 +147,31 @@ resource "azurerm_api_management_api_operation_policy" "telemetry_policy" {
   xml_content = file("${path.module}/policies/telemetry.xml")
   depends_on  = [azurerm_api_management_named_value.access_token_issuer_url, null_resource.swa_deploy]
 }
+
+resource "azurerm_api_management_diagnostic" "global_diagnostics" {
+  identifier               = "applicationinsights"
+  resource_group_name      = azurerm_resource_group.project_scope.name
+  api_management_name      = azurerm_api_management.api_gateway.name
+  api_management_logger_id = azurerm_api_management_logger.apim_logger.id
+
+  verbosity = var.environment == "prod" ? "information" : "verbose"
+  http_correlation_protocol = "W3C"
+  always_log_errors = true
+  log_client_ip     = true
+  sampling_percentage = var.environment == "prod" ? 5.0 : 100.0
+
+  frontend_request {
+    body_bytes = 0
+    headers_to_log = ["User-Agent"]
+  }
+
+  backend_request {
+    body_bytes = 0
+    headers_to_log = ["traceparent"] 
+  }
+
+  backend_response {
+    body_bytes = 0
+    headers_to_log = []
+  }
+}

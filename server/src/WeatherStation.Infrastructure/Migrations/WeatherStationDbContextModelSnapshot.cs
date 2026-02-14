@@ -22,12 +22,16 @@ namespace WeatherStation.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("WeatherStation.Infrastructure.Tables.DeviceDao", b =>
+            modelBuilder.Entity("WeatherStation.Infrastructure.Tables.DeviceDb", b =>
                 {
                     b.Property<string>("Id")
                         .HasColumnType("text");
 
-                    b.Property<Guid>("UserId")
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("UserId")
                         .HasColumnType("uuid");
 
                     b.HasKey("Id");
@@ -40,15 +44,21 @@ namespace WeatherStation.Infrastructure.Migrations
                     b.ToTable("Devices");
                 });
 
-            modelBuilder.Entity("WeatherStation.Infrastructure.Tables.UserDao", b =>
+            modelBuilder.Entity("WeatherStation.Infrastructure.Tables.UserDb", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Email")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Name")
                         .IsRequired()
@@ -65,18 +75,17 @@ namespace WeatherStation.Infrastructure.Migrations
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("WeatherStation.Infrastructure.Tables.DeviceDao", b =>
+            modelBuilder.Entity("WeatherStation.Infrastructure.Tables.DeviceDb", b =>
                 {
-                    b.HasOne("WeatherStation.Infrastructure.Tables.UserDao", "UserDao")
+                    b.HasOne("WeatherStation.Infrastructure.Tables.UserDb", "UserDb")
                         .WithMany("Devices")
                         .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Cascade);
 
-                    b.Navigation("UserDao");
+                    b.Navigation("UserDb");
                 });
 
-            modelBuilder.Entity("WeatherStation.Infrastructure.Tables.UserDao", b =>
+            modelBuilder.Entity("WeatherStation.Infrastructure.Tables.UserDb", b =>
                 {
                     b.Navigation("Devices");
                 });

@@ -3,9 +3,9 @@ namespace Worker.Domain.ValueObjects;
 public readonly struct Histogram
 {
     public Dictionary<int, float> Data { get; }
-    public int IntervalSeconds { get; }
-    public DateTimeOffset StartTime { get; }
-    public int SlotCount { get;}
+                                    public int IntervalSeconds { get; }
+                                    public DateTimeOffset StartTime { get; }
+                                    public int SlotCount { get;}
     
     public Histogram(
         Dictionary<int, float> initialData, 

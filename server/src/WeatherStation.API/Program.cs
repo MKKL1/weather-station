@@ -1,47 +1,60 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
-using WeatherStation.API.Options;
-using WeatherStation.Application.Services;
-using WeatherStation.Domain.Repositories;
+using WeatherStation.Core.Services;
 using WeatherStation.Infrastructure;
-using WeatherStation.Infrastructure.Mappers;
 using WeatherStation.Infrastructure.Repositories;
-
-//TODO program.cs is becoming polluted, it will be useful to split it into multiple files
+using WeatherStation.Infrastructure.Cosmos;
+using Microsoft.Azure.Cosmos;
+using WeatherStation.Core;
+using Container = Microsoft.Azure.Cosmos.Container;
+using Microsoft.Extensions.Options;
+using WeatherStation.API;
+using WeatherStation.API.Options;
+using WeatherStation.Core.Dto;
+using WeatherStation.Infrastructure.External;
 
 DotNetEnv.Env.Load();
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Support custom environment variable for Cosmos connection string
+var cosmosConnection = Environment.GetEnvironmentVariable("COSMOS_CONNECTION");
+if (!string.IsNullOrWhiteSpace(cosmosConnection))
+{
+    builder.Configuration["CosmosDb:ConnectionString"] = cosmosConnection;
+}
 
 builder.Services.AddDbContext<WeatherStationDbContext>(options =>
 {
     options.UseNpgsql(builder.Configuration.GetConnectionString("PortainerConnection"));
 });
 
-builder.Services
-    .Configure<InfluxDbOptions>(builder.Configuration.GetSection("InfluxDb"));
 
-builder.Services.AddControllers();
-
-// builder.Services.AddOpenApi();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    });
 
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo {
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
         Title = "WeatherStation API",
         Version = "v1"
     });
-    
+
     var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     c.IncludeXmlComments(xmlPath);
-    
-    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme {
+
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
         Type = SecuritySchemeType.Http,
         Scheme = "bearer",
         BearerFormat = "JWT",
@@ -60,53 +73,90 @@ builder.Services.AddSwaggerGen(c =>
     });
 });
 
-builder.Services.AddAutoMapper(_ => {}, typeof(UserMappingProfile));
-builder.Services.AddAutoMapper(_ => { }, typeof(DeviceMappingProfile));
+builder.Services.AddScoped<UserService>();
+builder.Services.AddScoped<UserMapper>();
+builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<IDeviceRepository, DeviceRepository>();
 
-builder.Services.AddScoped<IDeviceMapper, DeviceMapper>();
-builder.Services.AddScoped<IDeviceService, DeviceService>();
-builder.Services.AddScoped<IDeviceRepository, DeviceRepositoryImpl>();
-builder.Services.AddScoped<IUserService, UserService>();
-builder.Services.AddScoped<IUserRepository, UserRepositoryImpl>();
-builder.Services.AddScoped<IMeasurementQueryService, MeasurementQueryService>();
-builder.Services.AddScoped<IInfluxDbClientFactory, InfluxDbClientFactory>(sp =>
+
+builder.Services.AddOptions<CosmosDbOptions>()
+    .Bind(builder.Configuration.GetSection(CosmosDbOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
+builder.Services.AddOptions<KeycloakOptions>()
+    .Bind(builder.Configuration.GetSection(KeycloakOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
+builder.Services.AddSingleton<CosmosClient>(sp =>
 {
-    var opts = sp.GetRequiredService<IOptions<InfluxDbOptions>>().Value;
-    return new InfluxDbClientFactory(opts.Url, opts.Token);
+    var options = sp.GetRequiredService<IOptions<CosmosDbOptions>>().Value;
+    return new CosmosClient(options.ConnectionString, new CosmosClientOptions()
+    {
+        AllowBulkExecution = true,
+        SerializerOptions = new CosmosSerializationOptions
+        {
+            PropertyNamingPolicy = CosmosPropertyNamingPolicy.CamelCase
+        }
+    });
 });
-builder.Services.AddScoped<IMeasurementRepository, InfluxDbMeasurementRepository>(sp =>
+
+builder.Services.AddSingleton<Container>(sp =>
 {
-    var opts = sp.GetRequiredService<IOptions<InfluxDbOptions>>().Value;
-    var clientFactory = sp.GetRequiredService<IInfluxDbClientFactory>();
-    return new InfluxDbMeasurementRepository(clientFactory, opts.Bucket, opts.Org);
+    var options = sp.GetRequiredService<IOptions<CosmosDbOptions>>().Value;
+    var client = sp.GetRequiredService<CosmosClient>();
+    return client.GetDatabase(options.DatabaseName).GetContainer(options.ViewsContainerName);
 });
+
+builder.Services.AddScoped<IMeasurementRepository, MeasurementRepository>();
+builder.Services.AddScoped<MeasurementService>();
+builder.Services.AddScoped<DeviceAccessValidator>(sp => new DeviceAccessValidator(sp.GetRequiredService<IDeviceRepository>()));
+builder.Services.AddScoped<IDeviceAuthGateway, DeviceAuthGateway>(_ => new DeviceAuthGateway());
+builder.Services.AddScoped<DeviceService>(sp => new DeviceService(sp.GetRequiredService<IDeviceRepository>(), sp.GetRequiredService<DeviceAccessValidator>()));
+builder.Services.AddScoped<DeviceAuthenticationService>(_ => new DeviceAuthenticationService());
+builder.Services.AddScoped<DeviceClaimService>(sp => new DeviceClaimService(
+    sp.GetRequiredService<IDeviceAuthGateway>(),
+    sp.GetRequiredService<DeviceAuthenticationService>(),
+    sp.GetRequiredService<IDeviceRepository>()));
+
 builder.Services.AddAuthentication(options =>
     {
         options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-        options.DefaultChallengeScheme    = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
     })
     .AddJwtBearer(options =>
     {
-        options.Authority = builder.Configuration["OpenIDConnectSettings:Authority"];
-        options.Audience  = "account"; //TODO it's best to change it to OpenIDConnectSettings:ClientID but it requires additional mapping inside keycloak
-        options.RequireHttpsMetadata = false;
+        var keycloakOptions = builder.Configuration.GetSection(KeycloakOptions.SectionName).Get<KeycloakOptions>();
+
+        if (keycloakOptions == null) throw new InvalidOperationException("Keycloak configuration is missing");
+
+        options.Authority = keycloakOptions.Authority;
+        options.Audience = keycloakOptions.Audience;
+        options.RequireHttpsMetadata = keycloakOptions.RequireHttpsMetadata;
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
-            RoleClaimType = "roles",
-            NameClaimType = "preferred_username",
+            ValidateIssuer = true,
+            ValidIssuer = options.Authority, // Ensure this matches "http://localhost:8082/realms/weather-server"
+
+            // Fix for the NEXT error (Audience):
+            ValidateAudience = true,
+            ValidAudience = options.Audience, // Ensure this matches what Keycloak sends (see step 2 below)
+
+            RoleClaimType = keycloakOptions.RoleClaimType, // usually "realm_access.roles" or "roles"
+            NameClaimType = keycloakOptions.NameClaimType, // usually "preferred_username"
+
+            // Optional: Clock skew allowance for slight time differences between Docker/Host
+            ClockSkew = TimeSpan.Zero
         };
-        
+
         options.Events = new JwtBearerEvents()
         {
             OnTokenValidated = async ctx =>
             {
                 var principal = ctx.Principal!;
-                //TODO it should be moved in different place
-                //TODO check if email is verified
-                
-                //TODO on second though, we may go back to identifying by identity provider's id, but then we would have to ensure
-                //that migration from one idp to another is possible
-                
+
                 var email = principal.FindFirst(ClaimTypes.Email)?.Value;
                 var name = principal
                                .FindFirst("preferred_username")?.Value
@@ -117,38 +167,45 @@ builder.Services.AddAuthentication(options =>
 
                 if (string.IsNullOrEmpty(email) || string.IsNullOrEmpty(name))
                 {
-                    //TODO log/provide user with information that something may be wrong with given token
                     ctx.Fail("Required claim(s) missing: email or name.");
                     return;
                 }
-                
-                var userService = ctx.HttpContext.RequestServices.GetRequiredService<IUserService>();
-                var user = await userService.GetOrCreateUser(email, name, ctx.HttpContext.RequestAborted);
-                
-                //TODO remove magic value
-                //Inject user id for further use
-                var idIdentity = new ClaimsIdentity([new Claim("app_user_id", user.Id.Value.ToString())]);
+
+                var userService = ctx.HttpContext.RequestServices.GetRequiredService<UserService>();
+                var user = await userService.GetUserByEmail(email, ctx.HttpContext.RequestAborted);
+                if (user == null)
+                {
+                    await userService.CreateUser(new CreateUserRequest { Name = name, Email = email }, ctx.HttpContext.RequestAborted);
+                    user = await userService.GetUserByEmail(email, ctx.HttpContext.RequestAborted);
+                }
+
+                var idIdentity = new ClaimsIdentity();
+                idIdentity.AddClaim(new Claim("app_user_id", user.Id.ToString()));
                 principal.AddIdentity(idIdentity);
             }
         };
     });
 
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
 var app = builder.Build();
+app.UseExceptionHandler("/error");
+app.UseMiddleware<DomainExceptionMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {
     // app.MapOpenApi();
-    app.UseSwagger();                            // serve /swagger/v1/swagger.json
-    app.UseSwaggerUI(c => {
+    app.UseSwagger();
+    app.UseSwaggerUI(c =>
+    {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "WeatherStation API v1");
-        c.RoutePrefix = "";                      // serve the UI at root (e.g. https://localhost:5001/)
+        c.RoutePrefix = "";
     });
 }
 
 app.UseHttpsRedirection();
 app.UseRouting();
-app.UseAuthentication(); 
+app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 

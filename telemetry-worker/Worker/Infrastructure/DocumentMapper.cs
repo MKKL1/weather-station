@@ -3,6 +3,8 @@ using Worker.Domain.Entities;
 using Worker.Domain.Models;
 using Worker.Domain.ValueObjects;
 using Worker.Dto;
+using WeatherStation.Shared.Documents;
+using WeatherStation.Shared.Cosmos;
 using Worker.Infrastructure.Documents;
 
 namespace Worker.Infrastructure;

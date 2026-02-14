@@ -1,15 +1,15 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using WeatherStation.API.Responses;
-using WeatherStation.Application.Services;
+using WeatherStation.Core.Dto;
+using WeatherStation.Core.Services;
 
 namespace WeatherStation.API.Controllers;
 
 [ApiController]
-[Route("api/v1/sensor")]
+[Route("api/v1/devices")]
 [Produces("application/json")]
 [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-public class DeviceController(IDeviceService deviceService) : ControllerBase
+public class DeviceController(DeviceService deviceService) : ControllerBase
 {
     /// <summary>
     /// Retrieves all devices owned by the authenticated user
@@ -19,24 +19,32 @@ public class DeviceController(IDeviceService deviceService) : ControllerBase
     /// <response code="401">User is not authenticated or token is invalid</response>
     [Authorize]
     [HttpGet("")]
-    [ProducesResponseType(typeof(IEnumerable<DeviceDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(IEnumerable<DeviceResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetUsersDevices()
     {
-        var guid = User.GetUserId();
-        if (guid == null)
+        var userId = User.GetUserId();
+        if (userId == null)
         {
             return Unauthorized();
         }
 
-        var devices = await deviceService.GetUserDevices(guid.Value, HttpContext.RequestAborted);
-        return Ok(devices.Select(d => new DeviceDto
+        var devices = await deviceService.GetUserDevices(userId.Value, HttpContext.RequestAborted);
+        return Ok(devices);
+    }
+
+    [Authorize]
+    [HttpGet("{deviceId}")]
+    [ProducesResponseType(typeof(DeviceResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> GetDevice([FromRoute] string deviceId)
+    {
+        var userId = User.GetUserId();
+        if (userId == null)
         {
-            Id = d.Id,
-            User = new UserDto
-            {
-                Id = d.Owner.Value
-            }
-        }));
+            return Unauthorized();
+        }
+        var devices = await deviceService.GetDevice(userId.Value, deviceId, HttpContext.RequestAborted);
+        return Ok(devices);
     }
 }
