@@ -25,7 +25,7 @@ public static class MetricStatCosmosMapper
         {
             Total = totalVolume,
             MaxRate = maxRate,
-            DurationMinutes = totalDurationSeconds,
+            DurationSeconds = totalDurationSeconds,
             Pattern = new PrecipitationPattern
             {
                 IntervalSeconds = document.SlotSecs,

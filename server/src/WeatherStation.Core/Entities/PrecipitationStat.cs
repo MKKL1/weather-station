@@ -6,7 +6,7 @@ public record PrecipitationStat
     //TODO modify weekly aggregate to fix it
     public required double? Total { get; init; }          // Volume
     public required double MaxRate { get; init; }        // Intensity
-    public required double DurationMinutes { get; init; } // Duration
+    public required double DurationSeconds { get; init; } // Duration
     
     public PrecipitationPattern? Pattern { get; init; }
 }

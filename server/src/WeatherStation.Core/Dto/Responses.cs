@@ -11,22 +11,41 @@ public record DeviceResponse(
     Guid? OwnerId
 );
 
-public record Measurements(
-    float? Temperature,
-    float? Humidity,
-    float? Pressure,
-    RainReadingResponse? Rainfall);
+public record MeasurementsResponse
+{
+    public required double? Temperature { get; init; }
+    public required double? Humidity { get; init; }
+    public required double? Pressure { get; init; }
+    public required PrecipitationStatResponse? Precipitation { get; init; }
+    public required double? AirQuality { get; init; }
+    public required double? WindSpeed { get; init; }
+    public required WindDirectionStatResponse? WindDirection { get; init; }
+}
+
+public record WindDirectionStatResponse
+{
+    public required int Dominant { get; init; }
+}
+
+public record PrecipitationStatResponse
+{
+    public required double? Total { get; init; }
+    public required double MaxRate { get; init; }
+    public required double DurationSeconds { get; init; }
+    
+    public PrecipitationPatternResponse? Pattern { get; init; }
+}
+
+public record PrecipitationPatternResponse
+{
+    public required int IntervalSeconds { get; init; }
+    public required List<double> Intensities { get; init; }
+}
 
 public record MeasurementSnapshotResponse(
+    string DeviceId,
     DateTimeOffset Timestamp,
-    Measurements Measurements
-);
-
-public record RainReadingResponse(
-    DateTimeOffset StartTime,
-    int IntervalSeconds,
-    int SlotCount,
-    Dictionary<int, float> Data
+    MeasurementsResponse Measurements
 );
 
 public record ClaimDeviceResponse(

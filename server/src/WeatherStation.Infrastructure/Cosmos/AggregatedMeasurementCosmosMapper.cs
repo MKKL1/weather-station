@@ -88,7 +88,7 @@ public static class AggregatedMeasurementCosmosMapper
                     {
                         Total = totalVolume,
                         MaxRate = maxRate,
-                        DurationMinutes = rainSlotsPerHour * payload.HourlyRain.SlotSecs / 60.0,
+                        DurationSeconds = rainSlotsPerHour * payload.HourlyRain.SlotSecs / 60.0,
                         Pattern = new PrecipitationPattern
                         {
                             IntervalSeconds = payload.HourlyRain.SlotSecs,
@@ -225,7 +225,7 @@ public static class AggregatedMeasurementCosmosMapper
         {
             Total = null,
             MaxRate = document.Max,
-            DurationMinutes = 0,
+            DurationSeconds = 0,
             Pattern = null
         };
     }

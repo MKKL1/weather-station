@@ -26,7 +26,7 @@ public class MeasurementService
             throw new MeasurementNotFound();
         }
 
-        return null; //TODO map
+        return new MeasurementSnapshotResponse(deviceId, entity.MeasurementTime, MeasurementProjector.Project(entity));
     }
 
     public async Task<MeasurementHistoryResponse> GetHistory(

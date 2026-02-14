@@ -5,6 +5,22 @@ namespace WeatherStation.Core;
 
 public static class MeasurementProjector
 {
+    public static MeasurementsResponse Project(LatestMeasurement measurement)
+    {
+        return new MeasurementsResponse
+        {
+            Temperature = measurement.Temperature,
+            Humidity = measurement.Humidity,
+            Pressure = measurement.Humidity,
+            Precipitation = measurement.Precipitation == null
+                ? null
+                : PrecipitationToResponse(measurement.Precipitation),
+            AirQuality = null,
+            WindSpeed = null,
+            WindDirection = null
+        };
+    }
+
     public static MeasurementTimeSeries Project(
         IReadOnlyList<AggregatedMeasurement> measurements,
         IReadOnlySet<MetricType>? requestedMetrics = null,
@@ -46,7 +62,7 @@ public static class MeasurementProjector
             //     : null,
         };
     }
-    
+
     private static bool ShouldInclude(
         MetricType metric,
         bool includeAll,
@@ -62,7 +78,7 @@ public static class MeasurementProjector
     }
 
     private static RangeMetricSeries ExtractRange(
-        IReadOnlyList<AggregatedMeasurement> measurements, 
+        IReadOnlyList<AggregatedMeasurement> measurements,
         Func<AggregatedMeasurement, RangeStat?> selector)
     {
         var min = new double?[measurements.Count];
@@ -81,13 +97,13 @@ public static class MeasurementProjector
     }
 
     private static PrecipitationMetricSeries ExtractPrecipitation(
-        IReadOnlyList<AggregatedMeasurement> measurements, 
+        IReadOnlyList<AggregatedMeasurement> measurements,
         bool includePatterns)
     {
         var total = new double?[measurements.Count];
         var maxRate = new double?[measurements.Count];
         var durationMinutes = new double?[measurements.Count];
-        
+
         int? patternInterval = null;
         IReadOnlyList<double>?[]? patternSeries = null;
 
@@ -96,11 +112,11 @@ public static class MeasurementProjector
             var stat = measurements[i].Precipitation;
             total[i] = stat?.Total;
             maxRate[i] = stat?.MaxRate;
-            durationMinutes[i] = stat?.DurationMinutes;
+            durationMinutes[i] = stat?.DurationSeconds;
 
-            if (!includePatterns || stat?.Pattern is null) 
+            if (!includePatterns || stat?.Pattern is null)
                 continue;
-            
+
             if (patternSeries is null)
             {
                 patternInterval = stat.Pattern.IntervalSeconds;
@@ -122,7 +138,7 @@ public static class MeasurementProjector
     }
 
     private static WindSpeedMetricSeries ExtractWindSpeed(
-        IReadOnlyList<AggregatedMeasurement> measurements, 
+        IReadOnlyList<AggregatedMeasurement> measurements,
         Func<AggregatedMeasurement, WindSpeedStat?> selector)
     {
         var min = new double?[measurements.Count];
@@ -158,4 +174,21 @@ public static class MeasurementProjector
     //
     //     return new WindDirectionMetricSeries(dominant, variability);
     // }
+
+    private static PrecipitationStatResponse PrecipitationToResponse(PrecipitationStat stat)
+    {
+        var pattern = stat.Pattern;
+        return new PrecipitationStatResponse
+        {
+            Total = stat.Total,
+            MaxRate = stat.MaxRate,
+            DurationSeconds = stat.DurationSeconds,
+            Pattern = pattern == null ? null : new PrecipitationPatternResponse
+            {
+                IntervalSeconds = pattern.IntervalSeconds,
+                Intensities = pattern.Intensities
+            }
+        };
+    }
+
 }
