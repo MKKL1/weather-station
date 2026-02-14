@@ -27,32 +27,65 @@ public class MeasurementRepository(Container viewContainer): IMeasurementReposit
         }
     }
 
+    /// <summary>
+    /// Minimum day count at which daily requests switch to fetching weekly documents.
+    /// </summary>
+    private const int WeeklyFetchThreshold = 7;
+
     public Task<IEnumerable<AggregatedMeasurement>> GetRange(string deviceId,
         HistoryGranularity granularity,
         DateTimeOffset requestStart,
         DateTimeOffset requestEnd,
         CancellationToken ct)
     {
-        //TODO for now it's simple switch, but there is big optimization possible.
-        //Weekly granularity provides daily data as well.
-        //It could be used to make large queries much more efficient.
-
         return granularity switch
         {
-            HistoryGranularity.Auto or HistoryGranularity.Daily => GetRange(deviceId, requestStart, requestEnd, true,
-                false, ct),
-            HistoryGranularity.Hourly => GetRange(deviceId, requestStart, requestEnd, false, true, ct),
-            HistoryGranularity.Weekly => GetWeeklyRange(deviceId, requestStart, requestEnd, true, ct),
+            HistoryGranularity.Auto or HistoryGranularity.Daily
+                => GetDailyRange(deviceId, requestStart, requestEnd, ct),
+            HistoryGranularity.Hourly
+                => GetHourlyRange(deviceId, requestStart, requestEnd, ct),
+            HistoryGranularity.Weekly
+                => GetWeeklyRange(deviceId, requestStart, requestEnd, skipDaily: true, ct),
             _ => throw new ArgumentOutOfRangeException(nameof(granularity), granularity, null)
         };
     }
 
-    private async Task<IEnumerable<AggregatedMeasurement>> GetRange(
-        string deviceId, 
-        DateTimeOffset requestStart, 
+    public async Task<IEnumerable<AggregatedMeasurement>> GetDailyRange(
+        string deviceId,
+        DateTimeOffset requestStart,
         DateTimeOffset requestEnd,
-        bool skipHourly,
-        bool skipDaily,
+        CancellationToken ct)
+    {
+        var dayCount = requestEnd.Subtract(requestStart).Days + 1;
+        var currentWeekStart = GetCurrentIsoWeekStart();
+        
+        if (dayCount < WeeklyFetchThreshold || requestStart >= currentWeekStart)
+            return await GetDailyFromDailyDocuments(deviceId, requestStart, requestEnd, ct);
+        
+        if (requestEnd < currentWeekStart)
+            return await GetDailyFromWeeklyDocuments(deviceId, requestStart, requestEnd, ct);
+        
+        var pastRangeEnd = currentWeekStart.AddTicks(-1);
+
+        var pastWeeklyTask = GetDailyFromWeeklyDocuments(deviceId, requestStart, pastRangeEnd, ct);
+        var currentDailyTask = GetDailyFromDailyDocuments(deviceId, currentWeekStart, requestEnd, ct);
+
+        var results = await Task.WhenAll(pastWeeklyTask, currentDailyTask);
+        return results.SelectMany(x => x);
+    }
+
+    private static DateTimeOffset GetCurrentIsoWeekStart()
+    {
+        var today = DateTimeOffset.UtcNow.DateTime;
+        var year = ISOWeek.GetYear(today);
+        var week = ISOWeek.GetWeekOfYear(today);
+        return new DateTimeOffset(ISOWeek.ToDateTime(year, week, DayOfWeek.Monday), TimeSpan.Zero);
+    }
+
+    public async Task<IEnumerable<AggregatedMeasurement>> GetDailyFromDailyDocuments(
+        string deviceId,
+        DateTimeOffset requestStart,
+        DateTimeOffset requestEnd,
         CancellationToken ct)
     {
         var partitionKey = new PartitionKey(deviceId);
@@ -67,7 +100,9 @@ public class MeasurementRepository(Container viewContainer): IMeasurementReposit
         try
         {
             var items = await viewContainer.ReadManyItemsAsync<DailyWeatherDocument>(itemsToFetch, null, ct);
-            return items == null ? [] : items.SelectMany(x => AggregatedMeasurementCosmosMapper.ToEntity(x, skipHourly, skipDaily));
+            return items == null
+                ? []
+                : items.SelectMany(x => AggregatedMeasurementCosmosMapper.ToEntity(x, skipHourly: true, skipDaily: false));
         }
         catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
         {
@@ -75,7 +110,51 @@ public class MeasurementRepository(Container viewContainer): IMeasurementReposit
         }
     }
 
-    private async Task<IEnumerable<AggregatedMeasurement>> GetWeeklyRange(string deviceId,
+    public async Task<IEnumerable<AggregatedMeasurement>> GetDailyFromWeeklyDocuments(
+        string deviceId,
+        DateTimeOffset requestStart,
+        DateTimeOffset requestEnd,
+        CancellationToken ct)
+    {
+        var allData = await GetWeeklyRange(deviceId, requestStart, requestEnd, skipDaily: false, ct);
+
+        var startDate = requestStart.UtcDateTime.Date;
+        var endDate = requestEnd.UtcDateTime.Date;
+
+        return allData
+            .Where(m => m.Granularity == HistoryGranularity.Daily)
+            .Where(m => m.StartTime.UtcDateTime.Date >= startDate && m.StartTime.UtcDateTime.Date <= endDate);
+    }
+
+    public async Task<IEnumerable<AggregatedMeasurement>> GetHourlyRange(
+        string deviceId,
+        DateTimeOffset requestStart,
+        DateTimeOffset requestEnd,
+        CancellationToken ct)
+    {
+        var partitionKey = new PartitionKey(deviceId);
+        var itemsToFetch = Enumerable.Range(0, requestEnd.Subtract(requestStart).Days + 1)
+            .Select(offset => requestStart.AddDays(offset))
+            .Select(x => IdBuilder.BuildDaily(deviceId, x))
+            .Select(id => (id, partitionKey))
+            .ToList();
+        
+        if (itemsToFetch.Count == 0) return [];
+        
+        try
+        {
+            var items = await viewContainer.ReadManyItemsAsync<DailyWeatherDocument>(itemsToFetch, null, ct);
+            return items == null
+                ? []
+                : items.SelectMany(x => AggregatedMeasurementCosmosMapper.ToEntity(x, skipHourly: false, skipDaily: true));
+        }
+        catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            return [];
+        }
+    }
+
+    public async Task<IEnumerable<AggregatedMeasurement>> GetWeeklyRange(string deviceId,
         DateTimeOffset requestStart,
         DateTimeOffset requestEnd,
         bool skipDaily,
