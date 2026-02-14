@@ -4,40 +4,27 @@ using WeatherStation.Core.Exceptions;
 
 namespace WeatherStation.Core.Services;
 
-public class DeviceService
+public class DeviceService(IDeviceRepository deviceRepository, DeviceAccessValidator deviceAccessValidator)
 {
-    private readonly IDeviceRepository _deviceRepository;
-
-    public DeviceService(IDeviceRepository deviceRepository)
-    {
-        _deviceRepository = deviceRepository;
-    }
-
     public async Task<IEnumerable<DeviceResponse>> GetUserDevices(Guid userId, CancellationToken ct)
     {
-        var entities = await _deviceRepository.GetByOwnerId(userId, ct);
+        var entities = await deviceRepository.GetByOwnerId(userId, ct);
         return entities.Select(ToDto);
     }
     
     public async Task<DeviceResponse> GetDevice(Guid userId, string deviceId, CancellationToken ct)
     {
-        var entity = await _deviceRepository.GetById(deviceId, ct);
+        await deviceAccessValidator.ValidateAccess(userId, deviceId, ct);
         
+        var entity = await deviceRepository.GetById(deviceId, ct);
         if (entity == null)
         {
             throw new DeviceNotFoundException(deviceId);
         }
-        
-        //Can access this device?
-        if (entity.OwnerId != userId)
-        {
-            throw new DeviceAccessDeniedException(deviceId);
-        }
-
         return ToDto(entity);
     }
 
-    public DeviceResponse ToDto(DeviceEntity entity)
+    private static DeviceResponse ToDto(DeviceEntity entity)
     {
         return new DeviceResponse(entity.Id, entity.OwnerId);
     }

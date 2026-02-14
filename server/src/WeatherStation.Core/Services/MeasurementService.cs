@@ -5,22 +5,17 @@ using WeatherStation.Core.Exceptions;
 
 namespace WeatherStation.Core.Services;
 
-public class MeasurementService
+public class MeasurementService(IMeasurementRepository repository, DeviceAccessValidator deviceAccessValidator)
 {
-    private readonly IMeasurementRepository _repository;
-
-    public MeasurementService(
-        IMeasurementRepository repository)
-    {
-        _repository = repository;
-    }
 
     public async Task<MeasurementSnapshotResponse> GetLatest(
         Guid userId, 
         string deviceId, 
         CancellationToken ct)
     {
-        var entity = await _repository.GetLatest(deviceId, ct);
+        await deviceAccessValidator.ValidateAccess(userId, deviceId, ct);
+        
+        var entity = await repository.GetLatest(deviceId, ct);
         if (entity == null)
         {
             throw new MeasurementNotFound();
@@ -34,7 +29,7 @@ public class MeasurementService
         GetHistoryRequest request, 
         CancellationToken ct)
     {
-        //Check user access
+        await deviceAccessValidator.ValidateAccess(userId, request.DeviceId, ct);
         
         var end = request.End ?? DateTimeOffset.UtcNow;
         var granularity = request.Granularity == HistoryGranularity.Auto
@@ -48,7 +43,7 @@ public class MeasurementService
             throw new ArgumentException("Auto granularity should have been resolved before this point");
         }
 
-        var data = await _repository.GetRange(request.DeviceId, granularity, request.Start, end, ct);
+        var data = await repository.GetRange(request.DeviceId, granularity, request.Start, end, ct);
         var includeRainPatterns = granularity == HistoryGranularity.Hourly;
         var timeSeries = MeasurementProjector.Project(data.ToList(), metrics, includeRainPatterns);
         

@@ -109,8 +109,9 @@ builder.Services.AddSingleton<Container>(sp =>
 
 builder.Services.AddScoped<IMeasurementRepository, MeasurementRepository>();
 builder.Services.AddScoped<MeasurementService>();
+builder.Services.AddScoped<DeviceAccessValidator>(sp => new DeviceAccessValidator(sp.GetRequiredService<IDeviceRepository>()));
 builder.Services.AddScoped<IDeviceAuthGateway, DeviceAuthGateway>(_ => new DeviceAuthGateway());
-builder.Services.AddScoped<DeviceService>(sp => new DeviceService(sp.GetRequiredService<IDeviceRepository>()));
+builder.Services.AddScoped<DeviceService>(sp => new DeviceService(sp.GetRequiredService<IDeviceRepository>(), sp.GetRequiredService<DeviceAccessValidator>()));
 builder.Services.AddScoped<DeviceAuthenticationService>(_ => new DeviceAuthenticationService());
 builder.Services.AddScoped<DeviceClaimService>(sp => new DeviceClaimService(
     sp.GetRequiredService<IDeviceAuthGateway>(),
