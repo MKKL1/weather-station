@@ -28,11 +28,11 @@ public class WeeklyWeatherDocument
     [JsonProperty("dat")]
     [JsonPropertyName("dat")]
     public required PayloadRecord Payload { get; set; }
-    
+
     [JsonProperty("ttl")]
     [JsonPropertyName("ttl")]
     public int Ttl { get; set; } = -1;
-    
+
     [JsonProperty("_etag")]
     [JsonPropertyName("_etag")]
     public string? ETag { get; set; }
@@ -54,7 +54,7 @@ public class WeeklyWeatherDocument
         [JsonProperty("drain")]
         [JsonPropertyName("drain")]
         public StatSummaryDocument?[] DailyRainfall { get; set; } = new StatSummaryDocument?[7];
-        
+
         [JsonProperty("tmp")]
         [JsonPropertyName("tmp")]
         public StatSummaryDocument? Temperature { get; set; }

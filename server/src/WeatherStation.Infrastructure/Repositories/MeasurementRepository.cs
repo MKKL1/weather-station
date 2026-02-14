@@ -10,13 +10,13 @@ using WeatherStation.Shared.Cosmos;
 
 namespace WeatherStation.Infrastructure.Repositories;
 
-public class MeasurementRepository(Container viewContainer): IMeasurementRepository
+public class MeasurementRepository(Container viewContainer) : IMeasurementRepository
 {
     public async Task<LatestMeasurement?> GetLatest(string deviceId, CancellationToken ct)
     {
         try
         {
-            var item = await viewContainer.ReadItemAsync<LatestWeatherDocument>(IdBuilder.BuildLatest(deviceId), 
+            var item = await viewContainer.ReadItemAsync<LatestWeatherDocument>(IdBuilder.BuildLatest(deviceId),
                 new PartitionKey(deviceId), null, ct);
 
             return item.Resource == null ? null : LatestMeasurementCosmosMapper.ToEntity(item.Resource);
@@ -58,13 +58,13 @@ public class MeasurementRepository(Container viewContainer): IMeasurementReposit
     {
         var dayCount = requestEnd.Subtract(requestStart).Days + 1;
         var currentWeekStart = GetCurrentIsoWeekStart();
-        
+
         if (dayCount < WeeklyFetchThreshold || requestStart >= currentWeekStart)
             return await GetDailyFromDailyDocuments(deviceId, requestStart, requestEnd, ct);
-        
+
         if (requestEnd < currentWeekStart)
             return await GetDailyFromWeeklyDocuments(deviceId, requestStart, requestEnd, ct);
-        
+
         var pastRangeEnd = currentWeekStart.AddTicks(-1);
 
         var pastWeeklyTask = GetDailyFromWeeklyDocuments(deviceId, requestStart, pastRangeEnd, ct);
@@ -94,9 +94,9 @@ public class MeasurementRepository(Container viewContainer): IMeasurementReposit
             .Select(x => IdBuilder.BuildDaily(deviceId, x))
             .Select(id => (id, partitionKey))
             .ToList();
-        
+
         if (itemsToFetch.Count == 0) return [];
-        
+
         try
         {
             var items = await viewContainer.ReadManyItemsAsync<DailyWeatherDocument>(itemsToFetch, null, ct);
@@ -138,9 +138,9 @@ public class MeasurementRepository(Container viewContainer): IMeasurementReposit
             .Select(x => IdBuilder.BuildDaily(deviceId, x))
             .Select(id => (id, partitionKey))
             .ToList();
-        
+
         if (itemsToFetch.Count == 0) return [];
-        
+
         try
         {
             var items = await viewContainer.ReadManyItemsAsync<DailyWeatherDocument>(itemsToFetch, null, ct);
@@ -162,7 +162,7 @@ public class MeasurementRepository(Container viewContainer): IMeasurementReposit
     {
         var partitionKey = new PartitionKey(deviceId);
         var weeksToFetch = new HashSet<(int Year, int Week)>();
-        
+
         for (var date = requestStart; date <= requestEnd; date = date.AddDays(1))
         {
             int year = ISOWeek.GetYear(date.DateTime);
@@ -170,7 +170,7 @@ public class MeasurementRepository(Container viewContainer): IMeasurementReposit
             weeksToFetch.Add((year, week));
         }
         var itemsToFetch = weeksToFetch
-            .Select(w => IdBuilder.BuildWeekly(deviceId, w.Year, w.Week)) 
+            .Select(w => IdBuilder.BuildWeekly(deviceId, w.Year, w.Week))
             .Select(id => (id, partitionKey))
             .ToList();
 

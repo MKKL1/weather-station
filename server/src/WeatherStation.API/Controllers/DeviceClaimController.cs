@@ -14,7 +14,6 @@ public class DeviceClaimController(DeviceClaimService service) : ControllerBase
     {
         var userId = User.GetUserId() ?? throw new UnauthorizedAccessException();
         await service.ClaimDevice(userId, deviceId, request, ct);
-        
         return Ok(new { Success = true });
     }
 }

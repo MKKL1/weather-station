@@ -16,7 +16,7 @@ public class UserService(IUserRepository repo)
 
         return new UserResponse(entity.Id, entity.Email, entity.Name);
     }
-    
+
     public async Task CreateUser(CreateUserRequest request, CancellationToken ct)
     {
         var newUserEntity = new UserEntity
@@ -27,7 +27,7 @@ public class UserService(IUserRepository repo)
             CreatedAt = DateTime.UtcNow,
             IsActive = true
         };
-        
+
         await repo.Save(newUserEntity, ct);
     }
 }

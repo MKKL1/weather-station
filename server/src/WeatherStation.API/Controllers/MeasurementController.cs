@@ -11,12 +11,12 @@ namespace WeatherStation.API.Controllers;
 public class MeasurementController : ControllerBase
 {
     private readonly MeasurementService _measurementService;
-    
+
     public MeasurementController(MeasurementService measurementService)
     {
         _measurementService = measurementService;
     }
-    
+
     /// <summary>
     /// Endpoint that provides most recent data from device specified in url
     /// </summary>
@@ -49,7 +49,7 @@ public class MeasurementController : ControllerBase
         {
             return Unauthorized();
         }
-        
+
         var serviceRequest = new GetHistoryRequest
         {
             DeviceId = deviceId,
@@ -58,10 +58,10 @@ public class MeasurementController : ControllerBase
             Granularity = query.Granularity,
             Metrics = query.Metrics
         };
-        
+
         var response = await _measurementService.GetHistory(userId.Value, serviceRequest, HttpContext.RequestAborted);
         return Ok(response);
     }
 
-    
+
 }

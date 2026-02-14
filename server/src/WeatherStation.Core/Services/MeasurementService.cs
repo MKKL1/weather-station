@@ -9,12 +9,12 @@ public class MeasurementService(IMeasurementRepository repository, DeviceAccessV
 {
 
     public async Task<MeasurementSnapshotResponse> GetLatest(
-        Guid userId, 
-        string deviceId, 
+        Guid userId,
+        string deviceId,
         CancellationToken ct)
     {
         await deviceAccessValidator.ValidateAccess(userId, deviceId, ct);
-        
+
         var entity = await repository.GetLatest(deviceId, ct);
         if (entity == null)
         {
@@ -25,17 +25,17 @@ public class MeasurementService(IMeasurementRepository repository, DeviceAccessV
     }
 
     public async Task<MeasurementHistoryResponse> GetHistory(
-        Guid userId, 
-        GetHistoryRequest request, 
+        Guid userId,
+        GetHistoryRequest request,
         CancellationToken ct)
     {
         await deviceAccessValidator.ValidateAccess(userId, request.DeviceId, ct);
-        
+
         var end = request.End ?? DateTimeOffset.UtcNow;
         var granularity = request.Granularity == HistoryGranularity.Auto
             ? CalculateGranularity(request.Start, end)
             : request.Granularity;
-        
+
         var metrics = request.Metrics?.ToHashSet() ?? Enum.GetValues<MetricType>().ToHashSet();
 
         if (granularity == HistoryGranularity.Auto)
@@ -46,7 +46,7 @@ public class MeasurementService(IMeasurementRepository repository, DeviceAccessV
         var data = await repository.GetRange(request.DeviceId, granularity, request.Start, end, ct);
         var includeRainPatterns = granularity == HistoryGranularity.Hourly;
         var timeSeries = MeasurementProjector.Project(data.ToList(), metrics, includeRainPatterns);
-        
+
         return new MeasurementHistoryResponse(
             request.DeviceId,
             request.Start,

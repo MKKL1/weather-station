@@ -17,7 +17,7 @@ public class HistogramDocument
     [JsonProperty("sts")]
     [JsonPropertyName("sts")]
     public long StartTime { get; set; }
-    
+
     [JsonProperty("n")]
     [JsonPropertyName("n")]
     public int SlotCount { get; set; }

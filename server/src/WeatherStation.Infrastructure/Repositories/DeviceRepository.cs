@@ -45,7 +45,7 @@ public class DeviceRepository(WeatherStationDbContext context) : IDeviceReposito
     {
         return new DeviceEntity(deviceDb.Id, deviceDb.UserId, deviceDb.Status);
     }
-    
+
     private static DeviceDb ToDb(DeviceEntity deviceEntity)
     {
         return new DeviceDb

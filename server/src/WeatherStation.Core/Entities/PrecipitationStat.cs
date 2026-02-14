@@ -7,7 +7,7 @@ public record PrecipitationStat
     public required double? Total { get; init; }          // Volume
     public required double MaxRate { get; init; }        // Intensity
     public required double DurationSeconds { get; init; } // Duration
-    
+
     public PrecipitationPattern? Pattern { get; init; }
 }
 

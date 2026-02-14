@@ -10,8 +10,8 @@ public class UserRepository(WeatherStationDbContext context, UserMapper mapper) 
         var dbUser = await context.Users
             .AsNoTracking()
             .SingleOrDefaultAsync(u => u.Email == email, ct);
-        
-        return dbUser != null 
+
+        return dbUser != null
             ? mapper.ToEntity(dbUser)
             : null;
     }

@@ -11,16 +11,16 @@ public static class MetricStatCosmosMapper
         var intensities = new List<double>(document.SlotCount);
         double totalVolume = 0;
         double maxRate = 0;
-        
+
         for (var i = 0; i < document.SlotCount; i++)
         {
             var rainMm = document.Data.GetValueOrDefault(i, 0f);
-            
+
             intensities.Add(rainMm);
             totalVolume += rainMm;
             maxRate = Math.Max(maxRate, rainMm);
         }
-        
+
         return new PrecipitationStat
         {
             Total = totalVolume,
@@ -33,7 +33,7 @@ public static class MetricStatCosmosMapper
             }
         };
     }
-    
+
     public static RangeStat ToEntity(MetricAggregateDocument metric, bool isFinalized)
     {
         double avg;
@@ -56,7 +56,7 @@ public static class MetricStatCosmosMapper
             Avg = avg
         };
     }
-    
+
     public static RangeStat ToEntity(StatSummaryDocument metric)
     {
         return new RangeStat

@@ -10,7 +10,7 @@ public class UserDb
     //We may have to provide a setting that allows to identify by different email if they are not unique (not top priority)
     public required string Email { get; set; }
     public required string Name { get; set; }
-    public required DateTime CreatedAt { get; set; } 
+    public required DateTime CreatedAt { get; set; }
     public required bool IsActive { get; set; }
     public ICollection<DeviceDb> Devices { get; set; } = new List<DeviceDb>();
 }

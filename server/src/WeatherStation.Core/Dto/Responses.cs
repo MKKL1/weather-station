@@ -32,7 +32,7 @@ public record PrecipitationStatResponse
     public required double? Total { get; init; }
     public required double MaxRate { get; init; }
     public required double DurationSeconds { get; init; }
-    
+
     public PrecipitationPatternResponse? Pattern { get; init; }
 }
 
@@ -64,14 +64,14 @@ public record MeasurementHistoryResponse(
 public record MeasurementTimeSeries
 {
     public required IReadOnlyList<DateTimeOffset> Timestamps { get; init; }
-    
+
     public RangeMetricSeries? Temperature { get; init; }
     public RangeMetricSeries? Humidity { get; init; }
     public RangeMetricSeries? Pressure { get; init; }
     public RangeMetricSeries? AirQuality { get; init; }
-    
+
     public PrecipitationMetricSeries? Precipitation { get; init; }
-    
+
     public WindSpeedMetricSeries? WindSpeed { get; init; }
     public WindDirectionMetricSeries? WindDirection { get; init; }
 }

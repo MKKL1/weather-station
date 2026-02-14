@@ -11,14 +11,14 @@ public class GlobalExceptionHandler : IExceptionHandler
         var errorCode = "INTERNAL_SERVER_ERROR";
         var message = "An unhandled exception has occurred while executing the request";
         var statusCode = StatusCodes.Status500InternalServerError;
-        
+
         if (exception is DomainException domainEx)
         {
             errorCode = domainEx.ErrorCode;
             message = domainEx.Message;
             statusCode = StatusCodes.Status400BadRequest;
         }
-        
+
         var response = new
         {
             Success = success,

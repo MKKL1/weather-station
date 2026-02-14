@@ -36,23 +36,25 @@ builder.Services.AddDbContext<WeatherStationDbContext>(options =>
 
 
 builder.Services.AddControllers()
-    .AddJsonOptions(options => 
+    .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
 
 builder.Services.AddSwaggerGen(c =>
 {
-    c.SwaggerDoc("v1", new OpenApiInfo {
+    c.SwaggerDoc("v1", new OpenApiInfo
+    {
         Title = "WeatherStation API",
         Version = "v1"
     });
-    
+
     var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
     c.IncludeXmlComments(xmlPath);
-    
-    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme {
+
+    c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
+    {
         Type = SecuritySchemeType.Http,
         Scheme = "bearer",
         BearerFormat = "JWT",
@@ -121,18 +123,18 @@ builder.Services.AddScoped<DeviceClaimService>(sp => new DeviceClaimService(
 builder.Services.AddAuthentication(options =>
     {
         options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-        options.DefaultChallengeScheme    = JwtBearerDefaults.AuthenticationScheme;
+        options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
     })
     .AddJwtBearer(options =>
     {
         var keycloakOptions = builder.Configuration.GetSection(KeycloakOptions.SectionName).Get<KeycloakOptions>();
-        
+
         if (keycloakOptions == null) throw new InvalidOperationException("Keycloak configuration is missing");
 
         options.Authority = keycloakOptions.Authority;
-        options.Audience  = keycloakOptions.Audience;
+        options.Audience = keycloakOptions.Audience;
         options.RequireHttpsMetadata = keycloakOptions.RequireHttpsMetadata;
-        
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -144,17 +146,17 @@ builder.Services.AddAuthentication(options =>
 
             RoleClaimType = keycloakOptions.RoleClaimType, // usually "realm_access.roles" or "roles"
             NameClaimType = keycloakOptions.NameClaimType, // usually "preferred_username"
-        
+
             // Optional: Clock skew allowance for slight time differences between Docker/Host
             ClockSkew = TimeSpan.Zero
         };
-        
+
         options.Events = new JwtBearerEvents()
         {
             OnTokenValidated = async ctx =>
             {
                 var principal = ctx.Principal!;
-                
+
                 var email = principal.FindFirst(ClaimTypes.Email)?.Value;
                 var name = principal
                                .FindFirst("preferred_username")?.Value
@@ -168,15 +170,15 @@ builder.Services.AddAuthentication(options =>
                     ctx.Fail("Required claim(s) missing: email or name.");
                     return;
                 }
-                
+
                 var userService = ctx.HttpContext.RequestServices.GetRequiredService<UserService>();
                 var user = await userService.GetUserByEmail(email, ctx.HttpContext.RequestAborted);
-                if (user == null) 
+                if (user == null)
                 {
-                     await userService.CreateUser(new CreateUserRequest {Name = name, Email = email}, ctx.HttpContext.RequestAborted);
-                     user = await userService.GetUserByEmail(email, ctx.HttpContext.RequestAborted);
+                    await userService.CreateUser(new CreateUserRequest { Name = name, Email = email }, ctx.HttpContext.RequestAborted);
+                    user = await userService.GetUserByEmail(email, ctx.HttpContext.RequestAborted);
                 }
-                
+
                 var idIdentity = new ClaimsIdentity();
                 idIdentity.AddClaim(new Claim("app_user_id", user.Id.ToString()));
                 principal.AddIdentity(idIdentity);
@@ -194,7 +196,8 @@ if (app.Environment.IsDevelopment())
 {
     // app.MapOpenApi();
     app.UseSwagger();
-    app.UseSwaggerUI(c => {
+    app.UseSwaggerUI(c =>
+    {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "WeatherStation API v1");
         c.RoutePrefix = "";
     });
@@ -202,7 +205,7 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseRouting();
-app.UseAuthentication(); 
+app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 

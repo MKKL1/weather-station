@@ -2,7 +2,7 @@ using WeatherStation.Core;
 
 namespace WeatherStation.Infrastructure.External;
 
-public class DeviceAuthGateway: IDeviceAuthGateway
+public class DeviceAuthGateway : IDeviceAuthGateway
 {
     public Task<IDeviceAuthGateway.ClaimStatus> ClaimDevice(IDeviceAuthGateway.ClaimRequest claimRequest)
     {

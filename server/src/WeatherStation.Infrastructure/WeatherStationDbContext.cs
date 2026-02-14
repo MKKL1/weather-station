@@ -15,12 +15,12 @@ public class WeatherStationDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
-        
-        modelBuilder.Entity<DeviceDb>( e =>
+
+        modelBuilder.Entity<DeviceDb>(e =>
         {
             e.HasKey(d => d.Id);
             e.Property(d => d.Id).ValueGeneratedNever();
-            
+
             e.HasOne(d => d.UserDb)
             .WithMany(u => u.Devices)
             .HasForeignKey(d => d.UserId)
@@ -35,11 +35,11 @@ public class WeatherStationDbContext : DbContext
         modelBuilder.Entity<UserDb>(e =>
         {
             e.HasKey(u => u.Id);
-            
+
             e.HasIndex(u => u.Name).IsUnique();
             e.HasIndex(u => u.Email).IsUnique();
         });
     }
-    
+
 
 }

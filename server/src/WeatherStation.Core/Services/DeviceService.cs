@@ -11,11 +11,11 @@ public class DeviceService(IDeviceRepository deviceRepository, DeviceAccessValid
         var entities = await deviceRepository.GetByOwnerId(userId, ct);
         return entities.Select(ToDto);
     }
-    
+
     public async Task<DeviceResponse> GetDevice(Guid userId, string deviceId, CancellationToken ct)
     {
         await deviceAccessValidator.ValidateAccess(userId, deviceId, ct);
-        
+
         var entity = await deviceRepository.GetById(deviceId, ct);
         if (entity == null)
         {

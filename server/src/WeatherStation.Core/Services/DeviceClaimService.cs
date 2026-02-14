@@ -23,10 +23,10 @@ public class DeviceClaimService
         {
             throw new InvalidClaimWordsException(deviceId);
         }
-        
+
         var res = await _deviceAuthGateway
             .ClaimDevice(new IDeviceAuthGateway.ClaimRequest(deviceId, request.ClaimCode));
-        
+
         switch (res)
         {
             case IDeviceAuthGateway.ClaimStatus.InvalidCode:
@@ -40,10 +40,10 @@ public class DeviceClaimService
             default:
                 throw new ArgumentOutOfRangeException();
         }
-        
+
         //first let's check if it's already claimed
         var device = await _deviceRepository.GetById(deviceId, ct);
-        
+
         //device can be null at this point (it will be created in local database
         if (device != null && device.Status == DeviceState.Claimed)
         {
@@ -53,7 +53,7 @@ public class DeviceClaimService
             }
             throw new DeviceAlreadyClaimedByOtherException(deviceId);
         }
-        
+
         //create from provided device id (VerifyDeviceIdAgainstWords ensures it's valid)
         device ??= new DeviceEntity(deviceId, userId, DeviceState.Claimed);
 
