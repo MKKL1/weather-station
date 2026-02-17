@@ -26,6 +26,8 @@ const (
 
 	// TokenExpiry is the duration for which the access token is valid
 	TokenExpiry = 24 * time.Hour
+
+	TelemetryWriteRole = "weather-telemetry-write"
 )
 
 var (
@@ -116,7 +118,9 @@ func (s *TokenService) GenerateToken(
 		return nil, err
 	}
 
-	token, err := s.generateJWT(deviceID)
+	canSendTelemetry := device.CanSendTelemetry()
+
+	token, err := s.generateJWT(deviceID, canSendTelemetry)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate JWT: %w", err)
 	}
@@ -164,9 +168,14 @@ func (s *TokenService) validateSignature(deviceID string, timestamp int64, signa
 	return nil
 }
 
-func (s *TokenService) generateJWT(deviceID string) (string, error) {
+func (s *TokenService) generateJWT(deviceID string, canSendTelemetry bool) (string, error) {
 	now := time.Now().UTC()
 	expiresAt := now.Add(TokenExpiry)
+
+	var roles []string
+	if canSendTelemetry {
+		roles = append(roles, TelemetryWriteRole)
+	}
 
 	claims := jwt.MapClaims{
 		"iss":   s.issuer,
@@ -177,7 +186,7 @@ func (s *TokenService) generateJWT(deviceID string) (string, error) {
 		"exp":   expiresAt.Unix(),
 		"jti":   uuid.NewString(),
 		"typ":   "device",
-		"roles": []string{"weather-telemetry-write"},
+		"roles": roles,
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)

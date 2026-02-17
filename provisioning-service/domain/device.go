@@ -7,23 +7,19 @@ type Device struct {
 	ID              string     `json:"id"`
 	DeviceID        string     `json:"deviceId"`
 	IsClaimed       bool       `json:"is_claimed"`
-	UserID          string     `json:"user_id"`
 	IsRevoked       bool       `json:"is_revoked"`
 	ProvisionedDate time.Time  `json:"provisioned_date"`
 	ClaimedAt       *time.Time `json:"claimed_at"`
 
-	// Registration fields
-	HMACSecret   string     `json:"hmacSecret,omitempty"`
-	ActivatedAt  *time.Time `json:"activatedAt,omitempty"`
-	RegisteredAt *time.Time `json:"registeredAt,omitempty"`
+	HMACSecret   string     `json:"hmac_secret,omitempty"`
+	ActivatedAt  *time.Time `json:"activated_at,omitempty"`
+	RegisteredAt *time.Time `json:"registered_at,omitempty"`
 
-	// Activation code fields (replaces Redis cache)
-	ActivationCode          string     `json:"activationCode,omitempty"`
-	ActivationCodeExpiresAt *time.Time `json:"activationCodeExpiresAt,omitempty"`
+	ClaimCode               string     `json:"claim_code,omitempty"`
+	ActivationCodeExpiresAt *time.Time `json:"claim_code_expires_at,omitempty"`
 
-	// Failed attempt tracking
-	FailedAttempts            int        `json:"failedAttempts,omitempty"`
-	FailedAttemptsLockedUntil *time.Time `json:"failedAttemptsLockedUntil,omitempty"`
+	FailedAttempts            int        `json:"failed_attempts,omitempty"`
+	FailedAttemptsLockedUntil *time.Time `json:"failed_attempts_locked_until,omitempty"`
 }
 
 // NewDevice creates a new device with the given device ID.
@@ -38,29 +34,23 @@ func NewDevice(deviceID string) *Device {
 	}
 }
 
-// IsClaimedBy checks if the device is claimed by the specified user.
-func (d *Device) IsClaimedBy(userID string) bool {
-	return d.IsClaimed && d.UserID == userID
-}
-
 // Claim marks the device as claimed by the specified user and records the timestamp.
-func (d *Device) Claim(userID string) {
+func (d *Device) Claim() {
 	d.IsClaimed = true
-	d.UserID = userID
 	now := time.Now().UTC()
 	d.ClaimedAt = &now
 }
 
-// SetActivationCode assigns a new activation code to the device with the specified TTL.
-func (d *Device) SetActivationCode(code string, ttl time.Duration) {
-	d.ActivationCode = code
+// SetClaimCode assigns a new activation code to the device with the specified TTL.
+func (d *Device) SetClaimCode(code string, ttl time.Duration) {
+	d.ClaimCode = code
 	expiresAt := time.Now().UTC().Add(ttl)
 	d.ActivationCodeExpiresAt = &expiresAt
 }
 
 // ClearActivationCode removes the activation code and its expiration from the device.
 func (d *Device) ClearActivationCode() {
-	d.ActivationCode = ""
+	d.ClaimCode = ""
 	d.ActivationCodeExpiresAt = nil
 }
 
@@ -109,4 +99,8 @@ func (d *Device) IncrementFailedAttempts(maxAttempts int, lockDuration time.Dura
 func (d *Device) ResetFailedAttempts() {
 	d.FailedAttempts = 0
 	d.FailedAttemptsLockedUntil = nil
+}
+
+func (d *Device) CanSendTelemetry() bool {
+	return d.IsClaimed && !d.IsRevoked
 }

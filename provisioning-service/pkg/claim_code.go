@@ -7,15 +7,15 @@ import (
 )
 
 const (
-	// CodeLength is the length of generated activation codes.
+	// CodeLength is the length of generated claim codes.
 	CodeLength = 9
 
-	// charset defines the characters used in activation codes.
+	// charset defines the characters used in claim codes.
 	charset = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
 )
 
-// GenerateActivationCode generates a cryptographically random activation code.
-func GenerateActivationCode() (string, error) {
+// GenerateClaimCode generates a cryptographically random claim code.
+func GenerateClaimCode() (string, error) {
 	code := make([]byte, CodeLength)
 	charsetLen := big.NewInt(int64(len(charset)))
 

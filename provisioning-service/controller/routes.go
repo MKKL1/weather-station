@@ -10,11 +10,11 @@ import (
 )
 
 const (
-	apiVersion         = "/api/v1"
-	pathRegistration   = "/register"
-	pathToken          = "/auth/token"
-	pathActivationCode = "/activate"
-	pathUserClaim      = "/claim"
+	apiVersion            = "/api/v1"
+	pathRegistration      = "/devices/{id}/register"
+	pathToken             = "/devices/{id}/token"
+	pathGenerateClaimCode = "/devices/{id}/claim-code"
+	pathDeviceClaim       = "/devices/{id}/claim"
 )
 
 // Routes configures and returns the HTTP router with all endpoints and middleware.
@@ -29,8 +29,8 @@ func (c *Controller) Routes() http.Handler {
 	r.Route(apiVersion, func(r chi.Router) {
 		r.Post(pathRegistration, c.HandleRegistration)
 		r.Post(pathToken, c.HandleTokenGeneration)
-		r.Post(pathActivationCode, c.HandleGenerateActivationCode)
-		r.Post(pathUserClaim, c.HandleUserClaim)
+		r.Post(pathGenerateClaimCode, c.HandleGenerateClaimCode)
+		r.Post(pathDeviceClaim, c.HandleDeviceClaim)
 	})
 
 	return r

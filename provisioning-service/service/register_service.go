@@ -18,8 +18,8 @@ const (
 )
 
 type RegisterResponse struct {
-	DeviceID   string `json:"device_id"`
-	HMACSecret string `json:"hmac_secret"`
+	DeviceID   string
+	HMACSecret string
 }
 
 type RegisterService struct {

@@ -1,95 +1,93 @@
 package controller
 
 import (
+	"errors"
 	"net/http"
 
 	"provisioning-service/service"
 
 	"github.com/bytedance/sonic"
+	"github.com/go-chi/chi/v5"
 	"github.com/rs/zerolog"
 )
 
+// Error codes returned in API responses.
 const (
-	// HTTP header names
-	headerDeviceID  = "X-Device-ID"
-	headerUserID    = "X-User-ID"
-	headerTimestamp = "X-Timestamp"
-	headerSignature = "X-Signature"
-
-	// Error messages
-	errMsgMissingDeviceCert     = "missing device certificate"
-	errMsgMissingUserAuth       = "missing user authentication"
-	errMsgMissingTimestamp      = "missing timestamp"
-	errMsgMissingSignature      = "missing signature"
-	errMsgInvalidRequestBody    = "invalid request body"
-	errMsgMissingActivationCode = "missing activation_code"
-	errMsgInternalError         = "internal error"
-
-	// Response messages
-	msgDeviceNotFound     = "device not found - has it been powered on?"
-	msgDeviceNotActivated = "device has not been activated yet"
-	msgDeviceLocked       = "device locked due to too many failed attempts - contact support"
-	msgAlreadyClaimed     = "device already claimed by another user"
-	msgInvalidCode        = "invalid activation code"
-	msgTimestampExpired   = "timestamp expired or invalid"
-	msgInvalidSignature   = "invalid signature"
-	msgDeviceNotReg       = "device not registered - call /register first"
+	ErrCodeInvalidRequest       = "INVALID_REQUEST"
+	ErrCodeDeviceNotFound       = "DEVICE_NOT_FOUND"
+	ErrCodeDeviceNotRegistered  = "DEVICE_NOT_REGISTERED"
+	ErrCodeDeviceAlreadyClaimed = "DEVICE_ALREADY_CLAIMED"
+	ErrCodeDeviceLocked         = "DEVICE_LOCKED"
+	ErrCodeInvalidCode          = "INVALID_CODE"
+	ErrCodeInvalidTimestamp     = "INVALID_TIMESTAMP"
+	ErrCodeInvalidSignature     = "INVALID_SIGNATURE"
+	ErrCodeInternal             = "INTERNAL_ERROR"
 )
+
+// errorMapping maps service-layer sentinel errors to HTTP status codes and API error codes.
+var errorMapping = []struct {
+	target  error
+	status  int
+	code    string
+	message string
+}{
+	{service.ErrDeviceNotFound, http.StatusNotFound, ErrCodeDeviceNotFound, "device not found"},
+	{service.ErrDeviceNotRegistered, http.StatusNotFound, ErrCodeDeviceNotRegistered, "device not registered - call /register first"},
+	{service.ErrDeviceAlreadyClaimed, http.StatusConflict, ErrCodeDeviceAlreadyClaimed, "device already claimed by another user"},
+	{service.ErrDeviceLocked, http.StatusForbidden, ErrCodeDeviceLocked, "device locked due to too many failed attempts - contact support"},
+	{service.ErrInvalidCode, http.StatusBadRequest, ErrCodeInvalidCode, "invalid activation code"},
+	{service.ErrInvalidTimestamp, http.StatusUnauthorized, ErrCodeInvalidTimestamp, "timestamp expired or invalid"},
+	{service.ErrInvalidSignature, http.StatusUnauthorized, ErrCodeInvalidSignature, "invalid signature"},
+}
 
 // Controller handles HTTP requests for device provisioning and claiming.
 type Controller struct {
-	registerService   *service.RegisterService
-	tokenService      *service.TokenService
-	activationService *service.ActivationService
-	claimService      *service.ClaimService
-	logger            zerolog.Logger
+	registerService *service.RegisterService
+	tokenService    *service.TokenService
+	claimService    *service.ClaimService
+	logger          zerolog.Logger
 }
 
 // NewController creates a new Controller instance with the provided services and logger.
 func NewController(
 	registerService *service.RegisterService,
 	tokenService *service.TokenService,
-	activationService *service.ActivationService,
 	claimService *service.ClaimService,
 	logger zerolog.Logger,
 ) *Controller {
 	return &Controller{
-		registerService:   registerService,
-		tokenService:      tokenService,
-		activationService: activationService,
-		claimService:      claimService,
-		logger:            logger.With().Str("component", "controller").Logger(),
+		registerService: registerService,
+		tokenService:    tokenService,
+		claimService:    claimService,
+		logger:          logger.With().Str("component", "controller").Logger(),
 	}
 }
 
-// HandleRegistration performs device registration and generates HMAC secret.
-// The device ID must be provided in the X-Device-ID header (from validated JWT).
+// HandleRegistration performs device registration and generates an HMAC secret.
 func (c *Controller) HandleRegistration(w http.ResponseWriter, r *http.Request) {
-	deviceID := r.Header.Get(headerDeviceID)
+	deviceID := chi.URLParam(r, "id")
 	if deviceID == "" {
-		respondError(w, http.StatusBadRequest, errMsgMissingDeviceCert)
+		respondError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "missing device id in path")
 		return
 	}
 
 	result, err := c.registerService.Register(r.Context(), deviceID)
 	if err != nil {
-		c.logger.Error().
-			Err(err).
-			Str("device_id", deviceID).
-			Msg("failed to register device")
-		respondError(w, http.StatusInternalServerError, errMsgInternalError)
+		c.handleServiceError(w, err, "device_id", deviceID, "registration")
 		return
 	}
 
-	respondJSON(w, http.StatusOK, result)
+	respondSuccess(w, http.StatusOK, "registered", map[string]string{
+		"device_id":   result.DeviceID,
+		"hmac_secret": result.HMACSecret,
+	})
 }
 
-// HandleTokenGeneration validates HMAC signature and generates access token.
-// Required headers: X-Device-ID
+// HandleTokenGeneration validates the HMAC signature and generates an access token.
 func (c *Controller) HandleTokenGeneration(w http.ResponseWriter, r *http.Request) {
-	deviceID := r.Header.Get(headerDeviceID)
+	deviceID := chi.URLParam(r, "id")
 	if deviceID == "" {
-		respondError(w, http.StatusBadRequest, errMsgMissingDeviceCert)
+		respondError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "missing device id in path")
 		return
 	}
 
@@ -99,154 +97,126 @@ func (c *Controller) HandleTokenGeneration(w http.ResponseWriter, r *http.Reques
 	}
 
 	if err := sonic.ConfigDefault.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondError(w, http.StatusBadRequest, errMsgInvalidRequestBody)
+		respondError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "invalid request body")
 		return
 	}
-
-	//TODO validate req
 
 	result, err := c.tokenService.GenerateToken(r.Context(), deviceID, req.TimeStamp, req.Signature)
 	if err != nil {
-		c.handleTokenError(w, err, deviceID)
+		c.handleServiceError(w, err, "device_id", deviceID, "token generation")
 		return
 	}
 
-	respondJSON(w, http.StatusOK, result)
+	respondSuccess(w, http.StatusOK, "token_generated", map[string]interface{}{
+		"token":      result.Token,
+		"expires_in": result.ExpiresIn,
+		"token_type": result.TokenType,
+	})
 }
 
-// HandleGenerateActivationCode generates an activation code for a registered device.
-// The device ID must be provided in the X-Device-ID header.
-func (c *Controller) HandleGenerateActivationCode(w http.ResponseWriter, r *http.Request) {
-	deviceID := r.Header.Get(headerDeviceID)
+// HandleGenerateClaimCode generates an activation code for a registered device.
+func (c *Controller) HandleGenerateClaimCode(w http.ResponseWriter, r *http.Request) {
+	deviceID := chi.URLParam(r, "id")
 	if deviceID == "" {
-		respondError(w, http.StatusBadRequest, errMsgMissingDeviceCert)
+		respondError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "missing device id in path")
 		return
 	}
 
-	result, err := c.activationService.GenerateCode(r.Context(), deviceID)
+	result, err := c.claimService.GenerateCode(r.Context(), deviceID)
 	if err != nil {
-		c.handleActivationError(w, err, deviceID)
+		c.handleServiceError(w, err, "device_id", deviceID, "claim code generation")
 		return
 	}
 
-	respondJSON(w, http.StatusOK, map[string]interface{}{
-		"status":           "activation code generated",
-		"activation_code":  result.ActivationCode,
+	respondSuccess(w, http.StatusOK, "claim_code_generated", map[string]interface{}{
+		"claim_code":       result.ClaimCode,
 		"validity_seconds": result.ValiditySeconds,
 	})
 }
 
-// HandleUserClaim allows a user to claim a device using an activation code.
-// The user ID must be provided in the X-User-ID header.
-func (c *Controller) HandleUserClaim(w http.ResponseWriter, r *http.Request) {
-	userID := r.Header.Get(headerUserID)
-	if userID == "" {
-		respondError(w, http.StatusUnauthorized, errMsgMissingUserAuth)
+// HandleDeviceClaim claims a device using an activation code.
+func (c *Controller) HandleDeviceClaim(w http.ResponseWriter, r *http.Request) {
+	deviceID := chi.URLParam(r, "id")
+	if deviceID == "" {
+		respondError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "missing device id in path")
 		return
 	}
 
 	var req struct {
-		ActivationCode string `json:"activation_code"`
+		ClaimCode string `json:"claim_code"`
 	}
 
 	if err := sonic.ConfigDefault.NewDecoder(r.Body).Decode(&req); err != nil {
-		respondError(w, http.StatusBadRequest, errMsgInvalidRequestBody)
+		respondError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "invalid request body")
 		return
 	}
 
-	if req.ActivationCode == "" {
-		respondError(w, http.StatusBadRequest, errMsgMissingActivationCode)
+	if req.ClaimCode == "" {
+		respondError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "missing claim_code")
 		return
 	}
 
-	result, err := c.claimService.Claim(r.Context(), req.ActivationCode, userID)
+	result, err := c.claimService.Claim(r.Context(), req.ClaimCode, deviceID)
 	if err != nil {
-		c.handleClaimError(w, err, userID, req.ActivationCode)
+		c.handleServiceError(w, err, "device_id", deviceID, "device claim")
 		return
 	}
 
-	if result.AlreadyClaimedBySameUser {
-		respondJSON(w, http.StatusOK, map[string]string{
-			"status":  "already claimed",
-			"message": "device already belongs to you",
-		})
-		return
+	respondSuccess(w, http.StatusOK, string(result.Status), nil)
+}
+
+// handleServiceError maps service errors to appropriate HTTP responses.
+// Known sentinel errors are mapped via errorMapping; unknown errors produce 500.
+func (c *Controller) handleServiceError(w http.ResponseWriter, err error, contextKey, contextVal, operation string) {
+	for _, m := range errorMapping {
+		if errors.Is(err, m.target) {
+			if m.status == http.StatusForbidden {
+				c.logger.Warn().
+					Str(contextKey, contextVal).
+					Msg(operation + " blocked: " + m.code)
+			}
+			respondError(w, m.status, m.code, m.message)
+			return
+		}
 	}
 
-	respondJSON(w, http.StatusOK, map[string]string{
-		"status": "claimed",
+	c.logger.Error().
+		Err(err).
+		Str(contextKey, contextVal).
+		Msg("unexpected error during " + operation)
+	respondError(w, http.StatusInternalServerError, ErrCodeInternal, "internal error")
+}
+
+type successResponse struct {
+	Status string `json:"status"`
+	Data   any    `json:"data,omitempty"`
+}
+
+type errorDetail struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+type errorResponse struct {
+	Status string      `json:"status"`
+	Error  errorDetail `json:"error"`
+}
+
+func respondSuccess(w http.ResponseWriter, httpStatus int, status string, data any) {
+	writeJSON(w, httpStatus, successResponse{Status: status, Data: data})
+}
+
+func respondError(w http.ResponseWriter, httpStatus int, code, message string) {
+	writeJSON(w, httpStatus, errorResponse{
+		Status: "error",
+		Error:  errorDetail{Code: code, Message: message},
 	})
 }
 
-func (c *Controller) handleTokenError(w http.ResponseWriter, err error, deviceID string) {
-	switch err {
-	case service.ErrInvalidTimestamp:
-		respondError(w, http.StatusUnauthorized, msgTimestampExpired)
-	case service.ErrInvalidSignature:
-		respondError(w, http.StatusUnauthorized, msgInvalidSignature)
-	case service.ErrDeviceNotRegistered:
-		respondError(w, http.StatusNotFound, msgDeviceNotReg)
-	default:
-		c.logger.Error().
-			Err(err).
-			Str("device_id", deviceID).
-			Msg("unexpected error during token generation")
-		respondError(w, http.StatusInternalServerError, errMsgInternalError)
-	}
-}
-
-func (c *Controller) handleActivationError(w http.ResponseWriter, err error, deviceID string) {
-	switch err {
-	case service.ErrDeviceNotRegistered:
-		respondError(w, http.StatusNotFound, msgDeviceNotReg)
-	default:
-		c.logger.Error().
-			Err(err).
-			Str("device_id", deviceID).
-			Msg("unexpected error during activation code generation")
-		respondError(w, http.StatusInternalServerError, errMsgInternalError)
-	}
-}
-
-func (c *Controller) handleClaimError(w http.ResponseWriter, err error, userID, code string) {
-	switch err {
-	case service.ErrDeviceNotFound:
-		respondError(w, http.StatusNotFound, msgDeviceNotFound)
-	case service.ErrDeviceNotActivated:
-		respondError(w, http.StatusBadRequest, msgDeviceNotActivated)
-	case service.ErrDeviceLocked:
-		c.logger.Warn().
-			Str("user_id", userID).
-			Str("code_prefix", maskCode(code)).
-			Msg("claim blocked: device locked")
-		respondError(w, http.StatusForbidden, msgDeviceLocked)
-	case service.ErrAlreadyClaimed:
-		c.logger.Warn().
-			Str("user_id", userID).
-			Str("code_prefix", maskCode(code)).
-			Msg("claim blocked: device owned by another user")
-		respondError(w, http.StatusForbidden, msgAlreadyClaimed)
-	case service.ErrInvalidCode:
-		respondError(w, http.StatusBadRequest, msgInvalidCode)
-	default:
-		c.logger.Error().
-			Err(err).
-			Str("user_id", userID).
-			Msg("unexpected error during device claim")
-		respondError(w, http.StatusInternalServerError, errMsgInternalError)
-	}
-}
-
-func respondJSON(w http.ResponseWriter, status int, data any) {
+func writeJSON(w http.ResponseWriter, status int, data any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	if err := sonic.ConfigDefault.NewEncoder(w).Encode(data); err != nil {
-		// Log but don't return error to client as headers are already sent
-	}
-}
-
-func respondError(w http.ResponseWriter, status int, message string) {
-	respondJSON(w, status, map[string]string{"error": message})
+	_ = sonic.ConfigDefault.NewEncoder(w).Encode(data)
 }
 
 // maskCode returns the first 3 characters of the code followed by asterisks for logging.

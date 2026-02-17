@@ -80,29 +80,3 @@ func (r *DeviceRepository) Save(ctx context.Context, device *domain.Device) erro
 
 	return nil
 }
-
-// GetByActiveActivationCode finds a device by its active (non-expired) activation code.
-// Returns nil if no device with the given active code is found.
-// Returns an error if the database query fails.
-func (r *DeviceRepository) GetByActiveActivationCode(ctx context.Context, code string) (*domain.Device, error) {
-	dbData, err := r.db.QueryByActiveActivationCode(ctx, code)
-	if err != nil {
-		if errors.Is(err, infrastructure.ErrNotFound) {
-			return nil, nil
-		}
-		r.logger.Error().
-			Err(err).
-			Msg("database error querying by activation code")
-		return nil, fmt.Errorf("failed to query device by activation code: %w", err)
-	}
-
-	var device domain.Device
-	if err := sonic.Unmarshal(dbData, &device); err != nil {
-		r.logger.Error().
-			Err(err).
-			Msg("failed to unmarshal device from activation code query")
-		return nil, fmt.Errorf("failed to deserialize device data: %w", err)
-	}
-
-	return &device, nil
-}

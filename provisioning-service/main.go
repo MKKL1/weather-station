@@ -81,14 +81,12 @@ func main() {
 			Err(err).
 			Msg("token service initialization failed")
 	}
-	activationService := service.NewActivationService(deviceRepo, logger, config.ActivationCodeTTL)
-	claimService := service.NewClaimService(deviceRepo, config, logger)
+	claimService := service.NewClaimService(deviceRepo, config, logger, config.ActivationCodeTTL)
 
 	// Initialize controller
 	ctrl := controller.NewController(
 		registerService,
 		tokenService,
-		activationService,
 		claimService,
 		logger,
 	)
