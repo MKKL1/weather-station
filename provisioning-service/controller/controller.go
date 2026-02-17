@@ -107,7 +107,7 @@ func (c *Controller) HandleTokenGeneration(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	respondSuccess(w, http.StatusOK, "token_generated", map[string]interface{}{
+	respondSuccess(w, http.StatusOK, "token_generated", map[string]any{
 		"token":      result.Token,
 		"expires_in": result.ExpiresIn,
 		"token_type": result.TokenType,
@@ -128,7 +128,7 @@ func (c *Controller) HandleGenerateClaimCode(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	respondSuccess(w, http.StatusOK, "claim_code_generated", map[string]interface{}{
+	respondSuccess(w, http.StatusOK, "claim_code_generated", map[string]any{
 		"claim_code":       result.ClaimCode,
 		"validity_seconds": result.ValiditySeconds,
 	})
