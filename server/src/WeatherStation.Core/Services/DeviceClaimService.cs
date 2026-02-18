@@ -19,39 +19,39 @@ public class DeviceClaimService
 
     public async Task ClaimDevice(Guid userId, string deviceId, ClaimDeviceRequest request, CancellationToken ct)
     {
-        if (!_deviceAuthService.VerifyDeviceIdAgainstWords(deviceId, request.Key))
+        // if (!_deviceAuthService.VerifyDeviceIdAgainstWords(deviceId, request.Key))
+        // {
+        //     throw new InvalidClaimWordsException(deviceId);
+        // }
+
+        var device = await _deviceRepository.GetById(deviceId, ct);
+        if (device != null && device.Status == DeviceState.Claimed)
         {
-            throw new InvalidClaimWordsException(deviceId);
+            if (device.OwnerId == userId)
+            {
+                return; //Nothing to do, everything is correct
+                //TODO but there may be case where this service thinks it's claimed, but provisioning service doesn't
+            }
+            throw new DeviceAlreadyClaimedByOtherException(deviceId);
         }
 
+        //TODO there is a possibility that provisioning service claimed device, but this service didn't register it
+        //ClaimDevice is idempotent as long as claim code is correct, if it's not, then claim won't succeed
+        //We can just send message to user, asking them to generate new code if worst case scenario happens
+        //New claim code has to be always valid
         var res = await _deviceAuthGateway
-            .ClaimDevice(new IDeviceAuthGateway.ClaimRequest(deviceId, request.ClaimCode));
+            .ClaimDevice(new IDeviceAuthGateway.ClaimRequest(deviceId, request.ClaimCode, userId.ToString()));
 
         switch (res)
         {
             case IDeviceAuthGateway.ClaimStatus.InvalidCode:
                 throw new InvalidAuthCodeException();
             case IDeviceAuthGateway.ClaimStatus.AlreadyClaimed:
-                //TODO if already claimed, we can check local database to ensure it's true
-                //for now throwing already claimed exception
                 throw new DeviceAlreadyClaimedByOtherException(deviceId);
             case IDeviceAuthGateway.ClaimStatus.Success:
                 break;
             default:
                 throw new ArgumentOutOfRangeException();
-        }
-
-        //first let's check if it's already claimed
-        var device = await _deviceRepository.GetById(deviceId, ct);
-
-        //device can be null at this point (it will be created in local database
-        if (device != null && device.Status == DeviceState.Claimed)
-        {
-            if (device.OwnerId == userId)
-            {
-                throw new DeviceAlreadyClaimedBySelfException(deviceId);
-            }
-            throw new DeviceAlreadyClaimedByOtherException(deviceId);
         }
 
         //create from provided device id (VerifyDeviceIdAgainstWords ensures it's valid)

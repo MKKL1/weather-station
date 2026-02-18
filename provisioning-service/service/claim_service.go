@@ -13,24 +13,14 @@ import (
 	"github.com/rs/zerolog"
 )
 
-type ClaimStatus string
-
-const (
-	ClaimStatusAlreadyClaimed ClaimStatus = "already_claimed"
-	ClaimStatusSuccess        ClaimStatus = "success"
-)
-
 var (
-	// ErrDeviceLocked indicates the device is locked due to too many failed attempts
-	ErrDeviceLocked = errors.New("device locked due to too many failed attempts")
-
 	// ErrInvalidCode indicates the activation code is invalid or expired
 	ErrInvalidCode = errors.New("invalid or expired activation code")
 
 	// ErrDeviceNotFound indicates the device does not exist
 	ErrDeviceNotFound = errors.New("device not found")
 
-	// ErrDeviceAlreadyClaimed indicates the device is already claimed by another user
+	// ErrDeviceAlreadyClaimed indicates the device is already claimed
 	ErrDeviceAlreadyClaimed = errors.New("device already claimed")
 )
 
@@ -40,8 +30,8 @@ type ClaimCodeResponse struct {
 }
 
 type ClaimResult struct {
-	Status   ClaimStatus
-	DeviceID string
+	DeviceID        string
+	ClaimedByUserId string
 }
 
 type ClaimService struct {
@@ -66,7 +56,10 @@ func NewClaimService(
 }
 
 // Claim attempts to claim a device using an activation code.
-func (s *ClaimService) Claim(ctx context.Context, code string, deviceId string) (*ClaimResult, error) {
+// Idempotency:
+// if the device is already claimed with the same code and same user, the call succeeds without any state change.
+// If the user differs, ErrDeviceAlreadyClaimed is returned.
+func (s *ClaimService) Claim(ctx context.Context, code string, deviceId string, userId string) (*ClaimResult, error) {
 	device, err := s.deviceRepo.Get(ctx, deviceId)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query device by id: %w", err)
@@ -76,54 +69,30 @@ func (s *ClaimService) Claim(ctx context.Context, code string, deviceId string) 
 		return nil, ErrDeviceNotFound
 	}
 
+	//TODO domain logic in service layer!!
 	if device.IsClaimed {
-		//Idempotent
-		if device.ClaimCode == code {
-			return &ClaimResult{
-				Status:   ClaimStatusAlreadyClaimed,
-				DeviceID: device.DeviceID,
-			}, nil
+		if !device.CanReclaimWith(code, userId) {
+			return nil, ErrDeviceAlreadyClaimed
 		}
-
-		return nil, ErrDeviceAlreadyClaimed
+		return &ClaimResult{
+			DeviceID:        device.DeviceID,
+			ClaimedByUserId: device.ClaimedByUserId,
+		}, nil
 	}
 
-	if device.IsLocked() {
-		return nil, ErrDeviceLocked
-	}
-
-	//Check if provided activation code is invalid and save failed attempt count
-	if device.ClaimCode != code {
-		device.IncrementFailedAttempts(
-			s.config.MaxFailedAttempts,
-			s.config.FailedAttemptsTTL,
-		)
-
-		if saveErr := s.deviceRepo.Save(ctx, device); saveErr != nil {
-			s.logger.Error().
-				Err(saveErr).
-				Str("device_id", device.DeviceID).
-				Msg("failed to save device after failed claim")
-		}
-
+	if !device.IsCodeValid(code) {
 		return nil, ErrInvalidCode
 	}
 
-	//TODO in proper DDD, isClaimed should be checked in Claim method
-	//This project however doesn't need to be super clean implementation of DDD
-	//Instead I could just make it all a transaction script
-	//Leaving it as is for now
-	device.Claim()
-	device.ClearActivationCode()
-	device.ResetFailedAttempts()
+	device.Claim(userId, code)
 
 	if err := s.deviceRepo.Save(ctx, device); err != nil {
 		return nil, fmt.Errorf("failed to save claimed device: %w", err)
 	}
 
 	return &ClaimResult{
-		Status:   ClaimStatusSuccess,
-		DeviceID: device.DeviceID,
+		DeviceID:        device.DeviceID,
+		ClaimedByUserId: userId,
 	}, nil
 }
 
@@ -146,7 +115,6 @@ func (s *ClaimService) GenerateCode(ctx context.Context, deviceID string) (*Clai
 	}
 
 	device.SetClaimCode(code, s.activationCodeTTL)
-	device.ResetFailedAttempts()
 
 	if err := s.deviceRepo.Save(ctx, device); err != nil {
 		return nil, fmt.Errorf("failed to save device with claim code: %w", err)

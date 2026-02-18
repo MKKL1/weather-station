@@ -2,6 +2,7 @@ namespace WeatherStation.Core.Dto;
 
 public class ClaimDeviceRequest
 {
+    
     public required string ClaimCode { get; init; }
     public required string Key { get; init; }
 }
