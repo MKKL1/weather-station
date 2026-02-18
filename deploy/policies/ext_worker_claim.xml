@@ -1,0 +1,51 @@
+<policies>
+  <inbound>
+    <base />
+
+    <validate-jwt
+      header-name="Authorization"
+      failed-validation-httpcode="401"
+      failed-validation-error-message="Unauthorized. Invalid Worker Token."
+    >
+      <openid-config
+        url="https://login.microsoftonline.com/{{tenant-id}}/v2.0/.well-known/openid-configuration"
+      />
+      <audiences>
+        <audience>api://{{function-app-client-id}}</audience>
+      </audiences>
+      <issuers>
+        <issuer>https://sts.windows.net/{{tenant-id}}/</issuer>
+      </issuers>
+      <required-claims>
+        <claim name="appid" match="any">
+          <value>{{external-worker-client-id}}</value>
+        </claim>
+        <claim name="azp" match="any">
+          <value>{{external-worker-client-id}}</value>
+        </claim>
+      </required-claims>
+    </validate-jwt>
+
+    <authentication-managed-identity
+      resource="api://{{function-app-client-id}}"
+      output-token-variable-name="msi-access-token"
+      ignore-error="false"
+    />
+
+    <set-header name="Authorization" exists-action="override">
+      <value>@("Bearer " + context.Variables["msi-access-token"])</value>
+    </set-header>
+
+    <rewrite-uri template="@(&quot;/devices/&quot; + context.Request.MatchedParameters[&quot;deviceId&quot;] + &quot;/claim&quot;)" />
+    <set-backend-service backend-id="auth-backend" />
+  </inbound>
+  <backend>
+    <base />
+  </backend>
+  <outbound>
+    <base />
+  </outbound>
+  <on-error>
+    <base />
+  </on-error>
+</policies>
