@@ -140,7 +140,7 @@ func (c *Controller) HandleDeviceClaim(w http.ResponseWriter, r *http.Request) {
 	}
 
 	respondSuccess(w, http.StatusOK, "claimed", map[string]any{
-		"device_id":          result.DeviceID,
+		"device_id":          deviceID,
 		"claimed_by_user_id": result.ClaimedByUserId,
 	})
 }

@@ -65,7 +65,7 @@ func main() {
 			Msg("database initialization failed")
 	}
 
-	deviceRepo := repository.NewDeviceRepository(db, config, logger)
+	deviceRepo := repository.NewDeviceRepository(db, logger)
 
 	registerService := service.NewRegisterService(deviceRepo, logger)
 	tokenService, err := service.NewTokenService(service.TokenServiceConfig{
@@ -81,7 +81,7 @@ func main() {
 			Err(err).
 			Msg("token service initialization failed")
 	}
-	claimService := service.NewClaimService(deviceRepo, config, logger, config.ActivationCodeTTL)
+	claimService := service.NewClaimService(deviceRepo, logger, config.ActivationCodeTTL)
 
 	// Initialize controller
 	ctrl := controller.NewController(

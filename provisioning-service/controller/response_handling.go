@@ -2,6 +2,7 @@ package controller
 
 import (
 	"net/http"
+	"provisioning-service/domain"
 	"provisioning-service/service"
 
 	"github.com/bytedance/sonic"
@@ -19,17 +20,17 @@ const (
 	ErrCodeInternal             = "INTERNAL_ERROR"
 )
 
-// errorMapping maps service-layer sentinel errors to HTTP status codes and API error codes.
+// errorMapping maps sentinel errors to HTTP status codes and API error codes.
 var errorMapping = []struct {
 	target  error
 	status  int
 	code    string
 	message string
 }{
-	{service.ErrDeviceNotFound, http.StatusNotFound, ErrCodeDeviceNotFound, "device not found"},
+	{domain.ErrDeviceNotFound, http.StatusNotFound, ErrCodeDeviceNotFound, "device not found"},
 	{service.ErrDeviceNotRegistered, http.StatusNotFound, ErrCodeDeviceNotRegistered, "device not registered - call /register first"},
-	{service.ErrDeviceAlreadyClaimed, http.StatusConflict, ErrCodeDeviceAlreadyClaimed, "device already claimed"},
-	{service.ErrInvalidCode, http.StatusBadRequest, ErrCodeInvalidCode, "invalid activation code"},
+	{domain.ErrDeviceAlreadyClaimed, http.StatusConflict, ErrCodeDeviceAlreadyClaimed, "device already claimed"},
+	{domain.ErrInvalidCode, http.StatusBadRequest, ErrCodeInvalidCode, "invalid activation code"},
 	{service.ErrInvalidTimestamp, http.StatusUnauthorized, ErrCodeInvalidTimestamp, "timestamp expired or invalid"},
 	{service.ErrInvalidSignature, http.StatusUnauthorized, ErrCodeInvalidSignature, "invalid signature"},
 }

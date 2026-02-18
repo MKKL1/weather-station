@@ -13,7 +13,7 @@ import (
 	"fmt"
 	"time"
 
-	"provisioning-service/repository"
+	"provisioning-service/domain"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -53,7 +53,7 @@ type TokenResponse struct {
 
 // TokenService handles access token generation with HMAC authentication.
 type TokenService struct {
-	deviceRepo *repository.DeviceRepository
+	deviceRepo domain.DeviceRepository
 	privateKey *rsa.PrivateKey
 	logger     zerolog.Logger
 	issuer     string
@@ -62,7 +62,7 @@ type TokenService struct {
 }
 
 type TokenServiceConfig struct {
-	DeviceRepo       *repository.DeviceRepository
+	DeviceRepo       domain.DeviceRepository
 	PrivateKeyBase64 string
 	Logger           zerolog.Logger
 	Issuer           string
