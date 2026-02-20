@@ -92,6 +92,7 @@ func (c *Controller) HandleGenerateClaimCode(w http.ResponseWriter, r *http.Requ
 		respondError(w, http.StatusBadRequest, ErrCodeInvalidRequest, "missing device id in path")
 		return
 	}
+	//TODO handle device not registered
 
 	result, err := c.claimService.GenerateCode(r.Context(), deviceID)
 	if err != nil {

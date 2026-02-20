@@ -19,10 +19,10 @@ public class DeviceClaimService
 
     public async Task ClaimDevice(Guid userId, string deviceId, ClaimDeviceRequest request, CancellationToken ct)
     {
-        // if (!_deviceAuthService.VerifyDeviceIdAgainstWords(deviceId, request.Key))
-        // {
-        //     throw new InvalidClaimWordsException(deviceId);
-        // }
+        if (!_deviceAuthService.VerifyDeviceIdAgainstWords(deviceId, request.Key))
+        {
+            throw new InvalidClaimWordsException(deviceId);
+        }
 
         var device = await _deviceRepository.GetById(deviceId, ct);
         if (device != null && device.Status == DeviceState.Claimed)

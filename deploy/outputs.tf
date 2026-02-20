@@ -94,6 +94,11 @@ output "tenant_id" {
   value = data.azurerm_client_config.current.tenant_id
 }
 
+output "provisioning_function_app_client_id" {
+  description = "Client ID of the provisioning function app auth registration (use as AuthService Scope: api://<this>/.default)"
+  value       = azuread_application.function_app_auth.client_id
+}
+
 output "claim_endpoint" {
   description = "Full URL for the device claim endpoint (external worker)"
   value       = "${azurerm_api_management.api_gateway.gateway_url}/${azurerm_api_management_api.provisioning_api.path}/{deviceId}/claim"
