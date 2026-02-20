@@ -1,29 +1,48 @@
 package domain
 
-import "time"
+import (
+	"errors"
+	"time"
+)
 
-// Device represents an IoT device in the provisioning system.
+var (
+	// ErrDeviceNotFound indicates the device does not exist.
+	ErrDeviceNotFound = errors.New("device not found")
+
+	// ErrDeviceAlreadyClaimed indicates the device is already claimed by a different user.
+	ErrDeviceAlreadyClaimed = errors.New("device already claimed")
+
+	// ErrInvalidCode indicates the activation code is invalid or expired.
+	ErrInvalidCode = errors.New("invalid or expired activation code")
+)
+
+// ClaimResult represents the outcome of a successful claim operation.
+type ClaimResult struct {
+	ClaimedByUserId string
+}
+
+// ClaimCodeResult represents a generated claim code and its validity window.
+type ClaimCodeResult struct {
+	ClaimCode       string
+	ValiditySeconds int
+}
+
+// Device is the aggregate root for an IoT device in the provisioning system.
 type Device struct {
-	ID              string     `json:"id"`
-	DeviceID        string     `json:"deviceId"`
-	IsClaimed       bool       `json:"is_claimed"`
-	UserID          string     `json:"user_id"`
-	IsRevoked       bool       `json:"is_revoked"`
-	ProvisionedDate time.Time  `json:"provisioned_date"`
-	ClaimedAt       *time.Time `json:"claimed_at"`
+	ID              string
+	DeviceID        string
+	IsRevoked       bool
+	ProvisionedDate time.Time
 
-	// Registration fields
-	HMACSecret   string     `json:"hmacSecret,omitempty"`
-	ActivatedAt  *time.Time `json:"activatedAt,omitempty"`
-	RegisteredAt *time.Time `json:"registeredAt,omitempty"`
+	HMACSecret   string
+	RegisteredAt *time.Time
 
-	// Activation code fields (replaces Redis cache)
-	ActivationCode          string     `json:"activationCode,omitempty"`
-	ActivationCodeExpiresAt *time.Time `json:"activationCodeExpiresAt,omitempty"`
-
-	// Failed attempt tracking
-	FailedAttempts            int        `json:"failedAttempts,omitempty"`
-	FailedAttemptsLockedUntil *time.Time `json:"failedAttemptsLockedUntil,omitempty"`
+	IsClaimed          bool
+	ClaimedAt          *time.Time
+	ClaimedByUserId    string
+	ClaimCode          string
+	ClaimCodeExpiresAt *time.Time
+	LastUsedCode       string
 }
 
 // NewDevice creates a new device with the given device ID.
@@ -38,75 +57,59 @@ func NewDevice(deviceID string) *Device {
 	}
 }
 
-// IsClaimedBy checks if the device is claimed by the specified user.
-func (d *Device) IsClaimedBy(userID string) bool {
-	return d.IsClaimed && d.UserID == userID
-}
+// TryClaim attempts to claim the device.
+// If already claimed by the same user with the same code, it succeeds.
+// Returns ErrDeviceAlreadyClaimed if claimed by a different user or with a different code.
+// Returns ErrInvalidCode if the code is invalid or expired.
+func (d *Device) TryClaim(userId string, code string) (*ClaimResult, error) {
+	if d.IsClaimed {
+		if d.canReclaimWith(code, userId) {
+			return &ClaimResult{
+				ClaimedByUserId: d.ClaimedByUserId,
+			}, nil
+		}
+		return nil, ErrDeviceAlreadyClaimed
+	}
 
-// Claim marks the device as claimed by the specified user and records the timestamp.
-func (d *Device) Claim(userID string) {
+	if !d.isCodeValid(code) {
+		return nil, ErrInvalidCode
+	}
+
 	d.IsClaimed = true
-	d.UserID = userID
-	now := time.Now().UTC()
-	d.ClaimedAt = &now
+	d.ClaimedByUserId = userId
+	d.ClaimedAt = new(time.Now().UTC())
+	d.LastUsedCode = code
+
+	return &ClaimResult{
+		ClaimedByUserId: userId,
+	}, nil
 }
 
-// SetActivationCode assigns a new activation code to the device with the specified TTL.
-func (d *Device) SetActivationCode(code string, ttl time.Duration) {
-	d.ActivationCode = code
-	expiresAt := time.Now().UTC().Add(ttl)
-	d.ActivationCodeExpiresAt = &expiresAt
-}
-
-// ClearActivationCode removes the activation code and its expiration from the device.
-func (d *Device) ClearActivationCode() {
-	d.ActivationCode = ""
-	d.ActivationCodeExpiresAt = nil
+// SetClaimCode assigns a new activation code to the device with the specified TTL.
+func (d *Device) SetClaimCode(code string, ttl time.Duration) {
+	d.ClaimCode = code
+	d.ClaimCodeExpiresAt = new(time.Now().UTC().Add(ttl))
 }
 
 // SetHMACSecret assigns the HMAC secret to the device and records registration timestamp.
 func (d *Device) SetHMACSecret(secret string) {
 	d.HMACSecret = secret
-	now := time.Now().UTC()
-	d.RegisteredAt = &now
+	d.RegisteredAt = new(time.Now().UTC())
 }
 
-// IsLocked checks if the device is currently locked due to failed claim attempts.
-// If the lock has expired, it automatically clears the lock and returns false.
-func (d *Device) IsLocked() bool {
-	if d.FailedAttemptsLockedUntil == nil {
-		return false
-	}
-
-	if time.Now().UTC().Before(*d.FailedAttemptsLockedUntil) {
-		return true
-	}
-
-	d.ResetFailedAttempts()
-	return false
+// CanSendTelemetry returns whether the device is allowed to send telemetry data.
+func (d *Device) CanSendTelemetry() bool {
+	return d.IsClaimed && !d.IsRevoked
 }
 
-// IncrementFailedAttempts increments the failed claim attempt counter.
-// If the counter reaches maxAttempts, the device is locked for the specified duration.
-// Returns true if the device is now locked, false otherwise.
-func (d *Device) IncrementFailedAttempts(maxAttempts int, lockDuration time.Duration) bool {
-	if d.IsLocked() {
-		return true
-	}
-
-	d.FailedAttempts++
-
-	if d.FailedAttempts >= maxAttempts {
-		lockedUntil := time.Now().UTC().Add(lockDuration)
-		d.FailedAttemptsLockedUntil = &lockedUntil
-		return true
-	}
-
-	return false
+// canReclaimWith returns true when an already claimed device may be claimed again
+func (d *Device) canReclaimWith(code, userId string) bool {
+	return d.LastUsedCode == code && d.ClaimedByUserId == userId
 }
 
-// ResetFailedAttempts clears the failed attempt counter and removes any lock.
-func (d *Device) ResetFailedAttempts() {
-	d.FailedAttempts = 0
-	d.FailedAttemptsLockedUntil = nil
+// isCodeValid returns whether the provided code matches and has not yet expired.
+func (d *Device) isCodeValid(code string) bool {
+	return d.ClaimCode == code &&
+		d.ClaimCodeExpiresAt != nil &&
+		time.Now().UTC().Before(*d.ClaimCodeExpiresAt)
 }

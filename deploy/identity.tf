@@ -66,6 +66,12 @@ resource "azuread_app_role_assignment" "apim_to_function_app" {
   resource_object_id  = azuread_service_principal.function_app_auth.object_id
 }
 
+resource "azuread_app_role_assignment" "external_worker_to_function_app" {
+  app_role_id         = random_uuid.provisioning_role_id.result
+  principal_object_id = azuread_service_principal.external_worker_sp.object_id
+  resource_object_id  = azuread_service_principal.function_app_auth.object_id
+}
+
 resource "azuread_app_role_assignment" "apim_to_main_function_app" {
   app_role_id         = random_uuid.main_role_id.result
   principal_object_id = azurerm_api_management.api_gateway.identity[0].principal_id

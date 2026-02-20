@@ -2,7 +2,7 @@
   <inbound>
     <base />
     <include-fragment fragment-id="provisioning-jwt" />
-    <rewrite-uri template="@("/devices/" + (string)context.Variables["device-id"] + "/register")" />
+    <rewrite-uri template="@("/devices/" + (string)context.Variables["device-id"] + "/claim-code")" />
     <set-backend-service backend-id="auth-backend" />
   </inbound>
   <backend>

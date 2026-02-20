@@ -7,7 +7,6 @@ import (
 	"fmt"
 
 	"provisioning-service/domain"
-	"provisioning-service/repository"
 
 	"github.com/rs/zerolog"
 )
@@ -18,17 +17,17 @@ const (
 )
 
 type RegisterResponse struct {
-	DeviceID   string `json:"device_id"`
-	HMACSecret string `json:"hmac_secret"`
+	DeviceID   string
+	HMACSecret string
 }
 
 type RegisterService struct {
-	deviceRepo *repository.DeviceRepository
+	deviceRepo domain.DeviceRepository
 	logger     zerolog.Logger
 }
 
 func NewRegisterService(
-	deviceRepo *repository.DeviceRepository,
+	deviceRepo domain.DeviceRepository,
 	logger zerolog.Logger,
 ) *RegisterService {
 	return &RegisterService{

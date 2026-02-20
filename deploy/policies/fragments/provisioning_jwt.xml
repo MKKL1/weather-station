@@ -1,0 +1,47 @@
+<fragment>
+  <!-- Validate provisioning JWT from device -->
+  <validate-jwt header-name="Authorization" failed-validation-httpcode="401"
+    failed-validation-error-message="Invalid or expired provisioning token"
+    require-expiration-time="false">
+    <openid-config url="{{access_token_issuer_url}}/provisioning/.well-known/openid-configuration" />
+    <audiences>
+      <audience>provisioning-api</audience>
+    </audiences>
+    <issuers>
+      <issuer>{{access_token_issuer_url}}/provisioning</issuer>
+    </issuers>
+    <required-claims>
+      <claim name="sub" match="any" />
+    </required-claims>
+  </validate-jwt>
+
+  <!-- Extract device ID from JWT sub claim -->
+  <set-variable name="device-id" value="@{
+    var jwt = context.Request.Headers.GetValueOrDefault(&quot;Authorization&quot;, &quot;&quot;).Split(' ').Last();
+    Jwt token;
+    if (jwt.TryParseJwt(out token)) {
+      return token.Claims.GetValueOrDefault(&quot;sub&quot;, &quot;unknown&quot;);
+    }
+    return &quot;unknown&quot;;
+  }" />
+
+  <!-- JWT sub must match {deviceId} in URL -->
+  <choose>
+    <when condition="@((string)context.Variables[&quot;device-id&quot;] != context.Request.MatchedParameters[&quot;deviceId&quot;])">
+      <return-response>
+        <set-status code="403" reason="Forbidden" />
+        <set-header name="Content-Type" exists-action="override">
+          <value>application/json</value>
+        </set-header>
+        <!-- <set-body>{"error": "device_id_mismatch", "message": "Token does not belong to this device"}</set-body> -->
+      </return-response>
+    </when>
+  </choose>
+
+  <!-- Managed identity token for backend auth -->
+  <authentication-managed-identity resource="{{function-app-client-id}}"
+    output-token-variable-name="msi-access-token" ignore-error="false" />
+  <set-header name="Authorization" exists-action="override">
+    <value>@("Bearer " + (string)context.Variables[&quot;msi-access-token&quot;])</value>
+  </set-header>
+</fragment>

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"provisioning-service/domain"
 	"provisioning-service/infrastructure"
@@ -12,27 +13,75 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// deviceDocument is the persistence representation of a Device in CosmosDB.
+type deviceDocument struct {
+	ID              string     `json:"id"`
+	DeviceID        string     `json:"deviceId"`
+	IsRevoked       bool       `json:"is_revoked"`
+	ProvisionedDate time.Time  `json:"provisioned_date"`
+	HMACSecret      string     `json:"hmac_secret,omitempty"`
+	RegisteredAt    *time.Time `json:"registered_at,omitempty"`
+
+	IsClaimed          bool       `json:"is_claimed"`
+	ClaimedAt          *time.Time `json:"claimed_at"`
+	ClaimedByUserId    string     `json:"claimed_by_user_id,omitempty"`
+	ClaimCode          string     `json:"claim_code,omitempty"`
+	ClaimCodeExpiresAt *time.Time `json:"claim_code_expires_at,omitempty"`
+	LastUsedCode       string     `json:"last_used_code,omitempty"`
+}
+
+func toDocument(d *domain.Device) deviceDocument {
+	return deviceDocument{
+		ID:                 d.ID,
+		DeviceID:           d.DeviceID,
+		IsRevoked:          d.IsRevoked,
+		ProvisionedDate:    d.ProvisionedDate,
+		HMACSecret:         d.HMACSecret,
+		RegisteredAt:       d.RegisteredAt,
+		IsClaimed:          d.IsClaimed,
+		ClaimedAt:          d.ClaimedAt,
+		ClaimedByUserId:    d.ClaimedByUserId,
+		ClaimCode:          d.ClaimCode,
+		ClaimCodeExpiresAt: d.ClaimCodeExpiresAt,
+		LastUsedCode:       d.LastUsedCode,
+	}
+}
+
+func toDomain(doc deviceDocument) *domain.Device {
+	return &domain.Device{
+		ID:                 doc.ID,
+		DeviceID:           doc.DeviceID,
+		IsRevoked:          doc.IsRevoked,
+		ProvisionedDate:    doc.ProvisionedDate,
+		HMACSecret:         doc.HMACSecret,
+		RegisteredAt:       doc.RegisteredAt,
+		IsClaimed:          doc.IsClaimed,
+		ClaimedAt:          doc.ClaimedAt,
+		ClaimedByUserId:    doc.ClaimedByUserId,
+		ClaimCode:          doc.ClaimCode,
+		ClaimCodeExpiresAt: doc.ClaimCodeExpiresAt,
+		LastUsedCode:       doc.LastUsedCode,
+	}
+}
+
+// DeviceRepository implements domain.DeviceRepository using CosmosDB.
 type DeviceRepository struct {
 	db     *infrastructure.CosmosDB
-	config *infrastructure.Config
 	logger zerolog.Logger
 }
 
 func NewDeviceRepository(
 	db *infrastructure.CosmosDB,
-	config *infrastructure.Config,
 	logger zerolog.Logger,
 ) *DeviceRepository {
 	return &DeviceRepository{
 		db:     db,
-		config: config,
 		logger: logger.With().Str("component", "device_repository").Logger(),
 	}
 }
 
 // Get retrieves a device by its device ID.
 // Returns nil if the device is not found.
-// Returns an error if the database operation fails.
 func (r *DeviceRepository) Get(ctx context.Context, deviceID string) (*domain.Device, error) {
 	dbData, err := r.db.Get(ctx, deviceID)
 	if err != nil {
@@ -46,8 +95,8 @@ func (r *DeviceRepository) Get(ctx context.Context, deviceID string) (*domain.De
 		return nil, fmt.Errorf("failed to retrieve device from database: %w", err)
 	}
 
-	var device domain.Device
-	if err := sonic.Unmarshal(dbData, &device); err != nil {
+	var doc deviceDocument
+	if err := sonic.Unmarshal(dbData, &doc); err != nil {
 		r.logger.Error().
 			Err(err).
 			Str("device_id", deviceID).
@@ -55,13 +104,15 @@ func (r *DeviceRepository) Get(ctx context.Context, deviceID string) (*domain.De
 		return nil, fmt.Errorf("failed to deserialize device data: %w", err)
 	}
 
-	return &device, nil
+	return toDomain(doc), nil
 }
 
 // Save persists a device to the database.
 // Creates the device if it doesn't exist, updates it if it does.
 func (r *DeviceRepository) Save(ctx context.Context, device *domain.Device) error {
-	data, err := sonic.Marshal(device)
+	doc := toDocument(device)
+
+	data, err := sonic.Marshal(doc)
 	if err != nil {
 		r.logger.Error().
 			Err(err).
@@ -79,30 +130,4 @@ func (r *DeviceRepository) Save(ctx context.Context, device *domain.Device) erro
 	}
 
 	return nil
-}
-
-// GetByActiveActivationCode finds a device by its active (non-expired) activation code.
-// Returns nil if no device with the given active code is found.
-// Returns an error if the database query fails.
-func (r *DeviceRepository) GetByActiveActivationCode(ctx context.Context, code string) (*domain.Device, error) {
-	dbData, err := r.db.QueryByActiveActivationCode(ctx, code)
-	if err != nil {
-		if errors.Is(err, infrastructure.ErrNotFound) {
-			return nil, nil
-		}
-		r.logger.Error().
-			Err(err).
-			Msg("database error querying by activation code")
-		return nil, fmt.Errorf("failed to query device by activation code: %w", err)
-	}
-
-	var device domain.Device
-	if err := sonic.Unmarshal(dbData, &device); err != nil {
-		r.logger.Error().
-			Err(err).
-			Msg("failed to unmarshal device from activation code query")
-		return nil, fmt.Errorf("failed to deserialize device data: %w", err)
-	}
-
-	return &device, nil
 }

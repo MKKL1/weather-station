@@ -6,7 +6,7 @@
       "direction": "in",
       "name": "req",
       "methods": ["post"],
-      "route": "v1/activate"
+      "route": "v1/devices/{deviceId}/claim-code"
     },
     {
       "type": "http",

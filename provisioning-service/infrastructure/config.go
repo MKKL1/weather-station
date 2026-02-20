@@ -46,7 +46,7 @@ type Config struct {
 func NewConfig() (*Config, error) {
 	k := koanf.New(".")
 
-	if err := k.Load(confmap.Provider(map[string]interface{}{
+	if err := k.Load(confmap.Provider(map[string]any{
 		"activation_code_ttl":      defaultActivationCodeTTL,
 		"failed_attempts_ttl":      defaultFailedAttemptsTTL,
 		"max_failed_attempts":      defaultMaxFailedAttempts,

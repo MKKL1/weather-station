@@ -9,6 +9,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+	<PackageReference Include="Azure.Identity" Version="1.17.1" />
 	<PackageReference Include="Microsoft.Azure.Cosmos" Version="3.56.0" />
 	<PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="9.0.7" />
 	<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.0" />
@@ -17,14 +18,11 @@
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.7" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="9.0.7" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.3" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" Version="10.3.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.3" />
 	<ProjectReference Include="..\WeatherStation.Core\WeatherStation.Core.csproj" />
 	<ProjectReference Include="..\WeatherStation.Infrastructure\WeatherStation.Infrastructure.csproj" />
 	  
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Responses\" />
   </ItemGroup>
 
 </Project>

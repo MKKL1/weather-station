@@ -6,7 +6,7 @@
       "direction": "in",
       "name": "req",
       "methods": ["post"],
-      "route": "v1/auth/token"
+      "route": "v1/devices/{deviceId}/token"
     },
     {
       "type": "http",

@@ -27,6 +27,24 @@ resource "azurerm_key_vault_secret" "token_signing_key" {
   key_vault_id = azurerm_key_vault.secrets_vault.id
   tags         = var.tags
 
-  # Ensure the policy exists before trying to write the secret
   depends_on = [azurerm_key_vault_access_policy.terraform_user_access]
+}
+
+
+resource "azuread_application" "external_worker_app" {
+  display_name = "external-worker-app-${var.project_name}-${var.environment}"
+}
+
+resource "azuread_service_principal" "external_worker_sp" {
+  client_id = azuread_application.external_worker_app.client_id
+}
+
+resource "time_offset" "worker_secret_expiry" {
+  offset_days = 365
+}
+
+resource "azuread_application_password" "external_worker_secret" {
+  application_id = azuread_application.external_worker_app.id
+  display_name   = "external-worker-auth-secret"
+  end_date       = time_offset.worker_secret_expiry.rfc3339
 }

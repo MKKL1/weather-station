@@ -2,26 +2,17 @@ using WeatherStation.Core;
 
 namespace WeatherStation.API;
 
-public class DomainExceptionMiddleware
+public class DomainExceptionMiddleware(RequestDelegate next, ILogger<DomainExceptionMiddleware> logger)
 {
-    private readonly RequestDelegate _next;
-    private readonly ILogger<DomainExceptionMiddleware> _logger;
-
-    public DomainExceptionMiddleware(RequestDelegate next, ILogger<DomainExceptionMiddleware> logger)
-    {
-        _next = next;
-        _logger = logger;
-    }
-
     public async Task InvokeAsync(HttpContext context)
     {
         try
         {
-            await _next(context);
+            await next(context);
         }
         catch (DomainException ex)
         {
-            _logger.LogWarning("Domain logic rejected request: {Message}", ex.Message);
+            logger.LogWarning("Domain logic rejected request: {Message}", ex.Message);
 
             context.Response.ContentType = "application/json";
             context.Response.StatusCode = StatusCodes.Status400BadRequest;

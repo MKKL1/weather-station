@@ -80,3 +80,26 @@ output "app_insights_connection_string" {
   value       = azurerm_application_insights.backend_tracing.connection_string
   sensitive   = true
 }
+
+output "external_worker_client_id" {
+  value = azuread_application.external_worker_app.client_id
+}
+
+output "external_worker_client_secret" {
+  value     = azuread_application_password.external_worker_secret.value
+  sensitive = true
+}
+
+output "tenant_id" {
+  value = data.azurerm_client_config.current.tenant_id
+}
+
+output "provisioning_function_app_client_id" {
+  description = "Client ID of the provisioning function app auth registration (use as AuthService Scope: api://<this>/.default)"
+  value       = azuread_application.function_app_auth.client_id
+}
+
+output "claim_endpoint" {
+  description = "Full URL for the device claim endpoint (external worker)"
+  value       = "${azurerm_api_management.api_gateway.gateway_url}/${azurerm_api_management_api.provisioning_api.path}/{deviceId}/claim"
+}

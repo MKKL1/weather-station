@@ -15,6 +15,7 @@ using Container = Microsoft.Azure.Cosmos.Container;
 using Microsoft.Extensions.Options;
 using WeatherStation.API;
 using WeatherStation.API.Options;
+using WeatherStation.API.Token;
 using WeatherStation.Core.Dto;
 using WeatherStation.Infrastructure.External;
 
@@ -89,6 +90,11 @@ builder.Services.AddOptions<KeycloakOptions>()
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
+builder.Services.AddOptions<DeviceAuthServiceOptions>()
+    .Bind(builder.Configuration.GetSection(DeviceAuthServiceOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
 builder.Services.AddSingleton<CosmosClient>(sp =>
 {
     var options = sp.GetRequiredService<IOptions<CosmosDbOptions>>().Value;
@@ -109,10 +115,18 @@ builder.Services.AddSingleton<Container>(sp =>
     return client.GetDatabase(options.DatabaseName).GetContainer(options.ViewsContainerName);
 });
 
+builder.Services.AddTransient<ApimAuthenticationHandler>();
+builder.Services.AddHttpClient<IDeviceAuthGateway, DeviceAuthGatewayHttpClient>((sp, client) =>
+    {
+        var options = sp.GetRequiredService<IOptions<DeviceAuthServiceOptions>>().Value;
+        client.BaseAddress = new Uri(options.BaseUrl);
+    })
+    .AddHttpMessageHandler<ApimAuthenticationHandler>()
+    .AddStandardResilienceHandler();
+
 builder.Services.AddScoped<IMeasurementRepository, MeasurementRepository>();
 builder.Services.AddScoped<MeasurementService>();
 builder.Services.AddScoped<DeviceAccessValidator>(sp => new DeviceAccessValidator(sp.GetRequiredService<IDeviceRepository>()));
-builder.Services.AddScoped<IDeviceAuthGateway, DeviceAuthGateway>(_ => new DeviceAuthGateway());
 builder.Services.AddScoped<DeviceService>(sp => new DeviceService(sp.GetRequiredService<IDeviceRepository>(), sp.GetRequiredService<DeviceAccessValidator>()));
 builder.Services.AddScoped<DeviceAuthenticationService>(_ => new DeviceAuthenticationService());
 builder.Services.AddScoped<DeviceClaimService>(sp => new DeviceClaimService(
@@ -138,16 +152,14 @@ builder.Services.AddAuthentication(options =>
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
-            ValidIssuer = options.Authority, // Ensure this matches "http://localhost:8082/realms/weather-server"
+            ValidIssuer = options.Authority,
 
-            // Fix for the NEXT error (Audience):
             ValidateAudience = true,
-            ValidAudience = options.Audience, // Ensure this matches what Keycloak sends (see step 2 below)
+            ValidAudience = options.Audience,
 
-            RoleClaimType = keycloakOptions.RoleClaimType, // usually "realm_access.roles" or "roles"
-            NameClaimType = keycloakOptions.NameClaimType, // usually "preferred_username"
+            RoleClaimType = keycloakOptions.RoleClaimType,
+            NameClaimType = keycloakOptions.NameClaimType,
 
-            // Optional: Clock skew allowance for slight time differences between Docker/Host
             ClockSkew = TimeSpan.Zero
         };
 

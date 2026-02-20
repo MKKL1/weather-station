@@ -5,9 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -16,8 +14,7 @@ import (
 )
 
 const (
-	queryPageSize = 1
-	tracerName    = "provisioning-service/database"
+	tracerName = "provisioning-service/database"
 )
 
 var (
@@ -115,54 +112,6 @@ func (db *CosmosDB) Upsert(ctx context.Context, deviceID string, data []byte) er
 
 	span.SetStatus(codes.Ok, "")
 	return nil
-}
-
-// QueryByActiveActivationCode finds a device by its active activation code.
-func (db *CosmosDB) QueryByActiveActivationCode(ctx context.Context, code string) ([]byte, error) {
-	ctx, span := db.tracer.Start(ctx, "cosmos.query_items",
-		trace.WithAttributes(
-			attribute.String("db.system", "cosmosdb"),
-			attribute.String("db.operation", "QueryItems"),
-			attribute.String("db.container", db.containerName),
-			attribute.Bool("db.cross_partition", true),
-		),
-	)
-	defer span.End()
-
-	query := "SELECT * FROM c WHERE c.activationCode = @code AND c.activationCodeExpiresAt > @now"
-	now := time.Now().UTC().Format(time.RFC3339)
-
-	params := []azcosmos.QueryParameter{
-		{Name: "@code", Value: code},
-		{Name: "@now", Value: now},
-	}
-
-	pager := db.devices.NewQueryItemsPager(query, azcosmos.PartitionKey{}, &azcosmos.QueryOptions{
-		QueryParameters:           params,
-		EnableCrossPartitionQuery: to.Ptr(true),
-		PageSizeHint:              int32(queryPageSize),
-	})
-
-	if !pager.More() {
-		span.SetStatus(codes.Ok, "no results")
-		return nil, ErrNotFound
-	}
-
-	resp, err := pager.NextPage(ctx)
-	if err != nil {
-		span.SetStatus(codes.Error, err.Error())
-		span.RecordError(err)
-		return nil, fmt.Errorf("failed to query for activation code: %w", err)
-	}
-
-	if len(resp.Items) == 0 {
-		span.SetStatus(codes.Ok, "no results")
-		return nil, ErrNotFound
-	}
-
-	span.SetStatus(codes.Ok, "")
-	span.SetAttributes(attribute.Int("db.result_count", len(resp.Items)))
-	return resp.Items[0], nil
 }
 
 // isNotFoundError checks if an error indicates that a document was not found.

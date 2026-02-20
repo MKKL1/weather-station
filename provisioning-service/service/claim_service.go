@@ -2,121 +2,82 @@ package service
 
 import (
 	"context"
-	"errors"
 	"fmt"
-
-	"provisioning-service/infrastructure"
-	"provisioning-service/repository"
+	"provisioning-service/domain"
+	"provisioning-service/pkg"
+	"time"
 
 	"github.com/rs/zerolog"
 )
 
-// Predefined errors for claim operations
-var (
-	// ErrDeviceNotFound indicates the device does not exist in the system
-	ErrDeviceNotFound = errors.New("device not found")
-
-	// ErrDeviceNotActivated indicates the device has no activation code
-	ErrDeviceNotActivated = errors.New("device has not been activated")
-
-	// ErrDeviceLocked indicates the device is locked due to too many failed attempts
-	ErrDeviceLocked = errors.New("device locked due to too many failed attempts")
-
-	// ErrAlreadyClaimed indicates the device is already claimed by another user
-	ErrAlreadyClaimed = errors.New("device already claimed by another user")
-
-	// ErrInvalidCode indicates the activation code is invalid or expired
-	ErrInvalidCode = errors.New("invalid or expired activation code")
-)
-
-type ClaimResult struct {
-	// AlreadyClaimedBySameUser is true if the device was already claimed by the requesting user
-	AlreadyClaimedBySameUser bool
-}
-
 type ClaimService struct {
-	deviceRepo *repository.DeviceRepository
-	config     *infrastructure.Config
-	logger     zerolog.Logger
+	deviceRepo        domain.DeviceRepository
+	logger            zerolog.Logger
+	activationCodeTTL time.Duration
 }
 
 func NewClaimService(
-	deviceRepo *repository.DeviceRepository,
-	config *infrastructure.Config,
+	deviceRepo domain.DeviceRepository,
 	logger zerolog.Logger,
+	activationCodeTTL time.Duration,
 ) *ClaimService {
 	return &ClaimService{
-		deviceRepo: deviceRepo,
-		config:     config,
-		logger:     logger.With().Str("component", "claim_service").Logger(),
+		deviceRepo:        deviceRepo,
+		logger:            logger.With().Str("component", "claim_service").Logger(),
+		activationCodeTTL: activationCodeTTL,
 	}
 }
 
 // Claim attempts to claim a device using an activation code.
-func (s *ClaimService) Claim(ctx context.Context, code, userID string) (*ClaimResult, error) {
-	device, err := s.deviceRepo.GetByActiveActivationCode(ctx, code)
+func (s *ClaimService) Claim(ctx context.Context, code string, deviceId string, userId string) (*domain.ClaimResult, error) {
+	device, err := s.deviceRepo.Get(ctx, deviceId)
 	if err != nil {
-		return nil, fmt.Errorf("failed to query device by activation code: %w", err)
+		return nil, fmt.Errorf("failed to query device by id: %w", err)
 	}
 
 	if device == nil {
-		return nil, ErrInvalidCode
+		return nil, domain.ErrDeviceNotFound
 	}
 
-	if device.IsLocked() {
-		s.logger.Warn().
-			Str("device_id", device.DeviceID).
-			Str("user_id", userID).
-			Int("failed_attempts", device.FailedAttempts).
-			Msg("claim blocked: device locked")
-		return nil, ErrDeviceLocked
+	result, err := device.TryClaim(userId, code)
+	if err != nil {
+		return nil, err
 	}
-
-	if device.IsClaimedBy(userID) {
-		return &ClaimResult{AlreadyClaimedBySameUser: true}, nil
-	}
-
-	if device.IsClaimed {
-		s.logger.Warn().
-			Str("device_id", device.DeviceID).
-			Str("user_id", userID).
-			Str("current_owner", device.UserID).
-			Msg("claim blocked: owned by another user")
-
-		locked := device.IncrementFailedAttempts(
-			s.config.MaxFailedAttempts,
-			s.config.FailedAttemptsTTL,
-		)
-
-		if saveErr := s.deviceRepo.Save(ctx, device); saveErr != nil {
-			s.logger.Error().
-				Err(saveErr).
-				Str("device_id", device.DeviceID).
-				Msg("failed to save device after failed claim")
-		}
-
-		if locked {
-			s.logger.Warn().
-				Str("device_id", device.DeviceID).
-				Int("failed_attempts", device.FailedAttempts).
-				Msg("device locked: max attempts reached")
-		}
-
-		return nil, ErrAlreadyClaimed
-	}
-
-	device.Claim(userID)
-	device.ClearActivationCode()
-	device.ResetFailedAttempts()
 
 	if err := s.deviceRepo.Save(ctx, device); err != nil {
 		return nil, fmt.Errorf("failed to save claimed device: %w", err)
 	}
 
-	s.logger.Info().
-		Str("device_id", device.DeviceID).
-		Str("user_id", userID).
-		Msg("device claimed")
+	return result, nil
+}
 
-	return &ClaimResult{AlreadyClaimedBySameUser: false}, nil
+// GenerateCode generates a new activation code for a registered device.
+func (s *ClaimService) GenerateCode(ctx context.Context, deviceID string) (*domain.ClaimCodeResult, error) {
+	device, err := s.deviceRepo.Get(ctx, deviceID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve device: %w", err)
+	}
+
+	if device == nil {
+		s.logger.Warn().
+			Str("device_id", deviceID).
+			Msg("claim code requested for unregistered device")
+		return nil, ErrDeviceNotRegistered
+	}
+
+	code, err := pkg.GenerateClaimCode()
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate claim code: %w", err)
+	}
+
+	device.SetClaimCode(code, s.activationCodeTTL)
+
+	if err := s.deviceRepo.Save(ctx, device); err != nil {
+		return nil, fmt.Errorf("failed to save device with claim code: %w", err)
+	}
+
+	return &domain.ClaimCodeResult{
+		ClaimCode:       code,
+		ValiditySeconds: int(s.activationCodeTTL.Seconds()),
+	}, nil
 }
