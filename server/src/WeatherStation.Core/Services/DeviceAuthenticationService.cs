@@ -3,6 +3,7 @@ using SimpleBase;
 
 namespace WeatherStation.Core.Services;
 
+//TODO rename as there are a lot of services like this one, also service chaining
 public class DeviceAuthenticationService
 {
     //Handles 12 words device authentication.

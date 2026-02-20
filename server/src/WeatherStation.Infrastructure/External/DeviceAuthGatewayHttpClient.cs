@@ -7,7 +7,7 @@ public class DeviceAuthGatewayHttpClient(
     HttpClient httpClient)
     : IDeviceAuthGateway
 {
-    public async Task<IDeviceAuthGateway.ClaimStatus> ClaimDevice(IDeviceAuthGateway.ClaimRequest claimRequest)
+    public async Task<IDeviceAuthGateway.ClaimStatus> ClaimDevice(IDeviceAuthGateway.ClaimRequest claimRequest, CancellationToken ct)
     {
         var payload = new
         {
@@ -16,11 +16,12 @@ public class DeviceAuthGatewayHttpClient(
         };
         
         var response = await httpClient.PostAsJsonAsync(
-            $"http://localhost:8082/api/v1/devices/{claimRequest.DeviceId}/claim", //TODO format string
-            payload
+            $"{claimRequest.DeviceId}/claim", //TODO format string
+            payload,
+            ct
         );
         
-        var result = await response.Content.ReadFromJsonAsync<ClaimResponse>();
+        var result = await response.Content.ReadFromJsonAsync<ClaimResponse>(cancellationToken: ct);
         if (result == null)
         {
             throw new InvalidOperationException("Response body is empty");

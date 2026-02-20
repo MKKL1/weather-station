@@ -40,7 +40,7 @@ public class DeviceClaimService
         //We can just send message to user, asking them to generate new code if worst case scenario happens
         //New claim code has to be always valid
         var res = await _deviceAuthGateway
-            .ClaimDevice(new IDeviceAuthGateway.ClaimRequest(deviceId, request.ClaimCode, userId.ToString()));
+            .ClaimDevice(new IDeviceAuthGateway.ClaimRequest(deviceId, request.ClaimCode, userId.ToString()), ct);
 
         switch (res)
         {

@@ -15,6 +15,7 @@ using Container = Microsoft.Azure.Cosmos.Container;
 using Microsoft.Extensions.Options;
 using WeatherStation.API;
 using WeatherStation.API.Options;
+using WeatherStation.API.Token;
 using WeatherStation.Core.Dto;
 using WeatherStation.Infrastructure.External;
 
@@ -89,6 +90,11 @@ builder.Services.AddOptions<KeycloakOptions>()
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
+builder.Services.AddOptions<DeviceAuthServiceOptions>()
+    .Bind(builder.Configuration.GetSection(DeviceAuthServiceOptions.SectionName))
+    .ValidateDataAnnotations()
+    .ValidateOnStart();
+
 builder.Services.AddSingleton<CosmosClient>(sp =>
 {
     var options = sp.GetRequiredService<IOptions<CosmosDbOptions>>().Value;
@@ -109,12 +115,17 @@ builder.Services.AddSingleton<Container>(sp =>
     return client.GetDatabase(options.DatabaseName).GetContainer(options.ViewsContainerName);
 });
 
-builder.Services.AddHttpClient();
+builder.Services.AddTransient<ApimAuthenticationHandler>();
+builder.Services.AddHttpClient<IDeviceAuthGateway, DeviceAuthGatewayHttpClient>((sp, client) =>
+    {
+        var options = sp.GetRequiredService<IOptions<DeviceAuthServiceOptions>>().Value;
+        client.BaseAddress = new Uri(options.BaseUrl);
+    })
+    .AddHttpMessageHandler<ApimAuthenticationHandler>();
 
 builder.Services.AddScoped<IMeasurementRepository, MeasurementRepository>();
 builder.Services.AddScoped<MeasurementService>();
 builder.Services.AddScoped<DeviceAccessValidator>(sp => new DeviceAccessValidator(sp.GetRequiredService<IDeviceRepository>()));
-builder.Services.AddScoped<IDeviceAuthGateway, DeviceAuthGatewayHttpClient>(sp => new DeviceAuthGatewayHttpClient(sp.GetRequiredService<IHttpClientFactory>().CreateClient()));
 builder.Services.AddScoped<DeviceService>(sp => new DeviceService(sp.GetRequiredService<IDeviceRepository>(), sp.GetRequiredService<DeviceAccessValidator>()));
 builder.Services.AddScoped<DeviceAuthenticationService>(_ => new DeviceAuthenticationService());
 builder.Services.AddScoped<DeviceClaimService>(sp => new DeviceClaimService(

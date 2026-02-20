@@ -6,7 +6,7 @@
       "direction": "in",
       "name": "req",
       "methods": ["post"],
-      "route": "v1/claim"
+      "route": "v1/devices/{deviceId}/claim"
     },
     {
       "type": "http",
