@@ -12,14 +12,12 @@
       />
       <audiences>
         <audience>api://{{function-app-client-id}}</audience>
+        <audience>{{function-app-client-id}}</audience>
       </audiences>
       <issuers>
         <issuer>https://sts.windows.net/{{tenant-id}}/</issuer>
       </issuers>
       <required-claims>
-        <claim name="appid" match="any">
-          <value>{{external-worker-client-id}}</value>
-        </claim>
         <claim name="azp" match="any">
           <value>{{external-worker-client-id}}</value>
         </claim>
