@@ -1,0 +1,409 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "API for device registration, authentication, and ownership management.",
+        "title": "Provisioning Service API",
+        "contact": {},
+        "version": "1.0.0"
+    },
+    "basePath": "/api/v1",
+    "paths": {
+        "/api/v1/devices/{id}/claim": {
+            "post": {
+                "description": "Associates a device with a user account using a valid activation code.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Provisioning"
+                ],
+                "summary": "Claim Device",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "H1-ABC",
+                        "description": "Device ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Claim details",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controller.OwnershipClaimRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.DeviceClaimResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Missing required fields (INVALID_REQUEST) or invalid/expired activation code (INVALID_CODE)",
+                        "schema": {
+                            "$ref": "#/definitions/controller.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Device not found (DEVICE_NOT_FOUND)",
+                        "schema": {
+                            "$ref": "#/definitions/controller.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Device already claimed by a different user (DEVICE_ALREADY_CLAIMED)",
+                        "schema": {
+                            "$ref": "#/definitions/controller.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error (INTERNAL_ERROR)",
+                        "schema": {
+                            "$ref": "#/definitions/controller.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/devices/{id}/claim-code": {
+            "post": {
+                "description": "Generates a short-lived activation code that can be used to claim ownership of the device.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Provisioning"
+                ],
+                "summary": "Create Claim Code",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "H1-ABC",
+                        "description": "Device ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.ClaimCodeResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Missing device ID (INVALID_REQUEST)",
+                        "schema": {
+                            "$ref": "#/definitions/controller.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Device not found (DEVICE_NOT_FOUND) or not yet registered (DEVICE_NOT_REGISTERED)",
+                        "schema": {
+                            "$ref": "#/definitions/controller.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error (INTERNAL_ERROR)",
+                        "schema": {
+                            "$ref": "#/definitions/controller.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/devices/{id}/register": {
+            "post": {
+                "description": "Registers a new device and returns an HMAC secret for signing future authentication challenges. If the device is already registered, the existing secret is returned.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Provisioning"
+                ],
+                "summary": "Register Device",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "H1-ABC",
+                        "description": "Device ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.DeviceRegistrationResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Missing device ID (INVALID_REQUEST)",
+                        "schema": {
+                            "$ref": "#/definitions/controller.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error (INTERNAL_ERROR)",
+                        "schema": {
+                            "$ref": "#/definitions/controller.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/devices/{id}/token": {
+            "post": {
+                "description": "Exchanges a signed HMAC challenge for a short-lived access token. The signature must be the HMAC-SHA256 of \"{deviceId}:{timestamp}\" using the secret returned by registration.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Provisioning"
+                ],
+                "summary": "Create Access Token",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "example": "H1-ABC",
+                        "description": "Device ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "HMAC challenge",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/controller.HmacChallengeRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/controller.AccessTokenResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body (INVALID_REQUEST)",
+                        "schema": {
+                            "$ref": "#/definitions/controller.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Signature mismatch (INVALID_SIGNATURE) or timestamp outside allowed drift (INVALID_TIMESTAMP)",
+                        "schema": {
+                            "$ref": "#/definitions/controller.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Device not found (DEVICE_NOT_FOUND) or not yet registered (DEVICE_NOT_REGISTERED)",
+                        "schema": {
+                            "$ref": "#/definitions/controller.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal error (INTERNAL_ERROR)",
+                        "schema": {
+                            "$ref": "#/definitions/controller.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "controller.AccessTokenResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/controller.AccessTokenResponseData"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "token_generated"
+                }
+            }
+        },
+        "controller.AccessTokenResponseData": {
+            "type": "object",
+            "properties": {
+                "expires_in": {
+                    "type": "integer",
+                    "example": 86400
+                },
+                "token": {
+                    "type": "string",
+                    "example": "header.payload.signature"
+                },
+                "token_type": {
+                    "type": "string",
+                    "example": "Bearer"
+                }
+            }
+        },
+        "controller.ClaimCodeResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/controller.ClaimCodeResponseData"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "claim_code_generated"
+                }
+            }
+        },
+        "controller.ClaimCodeResponseData": {
+            "type": "object",
+            "properties": {
+                "claim_code": {
+                    "type": "string",
+                    "example": "A1B2C3"
+                },
+                "validity_seconds": {
+                    "type": "integer",
+                    "example": 300
+                }
+            }
+        },
+        "controller.DeviceClaimResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/controller.DeviceClaimResponseData"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "claimed"
+                }
+            }
+        },
+        "controller.DeviceClaimResponseData": {
+            "type": "object",
+            "properties": {
+                "claimed_by_user_id": {
+                    "type": "string",
+                    "example": "user-123"
+                },
+                "device_id": {
+                    "type": "string",
+                    "example": "H1-ABC"
+                }
+            }
+        },
+        "controller.DeviceRegistrationResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/controller.DeviceRegistrationResponseData"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "registered"
+                }
+            }
+        },
+        "controller.DeviceRegistrationResponseData": {
+            "type": "object",
+            "properties": {
+                "device_id": {
+                    "type": "string",
+                    "example": "H1-ABC"
+                },
+                "hmac_secret": {
+                    "type": "string",
+                    "example": "dGhpcyBpcyBhIHRlc3Qgc2VjcmV0IGtleQ=="
+                }
+            }
+        },
+        "controller.ErrorDetail": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "Application error code.",
+                    "type": "string",
+                    "enum": [
+                        "INVALID_REQUEST",
+                        "DEVICE_NOT_FOUND",
+                        "DEVICE_NOT_REGISTERED",
+                        "DEVICE_ALREADY_CLAIMED",
+                        "INVALID_CODE",
+                        "INVALID_TIMESTAMP",
+                        "INVALID_SIGNATURE",
+                        "INTERNAL_ERROR"
+                    ]
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "controller.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "$ref": "#/definitions/controller.ErrorDetail"
+                },
+                "status": {
+                    "type": "string",
+                    "example": "error"
+                }
+            }
+        },
+        "controller.HmacChallengeRequest": {
+            "type": "object",
+            "properties": {
+                "signature": {
+                    "description": "HMAC-SHA256 of \"{deviceId}:{timestamp}\" using hmac_secret.",
+                    "type": "string",
+                    "example": "c50c19d1cfe63cb95bb1bfa084db1307a32e3a55e51e2f451997352480151692"
+                },
+                "timestamp": {
+                    "description": "Unix timestamp (seconds) of the request.",
+                    "type": "integer",
+                    "example": 1763756825
+                }
+            }
+        },
+        "controller.OwnershipClaimRequest": {
+            "type": "object",
+            "properties": {
+                "claim_code": {
+                    "description": "Activation code displayed on the device.",
+                    "type": "string",
+                    "example": "A1B2C3"
+                },
+                "user_id": {
+                    "type": "string",
+                    "example": "user-123"
+                }
+            }
+        }
+    }
+}

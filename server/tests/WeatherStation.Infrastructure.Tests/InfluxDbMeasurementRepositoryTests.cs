@@ -81,7 +81,7 @@ public class InfluxDbMeasurementRepositoryTests
         Assert.Equal(22.5f, result.Values[MetricType.Temperature]);
         Assert.Equal(1013.25f, result.Values[MetricType.Pressure]);
         Assert.Equal(55f, result.Values[MetricType.Humidity]);
-        Assert.Equal(1.2f, result.Values[MetricType.Rainfall]);
+        Assert.Equal(1.2f, result.Values[MetricType.Precipitation]);
     }
 
     [Fact]

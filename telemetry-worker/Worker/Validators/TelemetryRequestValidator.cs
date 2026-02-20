@@ -7,8 +7,8 @@ namespace Worker.Validators;
 public class TelemetryRequestValidator : AbstractValidator<TelemetryRequest>
 {
     private const int MaxDataAgeMinutes = 180;
-    private const int MaxHistogramDurationMinutes = 60;
-    private const int HistogramTimeAlignmentMinutes = 30;
+    private const int MaxPrecipitationBinsDurationMinutes = 60;
+    private const int PrecipitationBinsTimeAlignmentMinutes = 30;
     private const int MaxDataPoints = 100;
     private readonly TimeProvider _timeProvider;
     
@@ -30,7 +30,7 @@ public class TelemetryRequestValidator : AbstractValidator<TelemetryRequest>
             .Custom(ValidateTimestampLogic);
         
         RuleFor(x => x)
-            .Custom(ValidateHistogramAlignment);
+            .Custom(ValidatePrecipitationBinsAlignment);
     }
 
     private void ValidateTimestampLogic(long? timestampEpoch, ValidationContext<TelemetryRequest> context)
@@ -72,72 +72,72 @@ public class TelemetryRequestValidator : AbstractValidator<TelemetryRequest>
         });
     }
 
-    private void ValidateHistogramAlignment(TelemetryRequest req, ValidationContext<TelemetryRequest> context)
+    private void ValidatePrecipitationBinsAlignment(TelemetryRequest req, ValidationContext<TelemetryRequest> context)
     {
         if (req.TimestampEpoch == null || 
-            req.Payload?.Rain?.Data == null || 
-            req.Payload.Rain.SlotSeconds == null ||
-            req.Payload.Rain.StartTimeEpoch == null ||
-            req.Payload.Rain.SlotCount == null)
+            req.Payload?.Precipitation?.Data == null || 
+            req.Payload.Precipitation.SlotSeconds == null ||
+            req.Payload.Precipitation.StartTimeEpoch == null ||
+            req.Payload.Precipitation.SlotCount == null)
         {
             return;
         }
 
-        var rain = req.Payload.Rain;
+        var precipitation = req.Payload.Precipitation;
         
-        if (rain.Data.Count > MaxDataPoints)
+        if (precipitation.Data.Count > MaxDataPoints)
         {
-            context.AddFailure(new ValidationFailure("Payload.Rain.Data", 
+            context.AddFailure(new ValidationFailure("Payload.Precipitation.Data", 
                     $"Too many data points. Max allowed: {MaxDataPoints}")
                 { ErrorCode = "TOO_MANY_POINTS" });
             return;
         }
 
-        long totalDurationSeconds = (long)rain.SlotCount.Value * rain.SlotSeconds.Value;
+        long totalDurationSeconds = (long)precipitation.SlotCount.Value * precipitation.SlotSeconds.Value;
 
-        if (totalDurationSeconds > MaxHistogramDurationMinutes * 60)
+        if (totalDurationSeconds > MaxPrecipitationBinsDurationMinutes * 60)
         {
-            context.AddFailure(new ValidationFailure("Payload.Rain", 
-                    $"Histogram duration ({totalDurationSeconds}s) exceeds limit of {MaxHistogramDurationMinutes} minutes")
+            context.AddFailure(new ValidationFailure("Payload.Precipitation", 
+                    $"Precipitation bins duration ({totalDurationSeconds}s) exceeds limit of {MaxPrecipitationBinsDurationMinutes} minutes")
                 { ErrorCode = "HISTOGRAM_DURATION_EXCEEDED" });
             return;
         }
 
-        if (rain.Data.Count > 0)
+        if (precipitation.Data.Count > 0)
         {
-            int maxIndex = rain.Data.Keys.Max();
-            int minIndex = rain.Data.Keys.Min();
+            int maxIndex = precipitation.Data.Keys.Max();
+            int minIndex = precipitation.Data.Keys.Min();
 
             if (minIndex < 0)
             {
-                context.AddFailure(new ValidationFailure("Payload.Rain.Data", "Negative time slots are not allowed")
+                context.AddFailure(new ValidationFailure("Payload.Precipitation.Data", "Negative time slots are not allowed")
                     { ErrorCode = "INVALID_SLOT_INDEX" });
                 return;
             }
 
-            if (maxIndex >= rain.SlotCount.Value)
+            if (maxIndex >= precipitation.SlotCount.Value)
             {
-                context.AddFailure(new ValidationFailure("Payload.Rain.Data", 
-                        $"Data contains index {maxIndex} which exceeds declared SlotCount {rain.SlotCount.Value}")
+                context.AddFailure(new ValidationFailure("Payload.Precipitation.Data", 
+                        $"Data contains index {maxIndex} which exceeds declared SlotCount {precipitation.SlotCount.Value}")
                     { ErrorCode = "INDEX_OUT_OF_BOUNDS" });
                 return;
             }
         }
 
         // 4. Timeline Alignment
-        var histStart = rain.StartTimeEpoch.Value > 0
-            ? DateTimeOffset.FromUnixTimeSeconds(rain.StartTimeEpoch.Value)
+        var binsStart = precipitation.StartTimeEpoch.Value > 0
+            ? DateTimeOffset.FromUnixTimeSeconds(precipitation.StartTimeEpoch.Value)
             : DateTimeOffset.UnixEpoch;
 
-        var histEnd = histStart.AddSeconds(totalDurationSeconds);
+        var binsEnd = binsStart.AddSeconds(totalDurationSeconds);
         var eventTime = DateTimeOffset.FromUnixTimeSeconds(req.TimestampEpoch.Value);
     
-        var diff = Math.Abs((eventTime - histEnd).TotalMinutes);
+        var diff = Math.Abs((eventTime - binsEnd).TotalMinutes);
 
-        if (diff > HistogramTimeAlignmentMinutes)
+        if (diff > PrecipitationBinsTimeAlignmentMinutes)
         {
-            context.AddFailure(new ValidationFailure("Payload.Rain", 
-                    $"Histogram timeline mismatch (off by {diff:F0} minutes)")
+            context.AddFailure(new ValidationFailure("Payload.Precipitation", 
+                    $"Precipitation bins timeline mismatch (off by {diff:F0} minutes)")
                 { ErrorCode = "HISTOGRAM_ALIGNMENT_MISMATCH" });
         }
     }
@@ -147,22 +147,22 @@ public class PayloadValidator : AbstractValidator<TelemetryRequest.PayloadRecord
 {
     public PayloadValidator()
     {
-        When(x => x.Rain != null, () =>
+        When(x => x.Precipitation != null, () =>
         {
-            RuleFor(x => x.Rain)
-                .SetValidator(new HistogramValidator()!);
+            RuleFor(x => x.Precipitation)
+                .SetValidator(new PrecipitationBinsValidator()!);
         });
     }
 }
 
-public class HistogramValidator : AbstractValidator<TelemetryRequest.HistogramRecord>
+public class PrecipitationBinsValidator : AbstractValidator<TelemetryRequest.PrecipitationBinsRecord>
 {
-    public HistogramValidator()
+    public PrecipitationBinsValidator()
     {
         RuleFor(x => x.Data)
-            .NotNull().WithMessage("Rain histogram data is required")
+            .NotNull().WithMessage("Precipitation bins data is required")
                 .WithErrorCode("MISSING_RAIN_DATA")
-            .NotEmpty().WithMessage("Rain histogram array cannot be empty")
+            .NotEmpty().WithMessage("Precipitation bins array cannot be empty")
                 .WithErrorCode("EMPTY_RAIN_DATA");
 
         RuleFor(x => x.SlotSeconds)
@@ -172,9 +172,9 @@ public class HistogramValidator : AbstractValidator<TelemetryRequest.HistogramRe
                 .WithErrorCode("INVALID_SLOT_SECONDS");
 
         RuleFor(x => x.StartTimeEpoch)
-            .NotNull().WithMessage("Histogram start time is required")
+            .NotNull().WithMessage("Precipitation bins start time is required")
                 .WithErrorCode("MISSING_HIST_START")
-            .GreaterThan(0).WithMessage("Histogram start time must be positive")
+            .GreaterThan(0).WithMessage("Precipitation bins start time must be positive")
                 .WithErrorCode("INVALID_HIST_START");
         
         RuleFor(x => x.SlotCount)

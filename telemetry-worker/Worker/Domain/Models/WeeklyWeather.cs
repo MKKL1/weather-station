@@ -13,12 +13,12 @@ public class WeeklyWeather
     public StatSummary?[] DailyTemperatures { get; private set; } = new StatSummary?[7];
     public StatSummary?[] DailyHumidities { get; private set; } = new StatSummary?[7];
     public StatSummary?[] DailyPressures { get; private set; } = new StatSummary?[7];
-    public StatSummary?[] DailyRainfall { get; private set; } = new StatSummary?[7];
+    public StatSummary?[] DailyPrecipitation { get; private set; } = new StatSummary?[7];
 
     public StatSummary? Temperature { get; private set; }
     public StatSummary? Humidity { get; private set; }
     public StatSummary? Pressure { get; private set; }
-    public StatSummary? Rain { get; private set; }
+    public StatSummary? Precipitation { get; private set; }
 
     public WeeklyWeather(string deviceId, int year, int weekNumber)
     {
@@ -46,10 +46,10 @@ public class WeeklyWeather
             DailyPressures[index] = new StatSummary(
                 day.Pressure.Min, day.Pressure.Max, day.Pressure.GetAverage);
 
-        if (day.Rain != null && day.Rain.Histogram.Data.Count > 0)
+        if (day.Precipitation != null && day.Precipitation.Bins.Data.Count > 0)
         {
-            var values = day.Rain.Histogram.Data.Values;
-            DailyRainfall[index] = new StatSummary(
+            var values = day.Precipitation.Bins.Data.Values;
+            DailyPrecipitation[index] = new StatSummary(
                 Min: values.Min(),
                 Max: values.Max(),
                 Avg: values.Average()
@@ -57,7 +57,7 @@ public class WeeklyWeather
         }
         else
         {
-            DailyRainfall[index] = new StatSummary(0, 0, 0);
+            DailyPrecipitation[index] = new StatSummary(0, 0, 0);
         }
 
         RecalculateWeeklyStats();
@@ -68,7 +68,7 @@ public class WeeklyWeather
         Temperature = CalculateStats(DailyTemperatures);
         Humidity = CalculateStats(DailyHumidities);
         Pressure = CalculateStats(DailyPressures);
-        Rain = CalculateStats(DailyRainfall);
+        Precipitation = CalculateStats(DailyPrecipitation);
     }
 
     private static StatSummary? CalculateStats(StatSummary?[] buckets)

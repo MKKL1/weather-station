@@ -32,7 +32,7 @@ public static class AggregatedMeasurementCosmosMapper
                     ? MetricStatCosmosMapper.ToEntity(payload.Pressure, payload.IsFinalized)
                     : null,
                 AirQuality = null, //Not yet in database
-                Precipitation = payload.HourlyRain == null ? null : MetricStatCosmosMapper.ToEntity(payload.HourlyRain),
+                Precipitation = payload.HourlyPrecipitation == null ? null : MetricStatCosmosMapper.ToEntity(payload.HourlyPrecipitation),
                 WindSpeed = null,
                 WindDirection = null
             });
@@ -51,10 +51,10 @@ public static class AggregatedMeasurementCosmosMapper
         var date = DateOnly.FromDateTime(DateTimeOffset.FromUnixTimeSeconds(document.DayTimestampEpoch).UtcDateTime);
         var payload = document.Payload;
 
-        int rainSlotsPerHour = 0;
-        if (payload.HourlyRain != null && payload.HourlyRain.SlotSecs > 0)
+        int precipitationSlotsPerHour = 0;
+        if (payload.HourlyPrecipitation != null && payload.HourlyPrecipitation.SlotSecs > 0)
         {
-            rainSlotsPerHour = 3600 / payload.HourlyRain.SlotSecs;
+            precipitationSlotsPerHour = 3600 / payload.HourlyPrecipitation.SlotSecs;
         }
 
         for (int hour = 0; hour < 24; hour++)
@@ -65,21 +65,21 @@ public static class AggregatedMeasurementCosmosMapper
 
             PrecipitationStat? precipStat = null;
 
-            if (payload.HourlyRain?.Data != null && rainSlotsPerHour > 0)
+            if (payload.HourlyPrecipitation?.Data != null && precipitationSlotsPerHour > 0)
             {
-                int startSlot = hour * rainSlotsPerHour;
-                int endSlot = startSlot + rainSlotsPerHour;
+                int startSlot = hour * precipitationSlotsPerHour;
+                int endSlot = startSlot + precipitationSlotsPerHour;
 
-                var hourlyIntensities = new List<double>(rainSlotsPerHour);
+                var hourlyIntensities = new List<double>(precipitationSlotsPerHour);
                 double totalVolume = 0;
                 double maxRate = 0;
 
                 for (int slot = startSlot; slot < endSlot; slot++)
                 {
-                    var rainMm = payload.HourlyRain.Data.GetValueOrDefault(slot, 0f);
-                    hourlyIntensities.Add(rainMm);
-                    totalVolume += rainMm;
-                    maxRate = Math.Max(maxRate, rainMm);
+                    var precipMm = payload.HourlyPrecipitation.Data.GetValueOrDefault(slot, 0f);
+                    hourlyIntensities.Add(precipMm);
+                    totalVolume += precipMm;
+                    maxRate = Math.Max(maxRate, precipMm);
                 }
 
                 if (totalVolume > 0)
@@ -88,10 +88,10 @@ public static class AggregatedMeasurementCosmosMapper
                     {
                         Total = totalVolume,
                         MaxRate = maxRate,
-                        DurationSeconds = rainSlotsPerHour * payload.HourlyRain.SlotSecs / 60.0,
+                        DurationSeconds = precipitationSlotsPerHour * payload.HourlyPrecipitation.SlotSecs / 60.0,
                         Pattern = new PrecipitationPattern
                         {
-                            IntervalSeconds = payload.HourlyRain.SlotSecs,
+                            IntervalSeconds = payload.HourlyPrecipitation.SlotSecs,
                             Intensities = hourlyIntensities
                         }
                     };
@@ -152,8 +152,8 @@ public static class AggregatedMeasurementCosmosMapper
                 ? MetricStatCosmosMapper.ToEntity(payload.Pressure)
                 : null,
             AirQuality = null,
-            Precipitation = payload.Rain != null
-                ? MapPrecipitationSummary(payload.Rain)
+            Precipitation = payload.Precipitation != null
+                ? MapPrecipitationSummary(payload.Precipitation)
                 : null,
             WindSpeed = null,
             WindDirection = null
@@ -176,9 +176,9 @@ public static class AggregatedMeasurementCosmosMapper
             var tempDoc = payload.DailyTemperatures?.ElementAtOrDefault(dayIndex);
             var humDoc = payload.DailyHumidities?.ElementAtOrDefault(dayIndex);
             var presDoc = payload.DailyPressures?.ElementAtOrDefault(dayIndex);
-            var rainDoc = payload.DailyRainfall?.ElementAtOrDefault(dayIndex);
+            var precipDoc = payload.DailyPrecipitation?.ElementAtOrDefault(dayIndex);
 
-            if (tempDoc == null && humDoc == null && presDoc == null && rainDoc == null)
+            if (tempDoc == null && humDoc == null && presDoc == null && precipDoc == null)
             {
                 continue;
             }
@@ -203,8 +203,8 @@ public static class AggregatedMeasurementCosmosMapper
                     ? MetricStatCosmosMapper.ToEntity(presDoc)
                     : null,
                 AirQuality = null,
-                Precipitation = rainDoc != null
-                    ? MapPrecipitationSummary(rainDoc)
+                Precipitation = precipDoc != null
+                    ? MapPrecipitationSummary(precipDoc)
                     : null,
                 WindSpeed = null,
                 WindDirection = null

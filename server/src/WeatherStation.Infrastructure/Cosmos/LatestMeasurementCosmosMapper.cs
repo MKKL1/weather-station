@@ -16,9 +16,9 @@ public static class LatestMeasurementCosmosMapper
             Temperature = document.Temperature,
             Humidity = document.Humidity,
             Pressure = document.Pressure,
-            Precipitation = document.Rain == null
+            Precipitation = document.Precipitation == null
                 ? null
-                : MetricStatCosmosMapper.ToEntity(document.Rain),
+                : MetricStatCosmosMapper.ToEntity(document.Precipitation),
             AirQuality = null, //not yet implemented in database schema
             WindSpeed = null,
             WindDirection = null

@@ -11,21 +11,21 @@ public class TelemetryMapper
         var timestamp = DateTimeOffset.FromUnixTimeSeconds(dto.TimestampEpoch).ToUniversalTime();
         var payload = dto.Payload;
 
-        RainfallReading? rainVo = null;
+        PrecipitationReading? precipitationVo = null;
         
-        if (payload.Rain != null)
+        if (payload.Precipitation != null)
         {
             float mmPerTip = payload.MmPerTip ?? 0.2f;
-            var sparseMmData = payload.Rain.Data.ToDictionary(
+            var sparseMmData = payload.Precipitation.Data.ToDictionary(
                 kvp => kvp.Key, 
                 kvp => kvp.Value * mmPerTip
             );
             
-            rainVo = RainfallReading.Create(
+            precipitationVo = PrecipitationReading.Create(
                 sparseMmData,
-                payload.Rain.SlotSeconds,
-                DateTimeOffset.FromUnixTimeSeconds(payload.Rain.StartTimeEpoch).ToUniversalTime(),
-                payload.Rain.SlotCount // Use explicit count
+                payload.Precipitation.SlotSeconds,
+                DateTimeOffset.FromUnixTimeSeconds(payload.Precipitation.StartTimeEpoch).ToUniversalTime(),
+                payload.Precipitation.SlotCount // Use explicit count
             );
         }
 
@@ -35,7 +35,7 @@ public class TelemetryMapper
             payload.Temperature ?? 0,
             payload.HumidityPpm ?? 0,
             payload.PressurePa ?? 0,
-            rainVo);
+            precipitationVo);
     }
     
     public ValidatedTelemetryDto ToValidatedDto(TelemetryRequest request)
@@ -49,12 +49,12 @@ public class TelemetryMapper
                 PressurePa = request.Payload.PressurePa,
                 HumidityPpm = request.Payload.HumidityPpm,
                 MmPerTip = request.Payload.MmPerTip,
-                Rain = request.Payload.Rain == null ? null : new ValidatedTelemetryDto.ValidatedHistogram
+                Precipitation = request.Payload.Precipitation == null ? null : new ValidatedTelemetryDto.ValidatedPrecipitationBins
                 {
-                    Data = request.Payload.Rain.Data!,
-                    SlotSeconds = request.Payload.Rain.SlotSeconds!.Value,
-                    StartTimeEpoch = request.Payload.Rain.StartTimeEpoch!.Value,
-                    SlotCount = request.Payload.Rain.SlotCount!.Value,
+                    Data = request.Payload.Precipitation.Data!,
+                    SlotSeconds = request.Payload.Precipitation.SlotSeconds!.Value,
+                    StartTimeEpoch = request.Payload.Precipitation.StartTimeEpoch!.Value,
+                    SlotCount = request.Payload.Precipitation.SlotCount!.Value,
                 }
             }
         };

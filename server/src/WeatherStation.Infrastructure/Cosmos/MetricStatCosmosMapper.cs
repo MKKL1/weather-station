@@ -5,7 +5,7 @@ namespace WeatherStation.Infrastructure.Cosmos;
 
 public static class MetricStatCosmosMapper
 {
-    public static PrecipitationStat ToEntity(HistogramDocument document)
+    public static PrecipitationStat ToEntity(PrecipitationBinsDocument document)
     {
         double totalDurationSeconds = document.SlotCount * document.SlotSecs;
         var intensities = new List<double>(document.SlotCount);

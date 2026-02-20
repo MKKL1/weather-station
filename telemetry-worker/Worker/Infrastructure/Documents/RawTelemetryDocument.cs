@@ -41,14 +41,14 @@ public class RawTelemetryDocument
 
         [JsonProperty("rain")]
         [JsonPropertyName("rain")]
-        public HistogramDocument? Rain { get; set; }
+        public PrecipitationBinsDocument? Precipitation { get; set; }
             
         [JsonProperty("mmpt")]
         [JsonPropertyName("mmpt")]
-        public float RainfallMMPerTip { get; set; }
+        public float PrecipitationMmPerTip { get; set; }
     }
 
-    public class HistogramDocument
+    public class PrecipitationBinsDocument
     {
         [JsonProperty("dat")]
         [JsonPropertyName("dat")]

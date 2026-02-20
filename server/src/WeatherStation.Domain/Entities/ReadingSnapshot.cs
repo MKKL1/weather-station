@@ -7,7 +7,7 @@ public enum MetricType
     Temperature,
     Pressure,
     Humidity,
-    Rainfall
+    Precipitation
 }
 
 public class ReadingSnapshot
