@@ -121,7 +121,8 @@ builder.Services.AddHttpClient<IDeviceAuthGateway, DeviceAuthGatewayHttpClient>(
         var options = sp.GetRequiredService<IOptions<DeviceAuthServiceOptions>>().Value;
         client.BaseAddress = new Uri(options.BaseUrl);
     })
-    .AddHttpMessageHandler<ApimAuthenticationHandler>();
+    .AddHttpMessageHandler<ApimAuthenticationHandler>()
+    .AddStandardResilienceHandler();
 
 builder.Services.AddScoped<IMeasurementRepository, MeasurementRepository>();
 builder.Services.AddScoped<MeasurementService>();
