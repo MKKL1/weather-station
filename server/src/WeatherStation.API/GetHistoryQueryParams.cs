@@ -1,10 +1,12 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
+using WeatherStation.API.Validation;
 using WeatherStation.Core;
 using WeatherStation.Core.Entities;
 
 namespace WeatherStation.API;
 
+[StartBeforeEnd(nameof(StartTime), nameof(EndTime))]
 public class GetHistoryQueryParams
 {
     [Required]

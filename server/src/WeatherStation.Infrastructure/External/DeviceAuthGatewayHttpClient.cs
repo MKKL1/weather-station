@@ -31,7 +31,7 @@ public class DeviceAuthGatewayHttpClient(
         }
         catch (HttpRequestException ex)
         {
-            logger.LogError(ex, "Network error calling {Service} for device {DeviceId}: {Message}", 
+            logger.LogError(ex, "Network error calling {Service} for device {DeviceId}: {Message}",
                 ServiceName, claimRequest.DeviceId, ex.Message);
 
             throw new ExternalServiceException(

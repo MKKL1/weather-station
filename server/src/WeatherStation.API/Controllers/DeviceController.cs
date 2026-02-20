@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using WeatherStation.API.Validation;
 using WeatherStation.Core.Dto;
 using WeatherStation.Core.Services;
 
@@ -37,7 +38,7 @@ public class DeviceController(DeviceService deviceService) : ControllerBase
     [HttpGet("{deviceId}")]
     [ProducesResponseType(typeof(DeviceResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<IActionResult> GetDevice([FromRoute] string deviceId)
+    public async Task<IActionResult> GetDevice([FromRoute, DeviceId] string deviceId)
     {
         var userId = User.GetUserId();
         if (userId == null)

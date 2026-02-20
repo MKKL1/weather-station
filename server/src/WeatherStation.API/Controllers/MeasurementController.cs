@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using WeatherStation.API.Validation;
 using WeatherStation.Core;
 using WeatherStation.Core.Dto;
 using WeatherStation.Core.Services;
@@ -22,7 +23,7 @@ public class MeasurementController : ControllerBase
     /// </summary>
     [Authorize]
     [HttpGet("latest")]
-    public async Task<IActionResult> GetDeviceSnapshot([FromRoute] string deviceId)
+    public async Task<IActionResult> GetDeviceSnapshot([FromRoute, DeviceId] string deviceId)
     {
         var userId = User.GetUserId();
         if (userId == null)
@@ -41,7 +42,7 @@ public class MeasurementController : ControllerBase
     [Authorize]
     [HttpGet("history")]
     public async Task<IActionResult> GetMeasurementRange(
-        [FromRoute] string deviceId,
+        [FromRoute, DeviceId] string deviceId,
         [FromQuery] GetHistoryQueryParams query)
     {
         var userId = User.GetUserId();

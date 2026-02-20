@@ -153,13 +153,13 @@ builder.Services.AddAuthentication(options =>
         {
             ValidateIssuer = true,
             ValidIssuer = options.Authority,
-            
+
             ValidateAudience = true,
             ValidAudience = options.Audience,
 
             RoleClaimType = keycloakOptions.RoleClaimType,
             NameClaimType = keycloakOptions.NameClaimType,
-            
+
             ClockSkew = TimeSpan.Zero
         };
 
