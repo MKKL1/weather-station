@@ -97,7 +97,7 @@ public class TelemetryRequestValidatorTests
             TimestampEpoch = 0,
             Payload = new TelemetryRequest.PayloadRecord
             {
-                Rain = new TelemetryRequest.HistogramRecord
+                Precipitation = new TelemetryRequest.PrecipitationBinsRecord
                 {
                     Data = new Dictionary<int, int>(),
                     SlotSeconds = 60,
@@ -109,66 +109,66 @@ public class TelemetryRequestValidatorTests
         
         var result = _validator.TestValidate(request);
 
-        result.ShouldHaveValidationErrorFor(x => x.Payload!.Rain!.SlotCount)
+        result.ShouldHaveValidationErrorFor(x => x.Payload!.Precipitation!.SlotCount)
             .WithErrorCode("MISSING_SLOT_COUNT");
     }
 
     [Fact]
-    public void Should_Fail_When_Histogram_Alignment_Is_Wrong()
+    public void Should_Fail_When_PrecipitationBins_Alignment_Is_Wrong()
     {
         var now = _timeProvider.GetUtcNow();
-        var rainStart = now.Subtract(TimeSpan.FromHours(2));
+        var precipitationStart = now.Subtract(TimeSpan.FromHours(2));
         
         var request = new TelemetryRequest
         {
             TimestampEpoch = now.ToUnixTimeSeconds(),
             Payload = new TelemetryRequest.PayloadRecord
             {
-                Rain = new TelemetryRequest.HistogramRecord
+                Precipitation = new TelemetryRequest.PrecipitationBinsRecord
                 {
                     Data = new Dictionary<int, int>(),
                     SlotSeconds = 10,
                     SlotCount = 3,
-                    StartTimeEpoch = rainStart.ToUnixTimeSeconds()
+                    StartTimeEpoch = precipitationStart.ToUnixTimeSeconds()
                 }
             }
         };
         
         var result = _validator.TestValidate(request);
 
-        result.ShouldHaveValidationErrorFor("Payload.Rain")
+        result.ShouldHaveValidationErrorFor("Payload.Precipitation")
             .WithErrorCode("HISTOGRAM_ALIGNMENT_MISMATCH");
     }
 
     [Fact]
-    public void Should_Pass_When_Histogram_Perfectly_Matches_Timestamp()
+    public void Should_Pass_When_PrecipitationBins_Perfectly_Matches_Timestamp()
     {
         var now = _timeProvider.GetUtcNow();
-        var rainDuration = TimeSpan.FromMinutes(35);
-        var rainStart = now.Subtract(rainDuration);
+        var precipitationDuration = TimeSpan.FromMinutes(35);
+        var precipitationStart = now.Subtract(precipitationDuration);
         
         var request = new TelemetryRequest
         {
             TimestampEpoch = now.ToUnixTimeSeconds(),
             Payload = new TelemetryRequest.PayloadRecord
             {
-                Rain = new TelemetryRequest.HistogramRecord
+                Precipitation = new TelemetryRequest.PrecipitationBinsRecord
                 {
                     Data = new Dictionary<int, int> { { 0, 1 } },
-                    SlotSeconds = (int?)rainDuration.TotalSeconds,
+                    SlotSeconds = (int?)precipitationDuration.TotalSeconds,
                     SlotCount = 1,
-                    StartTimeEpoch = rainStart.ToUnixTimeSeconds()
+                    StartTimeEpoch = precipitationStart.ToUnixTimeSeconds()
                 }
             }
         };
         
         var result = _validator.TestValidate(request);
 
-        result.ShouldNotHaveValidationErrorFor("Payload.Rain");
+        result.ShouldNotHaveValidationErrorFor("Payload.Precipitation");
     }
     
     [Fact]
-    public void Should_Fail_When_Histogram_Duration_Exceeds_Limit()
+    public void Should_Fail_When_PrecipitationBins_Duration_Exceeds_Limit()
     {
         var now = _timeProvider.GetUtcNow();
         
@@ -177,7 +177,7 @@ public class TelemetryRequestValidatorTests
             TimestampEpoch = now.ToUnixTimeSeconds(),
             Payload = new TelemetryRequest.PayloadRecord
             {
-                Rain = new TelemetryRequest.HistogramRecord
+                Precipitation = new TelemetryRequest.PrecipitationBinsRecord
                 {
                     Data = new Dictionary<int, int>(),
                     SlotSeconds = 600,
@@ -189,7 +189,7 @@ public class TelemetryRequestValidatorTests
         
         var result = _validator.TestValidate(request);
 
-        result.ShouldHaveValidationErrorFor("Payload.Rain")
+        result.ShouldHaveValidationErrorFor("Payload.Precipitation")
             .WithErrorCode("HISTOGRAM_DURATION_EXCEEDED");
     }
     
@@ -203,7 +203,7 @@ public class TelemetryRequestValidatorTests
             TimestampEpoch = now.ToUnixTimeSeconds(),
             Payload = new TelemetryRequest.PayloadRecord
             {
-                Rain = new TelemetryRequest.HistogramRecord
+                Precipitation = new TelemetryRequest.PrecipitationBinsRecord
                 {
                     Data = new Dictionary<int, int>
                     {
@@ -218,7 +218,7 @@ public class TelemetryRequestValidatorTests
         
         var result = _validator.TestValidate(request);
 
-        result.ShouldHaveValidationErrorFor("Payload.Rain.Data")
+        result.ShouldHaveValidationErrorFor("Payload.Precipitation.Data")
             .WithErrorCode("INDEX_OUT_OF_BOUNDS");
     }
 }

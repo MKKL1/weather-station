@@ -53,7 +53,7 @@ public class WeeklyWeatherDocument
 
         [JsonProperty("drain")]
         [JsonPropertyName("drain")]
-        public StatSummaryDocument?[] DailyRainfall { get; set; } = new StatSummaryDocument?[7];
+        public StatSummaryDocument?[] DailyPrecipitation { get; set; } = new StatSummaryDocument?[7];
 
         [JsonProperty("tmp")]
         [JsonPropertyName("tmp")]
@@ -69,6 +69,6 @@ public class WeeklyWeatherDocument
 
         [JsonProperty("rain")]
         [JsonPropertyName("rain")]
-        public StatSummaryDocument? Rain { get; set; }
+        public StatSummaryDocument? Precipitation { get; set; }
     }
 }

@@ -12,7 +12,7 @@ public class WeatherReading
     public Temperature? TemperatureVo { get; }
     public Humidity? HumidityVo { get; }
     public Pressure? PressureVo { get; }
-    public RainfallReading? RainfallVo { get; }
+    public PrecipitationReading? PrecipitationVo { get; }
 
     private WeatherReading(
         string deviceId,
@@ -20,14 +20,14 @@ public class WeatherReading
         Temperature? temperatureVo,
         Humidity? humidityVo,
         Pressure? pressureVo,
-        RainfallReading? rainfallVo)
+        PrecipitationReading? precipitationVo)
     {
         DeviceId = deviceId;
         Timestamp = timestamp;
         TemperatureVo = temperatureVo;
         HumidityVo = humidityVo;
         PressureVo = pressureVo;
-        RainfallVo = rainfallVo;
+        PrecipitationVo = precipitationVo;
     }
 
     public static WeatherReading Create(
@@ -36,7 +36,7 @@ public class WeatherReading
         float temperature,
         float humidity,
         float pressure,
-        RainfallReading? rain)
+        PrecipitationReading? precipitation)
     {
         if (string.IsNullOrWhiteSpace(deviceId))
             throw new ArgumentException("Device ID is required", nameof(deviceId));
@@ -51,6 +51,6 @@ public class WeatherReading
             tempVo,
             humVo,
             pressVo,
-            rain);
+            precipitation);
     }
 }

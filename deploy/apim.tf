@@ -186,7 +186,7 @@ resource "azurerm_api_management_api_operation_policy" "claim_code_policy" {
   operation_id        = azurerm_api_management_api_operation.claim_code.operation_id
 
   xml_content = file("${path.module}/policies/claim_code.xml")
-  depends_on  = [azurerm_api_management_policy_fragment.provisioning_jwt, null_resource.swa_deploy]
+  depends_on  = [azurerm_api_management_named_value.access_token_issuer_url, null_resource.swa_deploy]
 }
 
 // /provisioning/{deviceId}/claim

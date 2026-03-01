@@ -417,5 +417,16 @@ FodyWeavers.xsd
 *.msm
 *.msp
 
-*.idea*
-*.vscode
+# JetBrains IDE
+.idea/
+
+*.tfstate
+*.tfstate.backup
+
+local.settings.json
+
+# Go compiled binaries
+provisioning-service/provisioning-service
+
+.sonarqube/
+.vscode/

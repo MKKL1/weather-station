@@ -35,6 +35,17 @@ func NewController(
 }
 
 // HandleRegistration performs device registration and generates an HMAC secret.
+//
+//	@Summary		Register Device
+//	@Description	Registers a new device and returns an HMAC secret for signing future authentication challenges. If the device is already registered, the existing secret is returned.
+//	@Tags			Provisioning
+//	@Accept			JSON
+//	@Produce		JSON
+//	@Param			id	path		string	true	"Device ID"	example(H1-ABC)
+//	@Success		200	{object}	DeviceRegistrationResponse
+//	@Failure		400	{object}	ErrorResponse	"Missing device ID (`INVALID_REQUEST`)"
+//	@Failure		500	{object}	ErrorResponse	"Internal error (`INTERNAL_ERROR`)"
+//	@Router			/api/v1/devices/{id}/register [post]
 func (c *Controller) HandleRegistration(w http.ResponseWriter, r *http.Request) {
 	deviceID := chi.URLParam(r, "id")
 	if deviceID == "" {
@@ -55,6 +66,20 @@ func (c *Controller) HandleRegistration(w http.ResponseWriter, r *http.Request) 
 }
 
 // HandleTokenGeneration validates the HMAC signature and generates an access token.
+//
+//	@Summary		Create Access Token
+//	@Description	Exchanges a signed HMAC challenge for a short-lived access token. The signature must be the HMAC-SHA256 of "{deviceId}:{timestamp}" using the secret returned by registration.
+//	@Tags			Provisioning
+//	@Accept			JSON
+//	@Produce		JSON
+//	@Param			id		path		string				true	"Device ID"	example(H1-ABC)
+//	@Param			body	body		HmacChallengeRequest	true	"HMAC challenge"
+//	@Success		200		{object}	AccessTokenResponse
+//	@Failure		400		{object}	ErrorResponse	"Invalid request body (`INVALID_REQUEST`)"
+//	@Failure		401		{object}	ErrorResponse	"Signature mismatch (`INVALID_SIGNATURE`) or timestamp outside allowed drift (`INVALID_TIMESTAMP`)"
+//	@Failure		404		{object}	ErrorResponse	"Device not found (`DEVICE_NOT_FOUND`) or not yet registered (`DEVICE_NOT_REGISTERED`)"
+//	@Failure		500		{object}	ErrorResponse	"Internal error (`INTERNAL_ERROR`)"
+//	@Router			/api/v1/devices/{id}/token [post]
 func (c *Controller) HandleTokenGeneration(w http.ResponseWriter, r *http.Request) {
 	deviceID := chi.URLParam(r, "id")
 	if deviceID == "" {
@@ -86,6 +111,18 @@ func (c *Controller) HandleTokenGeneration(w http.ResponseWriter, r *http.Reques
 }
 
 // HandleGenerateClaimCode generates an activation code for a registered device.
+//
+//	@Summary		Create Claim Code
+//	@Description	Generates a short-lived activation code that can be used to claim ownership of the device.
+//	@Tags			Provisioning
+//	@Accept			JSON
+//	@Produce		JSON
+//	@Param			id	path		string	true	"Device ID"	example(H1-ABC)
+//	@Success		200	{object}	ClaimCodeResponse
+//	@Failure		400	{object}	ErrorResponse	"Missing device ID (`INVALID_REQUEST`)"
+//	@Failure		404	{object}	ErrorResponse	"Device not found (`DEVICE_NOT_FOUND`) or not yet registered (`DEVICE_NOT_REGISTERED`)"
+//	@Failure		500	{object}	ErrorResponse	"Internal error (`INTERNAL_ERROR`)"
+//	@Router			/api/v1/devices/{id}/claim-code [post]
 func (c *Controller) HandleGenerateClaimCode(w http.ResponseWriter, r *http.Request) {
 	deviceID := chi.URLParam(r, "id")
 	if deviceID == "" {
@@ -107,6 +144,20 @@ func (c *Controller) HandleGenerateClaimCode(w http.ResponseWriter, r *http.Requ
 }
 
 // HandleDeviceClaim claims a device using an activation code.
+//
+//	@Summary		Claim Device
+//	@Description	Associates a device with a user account using a valid activation code.
+//	@Tags			Provisioning
+//	@Accept			JSON
+//	@Produce		JSON
+//	@Param			id		path		string					true	"Device ID"	example(H1-ABC)
+//	@Param			body	body		OwnershipClaimRequest	true	"Claim details"
+//	@Success		200		{object}	DeviceClaimResponse
+//	@Failure		400		{object}	ErrorResponse	"Missing required fields (`INVALID_REQUEST`) or invalid/expired activation code (`INVALID_CODE`)"
+//	@Failure		404		{object}	ErrorResponse	"Device not found (`DEVICE_NOT_FOUND`)"
+//	@Failure		409		{object}	ErrorResponse	"Device already claimed by a different user (`DEVICE_ALREADY_CLAIMED`)"
+//	@Failure		500		{object}	ErrorResponse	"Internal error (`INTERNAL_ERROR`)"
+//	@Router			/api/v1/devices/{id}/claim [post]
 func (c *Controller) HandleDeviceClaim(w http.ResponseWriter, r *http.Request) {
 	deviceID := chi.URLParam(r, "id")
 	if deviceID == "" {

@@ -24,6 +24,11 @@ const (
 	serviceName     = "provisioning-service"
 )
 
+//	@title			Provisioning Service API
+//	@version		1.0.0
+//	@description	API for device registration, authentication, and ownership management.
+
+// @BasePath	/api/v1
 func main() {
 	config, err := infrastructure.NewConfig()
 	if err != nil {

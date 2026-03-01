@@ -1,0 +1,286 @@
+basePath: /api/v1
+definitions:
+  controller.AccessTokenResponse:
+    properties:
+      data:
+        $ref: '#/definitions/controller.AccessTokenResponseData'
+      status:
+        example: token_generated
+        type: string
+    type: object
+  controller.AccessTokenResponseData:
+    properties:
+      expires_in:
+        example: 86400
+        type: integer
+      token:
+        example: header.payload.signature
+        type: string
+      token_type:
+        example: Bearer
+        type: string
+    type: object
+  controller.ClaimCodeResponse:
+    properties:
+      data:
+        $ref: '#/definitions/controller.ClaimCodeResponseData'
+      status:
+        example: claim_code_generated
+        type: string
+    type: object
+  controller.ClaimCodeResponseData:
+    properties:
+      claim_code:
+        example: A1B2C3
+        type: string
+      validity_seconds:
+        example: 300
+        type: integer
+    type: object
+  controller.DeviceClaimResponse:
+    properties:
+      data:
+        $ref: '#/definitions/controller.DeviceClaimResponseData'
+      status:
+        example: claimed
+        type: string
+    type: object
+  controller.DeviceClaimResponseData:
+    properties:
+      claimed_by_user_id:
+        example: user-123
+        type: string
+      device_id:
+        example: H1-ABC
+        type: string
+    type: object
+  controller.DeviceRegistrationResponse:
+    properties:
+      data:
+        $ref: '#/definitions/controller.DeviceRegistrationResponseData'
+      status:
+        example: registered
+        type: string
+    type: object
+  controller.DeviceRegistrationResponseData:
+    properties:
+      device_id:
+        example: H1-ABC
+        type: string
+      hmac_secret:
+        example: dGhpcyBpcyBhIHRlc3Qgc2VjcmV0IGtleQ==
+        type: string
+    type: object
+  controller.ErrorDetail:
+    properties:
+      code:
+        description: Application error code.
+        enum:
+        - INVALID_REQUEST
+        - DEVICE_NOT_FOUND
+        - DEVICE_NOT_REGISTERED
+        - DEVICE_ALREADY_CLAIMED
+        - INVALID_CODE
+        - INVALID_TIMESTAMP
+        - INVALID_SIGNATURE
+        - INTERNAL_ERROR
+        type: string
+      message:
+        type: string
+    type: object
+  controller.ErrorResponse:
+    properties:
+      error:
+        $ref: '#/definitions/controller.ErrorDetail'
+      status:
+        example: error
+        type: string
+    type: object
+  controller.HmacChallengeRequest:
+    properties:
+      signature:
+        description: HMAC-SHA256 of "{deviceId}:{timestamp}" using hmac_secret.
+        example: c50c19d1cfe63cb95bb1bfa084db1307a32e3a55e51e2f451997352480151692
+        type: string
+      timestamp:
+        description: Unix timestamp (seconds) of the request.
+        example: 1763756825
+        type: integer
+    type: object
+  controller.OwnershipClaimRequest:
+    properties:
+      claim_code:
+        description: Activation code displayed on the device.
+        example: A1B2C3
+        type: string
+      user_id:
+        example: user-123
+        type: string
+    type: object
+info:
+  contact: {}
+  description: API for device registration, authentication, and ownership management.
+  title: Provisioning Service API
+  version: 1.0.0
+paths:
+  /api/v1/devices/{id}/claim:
+    post:
+      consumes:
+      - application/json
+      description: Associates a device with a user account using a valid activation
+        code.
+      parameters:
+      - description: Device ID
+        example: H1-ABC
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Claim details
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/controller.OwnershipClaimRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.DeviceClaimResponse'
+        "400":
+          description: Missing required fields (INVALID_REQUEST) or invalid/expired
+            activation code (INVALID_CODE)
+          schema:
+            $ref: '#/definitions/controller.ErrorResponse'
+        "404":
+          description: Device not found (DEVICE_NOT_FOUND)
+          schema:
+            $ref: '#/definitions/controller.ErrorResponse'
+        "409":
+          description: Device already claimed by a different user (DEVICE_ALREADY_CLAIMED)
+          schema:
+            $ref: '#/definitions/controller.ErrorResponse'
+        "500":
+          description: Internal error (INTERNAL_ERROR)
+          schema:
+            $ref: '#/definitions/controller.ErrorResponse'
+      summary: Claim Device
+      tags:
+      - Provisioning
+  /api/v1/devices/{id}/claim-code:
+    post:
+      consumes:
+      - application/json
+      description: Generates a short-lived activation code that can be used to claim
+        ownership of the device.
+      parameters:
+      - description: Device ID
+        example: H1-ABC
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.ClaimCodeResponse'
+        "400":
+          description: Missing device ID (INVALID_REQUEST)
+          schema:
+            $ref: '#/definitions/controller.ErrorResponse'
+        "404":
+          description: Device not found (DEVICE_NOT_FOUND) or not yet registered (DEVICE_NOT_REGISTERED)
+          schema:
+            $ref: '#/definitions/controller.ErrorResponse'
+        "500":
+          description: Internal error (INTERNAL_ERROR)
+          schema:
+            $ref: '#/definitions/controller.ErrorResponse'
+      summary: Create Claim Code
+      tags:
+      - Provisioning
+  /api/v1/devices/{id}/register:
+    post:
+      consumes:
+      - application/json
+      description: Registers a new device and returns an HMAC secret for signing future
+        authentication challenges. If the device is already registered, the existing
+        secret is returned.
+      parameters:
+      - description: Device ID
+        example: H1-ABC
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.DeviceRegistrationResponse'
+        "400":
+          description: Missing device ID (INVALID_REQUEST)
+          schema:
+            $ref: '#/definitions/controller.ErrorResponse'
+        "500":
+          description: Internal error (INTERNAL_ERROR)
+          schema:
+            $ref: '#/definitions/controller.ErrorResponse'
+      summary: Register Device
+      tags:
+      - Provisioning
+  /api/v1/devices/{id}/token:
+    post:
+      consumes:
+      - application/json
+      description: Exchanges a signed HMAC challenge for a short-lived access token.
+        The signature must be the HMAC-SHA256 of "{deviceId}:{timestamp}" using the
+        secret returned by registration.
+      parameters:
+      - description: Device ID
+        example: H1-ABC
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: HMAC challenge
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/controller.HmacChallengeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/controller.AccessTokenResponse'
+        "400":
+          description: Invalid request body (INVALID_REQUEST)
+          schema:
+            $ref: '#/definitions/controller.ErrorResponse'
+        "401":
+          description: Signature mismatch (INVALID_SIGNATURE) or timestamp outside
+            allowed drift (INVALID_TIMESTAMP)
+          schema:
+            $ref: '#/definitions/controller.ErrorResponse'
+        "404":
+          description: Device not found (DEVICE_NOT_FOUND) or not yet registered (DEVICE_NOT_REGISTERED)
+          schema:
+            $ref: '#/definitions/controller.ErrorResponse'
+        "500":
+          description: Internal error (INTERNAL_ERROR)
+          schema:
+            $ref: '#/definitions/controller.ErrorResponse'
+      summary: Create Access Token
+      tags:
+      - Provisioning
+swagger: "2.0"

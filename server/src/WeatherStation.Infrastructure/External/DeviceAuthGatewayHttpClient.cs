@@ -11,6 +11,7 @@ public class DeviceAuthGatewayHttpClient(
     : IDeviceAuthGateway
 {
     private const string ServiceName = "DeviceAuthGateway";
+    private const string Operation = "ClaimDevice";
 
     public async Task<IDeviceAuthGateway.ClaimStatus> ClaimDevice(IDeviceAuthGateway.ClaimRequest claimRequest, CancellationToken ct)
     {
@@ -35,7 +36,7 @@ public class DeviceAuthGatewayHttpClient(
                 ServiceName, claimRequest.DeviceId, ex.Message);
 
             throw new ExternalServiceException(
-                ServiceName, "ClaimDevice",
+                ServiceName, Operation,
                 "Service is unreachable.",
                 (int?)ex.StatusCode, ex);
         }
@@ -46,7 +47,7 @@ public class DeviceAuthGatewayHttpClient(
                 ServiceName, claimRequest.DeviceId);
 
             throw new ExternalServiceException(
-                ServiceName, "ClaimDevice",
+                ServiceName, Operation,
                 "Request timed out.",
                 innerException: ex);
         }
@@ -67,7 +68,7 @@ public class DeviceAuthGatewayHttpClient(
             "HTTP {StatusCode} from {Service} for device {DeviceId}. Body: {Body}",
             (int)response.StatusCode, ServiceName, deviceId, body);
 
-        throw new ExternalServiceException(ServiceName, "ClaimDevice", "HTTP error", (int)response.StatusCode);
+        throw new ExternalServiceException(ServiceName, Operation, "HTTP error", (int)response.StatusCode);
     }
 
     private static async Task<IDeviceAuthGateway.ClaimStatus> ParseClaimResponse(HttpResponseMessage response, CancellationToken ct)
@@ -80,7 +81,7 @@ public class DeviceAuthGatewayHttpClient(
         catch (Exception ex) when (ex is System.Text.Json.JsonException or NotSupportedException)
         {
             throw new ExternalServiceException(
-                ServiceName, "ClaimDevice",
+                ServiceName, Operation,
                 "Received a successful HTTP response but the body could not be deserialized.",
                 (int)response.StatusCode, ex);
         }
@@ -88,7 +89,7 @@ public class DeviceAuthGatewayHttpClient(
         if (result is null)
         {
             throw new ExternalServiceException(
-                ServiceName, "ClaimDevice",
+                ServiceName, Operation,
                 "Received a successful HTTP response with an empty body.",
                 (int)response.StatusCode);
         }
@@ -101,7 +102,7 @@ public class DeviceAuthGatewayHttpClient(
         if (result.Error is null)
         {
             throw new ExternalServiceException(
-                ServiceName, "ClaimDevice",
+                ServiceName, Operation,
                 $"Unexpected response status '{result.Status}' with no error details.",
                 (int)response.StatusCode);
         }
@@ -112,13 +113,13 @@ public class DeviceAuthGatewayHttpClient(
             "DEVICE_NOT_FOUND" => IDeviceAuthGateway.ClaimStatus.InvalidCode,
             "INVALID_CODE" => IDeviceAuthGateway.ClaimStatus.InvalidCode,
             _ => throw new ExternalServiceException(
-                ServiceName, "ClaimDevice",
+                ServiceName, Operation,
                 $"Unknown error code '{result.Error.Code}': {result.Error.Message}",
                 (int)response.StatusCode)
         };
     }
 
-    private record ClaimResponse(string Status, ErrorResponse? Error);
+    private sealed record ClaimResponse(string Status, ErrorResponse? Error);
 
-    private record ErrorResponse(string Code, string Message);
+    private sealed record ErrorResponse(string Code, string Message);
 }

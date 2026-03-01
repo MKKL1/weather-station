@@ -6,12 +6,11 @@ namespace WeatherStation.Core.Services;
 
 public class DeviceClaimService(
     IDeviceAuthGateway deviceAuthGateway,
-    DeviceAuthenticationService deviceAuthService,
     IDeviceRepository deviceRepository)
 {
     public async Task ClaimDevice(Guid userId, string deviceId, ClaimDeviceRequest request, CancellationToken ct)
     {
-        if (!deviceAuthService.VerifyDeviceIdAgainstWords(deviceId, request.Key))
+        if (!DeviceAuthenticationService.VerifyDeviceIdAgainstWords(deviceId, request.Key))
         {
             throw new InvalidClaimWordsException(deviceId);
         }
@@ -36,7 +35,7 @@ public class DeviceClaimService(
             case IDeviceAuthGateway.ClaimStatus.Success:
                 break;
             default:
-                throw new ArgumentOutOfRangeException();
+                throw new InvalidOperationException($"Unexpected claim status value: {res}");
         }
 
         device ??= new DeviceEntity(deviceId, userId, DeviceState.Claimed);

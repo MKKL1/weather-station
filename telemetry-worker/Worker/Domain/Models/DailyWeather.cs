@@ -8,7 +8,7 @@ public class DailyWeather
     private const int BucketSizeSeconds = 300; 
     public string DeviceId { get; }
     public DateTimeOffset DayTimestamp { get; }
-    public RainfallAccumulator? Rain { get; set; }
+    public PrecipitationAccumulator? Precipitation { get; set; }
     public MetricAggregate? Temperature { get; set; }
     public MetricAggregate? Humidity { get; set; }
     public MetricAggregate? Pressure { get; set; }
@@ -35,10 +35,10 @@ public class DailyWeather
             return;
         }
 
-        if (reading.RainfallVo != null)
+        if (reading.PrecipitationVo != null)
         {
-            Rain ??= RainfallAccumulator.FromDuration(DayTimestamp, BucketSizeSeconds, 86400);
-            Rain.Add(reading.RainfallVo.Value);
+            Precipitation ??= PrecipitationAccumulator.FromDuration(DayTimestamp, BucketSizeSeconds, 86400);
+            Precipitation.Add(reading.PrecipitationVo.Value);
         }
         
         IncludedTimestamps.Add(reading.Timestamp);

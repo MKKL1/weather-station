@@ -29,7 +29,7 @@ public class DocumentMapper
                 HourlyTemperature = ToDictDoc(domain.HourlyTemperature),
                 HourlyHumidity = ToDictDoc(domain.HourlyHumidity),
                 HourlyPressure = ToDictDoc(domain.HourlyPressure),
-                HourlyRain = ToHistogramDoc(domain.Rain),
+                HourlyPrecipitation = ToPrecipitationBinsDoc(domain.Precipitation),
                 IncludedTimestamps = domain.IncludedTimestamps.Select(x => x.ToUnixTimeSeconds()).ToList(),
                 IsFinalized = domain.IsFinalized
             }
@@ -55,11 +55,11 @@ public class DocumentMapper
                 .Select(t => DateTimeOffset.FromUnixTimeSeconds(t).ToUniversalTime())
                 .ToList() ?? [],
             IsFinalized = doc.Payload.IsFinalized,
-            Rain = doc.Payload.HourlyRain == null ? null : RainfallAccumulator.FromData(
-                doc.Payload.HourlyRain.Data,
-                doc.Payload.HourlyRain.SlotSecs,
-                DateTimeOffset.FromUnixTimeSeconds(doc.Payload.HourlyRain.StartTime).ToUniversalTime(),
-                doc.Payload.HourlyRain.SlotCount 
+            Precipitation = doc.Payload.HourlyPrecipitation == null ? null : PrecipitationAccumulator.FromData(
+                doc.Payload.HourlyPrecipitation.Data,
+                doc.Payload.HourlyPrecipitation.SlotSecs,
+                DateTimeOffset.FromUnixTimeSeconds(doc.Payload.HourlyPrecipitation.StartTime).ToUniversalTime(),
+                doc.Payload.HourlyPrecipitation.SlotCount 
             )
         };
     }
@@ -78,12 +78,12 @@ public class DocumentMapper
                 DailyTemperatures = domain.DailyTemperatures.Select(ToDoc).ToArray(),
                 DailyHumidities = domain.DailyHumidities.Select(ToDoc).ToArray(),
                 DailyPressures = domain.DailyPressures.Select(ToDoc).ToArray(),
-                DailyRainfall = domain.DailyRainfall.Select(ToDoc).ToArray(),
+                DailyPrecipitation = domain.DailyPrecipitation.Select(ToDoc).ToArray(),
                 
                 Temperature = ToDoc(domain.Temperature),
                 Humidity = ToDoc(domain.Humidity),
                 Pressure = ToDoc(domain.Pressure),
-                Rain = ToDoc(domain.Rain)
+                Precipitation = ToDoc(domain.Precipitation)
             }
         };
     }
@@ -101,7 +101,7 @@ public class DocumentMapper
             if (i < p.DailyTemperatures?.Length) weekly.DailyTemperatures[i] = ToDomain(p.DailyTemperatures[i]);
             if (i < p.DailyHumidities?.Length) weekly.DailyHumidities[i] = ToDomain(p.DailyHumidities[i]);
             if (i < p.DailyPressures?.Length) weekly.DailyPressures[i] = ToDomain(p.DailyPressures[i]);
-            if (i < p.DailyRainfall?.Length) weekly.DailyRainfall[i] = ToDomain(p.DailyRainfall[i]);
+            if (i < p.DailyPrecipitation?.Length) weekly.DailyPrecipitation[i] = ToDomain(p.DailyPrecipitation[i]);
         }
         
         // We use reflection helper SetProp because these properties have private setters 
@@ -110,7 +110,7 @@ public class DocumentMapper
         SetProp(weekly, nameof(WeeklyWeather.Temperature), ToDomain(p.Temperature));
         SetProp(weekly, nameof(WeeklyWeather.Humidity), ToDomain(p.Humidity));
         SetProp(weekly, nameof(WeeklyWeather.Pressure), ToDomain(p.Pressure));
-        SetProp(weekly, nameof(WeeklyWeather.Rain), ToDomain(p.Rain));
+        SetProp(weekly, nameof(WeeklyWeather.Precipitation), ToDomain(p.Precipitation));
 
         return weekly;
     }
@@ -143,7 +143,7 @@ public class DocumentMapper
             Temperature = reading.TemperatureVo?.Value,
             Humidity = reading.HumidityVo?.Value,
             Pressure = reading.PressureVo?.Value,
-            Rain = ToHistogramDoc(reading.RainfallVo) 
+            Precipitation = ToPrecipitationBinsDoc(reading.PrecipitationVo) 
         };
     }
 
@@ -161,12 +161,12 @@ public class DocumentMapper
                 Temperature = request.Payload.Temperature ?? 0,
                 Humidity = request.Payload.HumidityPpm ?? 0,
                 Pressure = request.Payload.PressurePa ?? 0,
-                RainfallMMPerTip = request.Payload.MmPerTip ?? 0,
-                Rain = request.Payload.Rain == null ? null : new RawTelemetryDocument.HistogramDocument
+                PrecipitationMmPerTip = request.Payload.MmPerTip ?? 0,
+                Precipitation = request.Payload.Precipitation == null ? null : new RawTelemetryDocument.PrecipitationBinsDocument
                 {
-                    Data = request.Payload.Rain.Data,
-                    SlotSecs = request.Payload.Rain.SlotSeconds,
-                    StartTime = request.Payload.Rain.StartTimeEpoch
+                    Data = request.Payload.Precipitation.Data,
+                    SlotSecs = request.Payload.Precipitation.SlotSeconds,
+                    StartTime = request.Payload.Precipitation.StartTimeEpoch
                 }
             }
         };
@@ -195,21 +195,21 @@ public class DocumentMapper
         source?.ToDictionary(k => k.Key, 
             v => ToDomain(v.Value)!);
 
-    private HistogramDocument? ToHistogramDoc(RainfallReading? rain) =>
-        rain == null ? null : new HistogramDocument
+    private PrecipitationBinsDocument? ToPrecipitationBinsDoc(PrecipitationReading? precipitation) =>
+        precipitation == null ? null : new PrecipitationBinsDocument
         {
-            Data = rain.Value.Values.ToDictionary(k=>k.Key, v=>v.Value),
-            SlotSecs = rain.Value.IntervalSeconds,
-            StartTime = rain.Value.StartTime.ToUniversalTime().ToUnixTimeSeconds(),
-            SlotCount = rain.Value.TotalDuration / rain.Value.IntervalSeconds
+            Data = precipitation.Value.Values.ToDictionary(k=>k.Key, v=>v.Value),
+            SlotSecs = precipitation.Value.IntervalSeconds,
+            StartTime = precipitation.Value.StartTime.ToUniversalTime().ToUnixTimeSeconds(),
+            SlotCount = precipitation.Value.TotalDuration / precipitation.Value.IntervalSeconds
         };
     
-    private HistogramDocument? ToHistogramDoc(RainfallAccumulator? rain) =>
-        rain == null ? null : new HistogramDocument
+    private PrecipitationBinsDocument? ToPrecipitationBinsDoc(PrecipitationAccumulator? precipitation) =>
+        precipitation == null ? null : new PrecipitationBinsDocument
         {
-            Data = rain.Histogram.Data,
-            SlotSecs = rain.Histogram.IntervalSeconds,
-            StartTime = rain.Histogram.StartTime.ToUniversalTime().ToUnixTimeSeconds(),
-            SlotCount = rain.Histogram.SlotCount
+            Data = precipitation.Bins.Data,
+            SlotSecs = precipitation.Bins.IntervalSeconds,
+            StartTime = precipitation.Bins.StartTime.ToUniversalTime().ToUnixTimeSeconds(),
+            SlotCount = precipitation.Bins.SlotCount
         };
 }

@@ -11,11 +11,11 @@ public class WeatherAggregationService(IWeatherRepository repository)
         var start = reading.Timestamp;
         var end = reading.Timestamp;
 
-        // If it's a rain reading (histogram), it might span across midnight, affecting two days.
-        if (reading.RainfallVo != null)
+        // If it's a precipitation reading (bins), it might span across midnight, affecting two days.
+        if (reading.PrecipitationVo != null)
         {
-            start = reading.RainfallVo.Value.StartTime;
-            end = reading.RainfallVo.Value.StartTime.AddSeconds(reading.RainfallVo.Value.TotalDuration);
+            start = reading.PrecipitationVo.Value.StartTime;
+            end = reading.PrecipitationVo.Value.StartTime.AddSeconds(reading.PrecipitationVo.Value.TotalDuration);
         }
         
         var affectedDates = GetUniqueDays(start, end);

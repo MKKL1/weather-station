@@ -16,10 +16,10 @@ public record TelemetryRequest
         [JsonPropertyName("prs")] public float? PressurePa { get; init; }
         [JsonPropertyName("hum")] public float? HumidityPpm { get; init; }
         [JsonPropertyName("mmpt")] public float? MmPerTip { get; init; }
-        [JsonPropertyName("rain")] public HistogramRecord? Rain { get; init; }
+        [JsonPropertyName("rain")] public PrecipitationBinsRecord? Precipitation { get; init; }
     }
 
-    public record HistogramRecord
+    public record PrecipitationBinsRecord
     {
         [JsonPropertyName("dat")] public Dictionary<int, int>? Data { get; init; }
         [JsonPropertyName("sec")] public int? SlotSeconds { get; init; }

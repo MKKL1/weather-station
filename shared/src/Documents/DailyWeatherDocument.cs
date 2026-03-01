@@ -62,7 +62,7 @@ public class DailyWeatherDocument
 
         [JsonProperty("hrain")]
         [JsonPropertyName("hrain")]
-        public HistogramDocument? HourlyRain { get; set; }
+        public PrecipitationBinsDocument? HourlyPrecipitation { get; set; }
 
         [JsonProperty("ids")]
         [JsonPropertyName("ids")]

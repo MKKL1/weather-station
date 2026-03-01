@@ -9,16 +9,17 @@ namespace WeatherStation.API.Controllers;
 [ApiController]
 [Route("api/v1/devices")]
 [Produces("application/json")]
-[ProducesResponseType(StatusCodes.Status401Unauthorized)]
+[Authorize]
 public class DeviceController(DeviceService deviceService) : ControllerBase
 {
     /// <summary>
-    /// Retrieves all devices owned by the authenticated user
+    /// List devices
     /// </summary>
-    /// <returns>A list of devices owned by the user</returns>
-    /// <response code="200">Ok</response>
-    /// <response code="401">User is not authenticated or token is invalid</response>
-    [Authorize]
+    /// <remarks>
+    /// Returns all devices owned by the authenticated user.
+    /// </remarks>
+    /// <response code="200">List of devices</response>
+    /// <response code="401">Not authenticated or token is invalid</response>
     [HttpGet("")]
     [ProducesResponseType(typeof(IEnumerable<DeviceResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -34,9 +35,19 @@ public class DeviceController(DeviceService deviceService) : ControllerBase
         return Ok(devices);
     }
 
-    [Authorize]
+    /// <summary>
+    /// Get device
+    /// </summary>
+    /// <remarks>
+    /// Returns a single device by ID. The device must be owned by the authenticated user.
+    /// </remarks>
+    /// <param name="deviceId">Device identifier</param>
+    /// <response code="200">Device details</response>
+    /// <response code="400">Device not found (`DEVICE_NOT_FOUND`) or access denied (`DEVICE_ACCESS_DENIED`)</response>
+    /// <response code="401">Not authenticated or token is invalid</response>
     [HttpGet("{deviceId}")]
     [ProducesResponseType(typeof(DeviceResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public async Task<IActionResult> GetDevice([FromRoute, DeviceId] string deviceId)
     {
