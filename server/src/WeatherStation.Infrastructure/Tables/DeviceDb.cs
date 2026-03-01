@@ -10,11 +10,9 @@ public class DeviceDb
 {
     [Key]
     [DatabaseGenerated(DatabaseGeneratedOption.None)]
-    public string Id { get; set; } //PK
+    public required string Id { get; set; } //PK
     public Guid? UserId { get; set; } //FK
-    public UserDb UserDb { get; set; }
+    public UserDb? UserDb { get; set; }
 
     public DeviceState Status { get; set; } = DeviceState.Unclaimed;
-
-
 }

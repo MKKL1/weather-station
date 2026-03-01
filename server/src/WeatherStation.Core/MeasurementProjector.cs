@@ -69,7 +69,7 @@ public static class MeasurementProjector
         IReadOnlySet<MetricType>? requested)
         => includeAll || requested!.Contains(metric);
 
-    private static IReadOnlyList<DateTimeOffset> ExtractTimestamps(IReadOnlyList<AggregatedMeasurement> measurements)
+    private static DateTimeOffset[] ExtractTimestamps(IReadOnlyList<AggregatedMeasurement> measurements)
     {
         var timestamps = new DateTimeOffset[measurements.Count];
         for (var i = 0; i < measurements.Count; i++)

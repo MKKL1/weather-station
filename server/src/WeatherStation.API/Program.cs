@@ -75,7 +75,6 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 builder.Services.AddScoped<UserService>();
-builder.Services.AddScoped<UserMapper>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IDeviceRepository, DeviceRepository>();
 
@@ -128,10 +127,8 @@ builder.Services.AddScoped<IMeasurementRepository, MeasurementRepository>();
 builder.Services.AddScoped<MeasurementService>();
 builder.Services.AddScoped<DeviceAccessValidator>(sp => new DeviceAccessValidator(sp.GetRequiredService<IDeviceRepository>()));
 builder.Services.AddScoped<DeviceService>(sp => new DeviceService(sp.GetRequiredService<IDeviceRepository>(), sp.GetRequiredService<DeviceAccessValidator>()));
-builder.Services.AddScoped<DeviceAuthenticationService>(_ => new DeviceAuthenticationService());
 builder.Services.AddScoped<DeviceClaimService>(sp => new DeviceClaimService(
     sp.GetRequiredService<IDeviceAuthGateway>(),
-    sp.GetRequiredService<DeviceAuthenticationService>(),
     sp.GetRequiredService<IDeviceRepository>()));
 
 builder.Services.AddAuthentication(options =>
@@ -191,6 +188,12 @@ builder.Services.AddAuthentication(options =>
                     user = await userService.GetUserByEmail(email, ctx.HttpContext.RequestAborted);
                 }
 
+                if (user == null)
+                {
+                    ctx.Fail("Failed to resolve or create user.");
+                    return;
+                }
+
                 var idIdentity = new ClaimsIdentity();
                 idIdentity.AddClaim(new Claim("app_user_id", user.Id.ToString()));
                 principal.AddIdentity(idIdentity);
@@ -206,7 +209,6 @@ app.UseMiddleware<DomainExceptionMiddleware>();
 
 if (app.Environment.IsDevelopment())
 {
-    // app.MapOpenApi();
     app.UseSwagger();
     app.UseSwaggerUI(c =>
     {
@@ -224,7 +226,7 @@ app.MapControllers();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<WeatherStationDbContext>();
-    db.Database.Migrate();
+    await db.Database.MigrateAsync();
 }
 
-app.Run();
+await app.RunAsync();

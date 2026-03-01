@@ -6,7 +6,6 @@ using WeatherStation.API.Options;
 
 namespace WeatherStation.API.Token;
 
-//TODO better name needed
 public class ApimAuthenticationHandler : DelegatingHandler
 {
     private readonly TokenCredential _credential;
@@ -23,10 +22,10 @@ public class ApimAuthenticationHandler : DelegatingHandler
         _scopes = [settings.Scope];
     }
 
-    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        var tokenResponse = await _credential.GetTokenAsync(new TokenRequestContext(_scopes), ct);
+        var tokenResponse = await _credential.GetTokenAsync(new TokenRequestContext(_scopes), cancellationToken);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokenResponse.Token);
-        return await base.SendAsync(request, ct);
+        return await base.SendAsync(request, cancellationToken);
     }
 }

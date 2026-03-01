@@ -18,7 +18,7 @@ public class MeasurementService(IMeasurementRepository repository, DeviceAccessV
         var entity = await repository.GetLatest(deviceId, ct);
         if (entity == null)
         {
-            throw new MeasurementNotFound();
+            throw new MeasurementNotFoundException();
         }
 
         return new MeasurementSnapshotResponse(deviceId, entity.MeasurementTime, MeasurementProjector.Project(entity));

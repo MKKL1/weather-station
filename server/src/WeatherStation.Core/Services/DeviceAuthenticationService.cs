@@ -3,12 +3,11 @@ using SimpleBase;
 
 namespace WeatherStation.Core.Services;
 
-//TODO rename as there are a lot of services like this one, also service chaining
-public class DeviceAuthenticationService
+public static class DeviceAuthenticationService
 {
-    //Handles 12 words device authentication.
-    //Verifies if bip39 words form given device id (initial proof of possession)
-    public bool VerifyDeviceIdAgainstWords(string deviceId, string words)
+    // Verifies if BIP39 words form the given device ID (initial proof of possession).
+    // Handles 12-word device authentication by checking the last 20 characters of the device ID.
+    public static bool VerifyDeviceIdAgainstWords(string deviceId, string words)
     {
         var seed = BIP39.GetSeedBytes(words);
         var rawHash = seed[..12];

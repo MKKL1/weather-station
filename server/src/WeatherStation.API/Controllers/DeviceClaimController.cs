@@ -8,6 +8,7 @@ namespace WeatherStation.API.Controllers;
 
 [ApiController]
 [Authorize]
+[Route("")]
 [Produces("application/json")]
 public class DeviceClaimController(DeviceClaimService service) : ControllerBase
 {

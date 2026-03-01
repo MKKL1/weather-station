@@ -75,7 +75,7 @@ public class MeasurementController(MeasurementService measurementService) : Cont
             DeviceId = deviceId,
             Start = query.StartTime,
             End = query.EndTime,
-            Granularity = query.Granularity,
+            Granularity = query.Granularity ?? HistoryGranularity.Auto,
             Metrics = query.Metrics
         };
 

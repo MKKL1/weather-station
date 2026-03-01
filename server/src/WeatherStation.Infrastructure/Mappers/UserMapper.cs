@@ -3,9 +3,9 @@ using WeatherStation.Infrastructure.Tables;
 
 namespace WeatherStation.Infrastructure;
 
-public class UserMapper
+public static class UserMapper
 {
-    public UserDb ToDb(UserEntity entity)
+    public static UserDb ToDb(UserEntity entity)
     {
         return new UserDb
         {
@@ -17,7 +17,7 @@ public class UserMapper
         };
     }
 
-    public UserEntity ToEntity(UserDb dbUser)
+    public static UserEntity ToEntity(UserDb dbUser)
     {
         return new UserEntity
         {

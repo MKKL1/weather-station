@@ -11,7 +11,7 @@ public class GetHistoryQueryParams
 {
     [Required]
     [FromQuery(Name = "start")]
-    public DateTimeOffset StartTime { get; init; }
+    public required DateTimeOffset StartTime { get; init; }
 
     [FromQuery(Name = "end")]
     public DateTimeOffset? EndTime { get; init; }
@@ -20,5 +20,5 @@ public class GetHistoryQueryParams
     public List<MetricType>? Metrics { get; init; }
 
     [FromQuery(Name = "granularity")]
-    public HistoryGranularity Granularity { get; init; } = HistoryGranularity.Auto;
+    public HistoryGranularity? Granularity { get; init; }
 }

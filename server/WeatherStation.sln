@@ -15,7 +15,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WeatherStation.API.Tests", "tests\WeatherStation.API.Tests\WeatherStation.API.Tests.csproj", "{7AFCB24E-483E-4517-A9D2-25F0A43E570F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WeatherStation.Core.Tests", "src\WeatherStation.Core.Tests\WeatherStation.Core.Tests.csproj", "{CF4BA577-D736-4ACE-8476-AFEA1B534B19}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WeatherStation.Core.Tests", "tests\WeatherStation.Core.Tests\WeatherStation.Core.Tests.csproj", "{CF4BA577-D736-4ACE-8476-AFEA1B534B19}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

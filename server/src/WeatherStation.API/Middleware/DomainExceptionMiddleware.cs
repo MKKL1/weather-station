@@ -12,7 +12,7 @@ public class DomainExceptionMiddleware(RequestDelegate next, ILogger<DomainExcep
         }
         catch (DomainException ex)
         {
-            logger.LogWarning("Domain logic rejected request: {Message}", ex.Message);
+            logger.LogWarning(ex, "Domain logic rejected request: {Message}", ex.Message);
 
             context.Response.ContentType = "application/json";
             context.Response.StatusCode = StatusCodes.Status400BadRequest;

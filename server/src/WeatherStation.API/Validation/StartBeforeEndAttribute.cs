@@ -6,7 +6,7 @@ namespace WeatherStation.API.Validation;
 public class StartBeforeEndAttribute(string startProperty, string endProperty)
     : ValidationAttribute($"'{startProperty}' must be earlier than '{endProperty}'.")
 {
-    protected override ValidationResult? IsValid(object? value, ValidationContext context)
+    protected override ValidationResult? IsValid(object? value, ValidationContext validationContext)
     {
         if (value is null) return ValidationResult.Success;
 
@@ -24,7 +24,7 @@ public class StartBeforeEndAttribute(string startProperty, string endProperty)
         if (startValue is DateTimeOffset start && endValue is DateTimeOffset end && start >= end)
         {
             return new ValidationResult(
-                FormatErrorMessage(context.DisplayName),
+                FormatErrorMessage(validationContext.DisplayName),
                 [startProperty, endProperty]);
         }
 
