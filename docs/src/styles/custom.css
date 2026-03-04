@@ -1,0 +1,70 @@
+/*
+Frozen Water  #daffed  (mint-white)
+Soft Cyan     #9bf3f0  (light teal)
+Indigo Velvet #473198  (deep purple)
+Indigo        #4a0d67  (dark violet)
+Light Green   #adfc92  (lime green)
+*/
+
+:root,
+[data-theme="dark"] {
+    --sl-color-accent-low: #0e2429;
+    --sl-color-accent: #4ec4c1;
+    --sl-color-accent-high: #72d4d1;
+    --sl-color-bg: #0c0d12;
+    --sl-color-bg-nav: #10111a;
+    --sl-color-bg-sidebar: #10111a;
+    --sl-color-hairline: #1c1e2e;
+
+    --sl-sidebar-item-border-radius: 0.375rem;
+}
+
+[data-theme="light"] {
+    --sl-color-accent-low: #ede9f8;
+    --sl-color-accent: #6b54b8;
+    --sl-color-accent-high: #8470cc;
+    --sl-color-bg: #ffffff;
+    --sl-color-bg-nav: #f9f9fb;
+    --sl-color-bg-sidebar: #f4f4f8;
+    --sl-color-hairline: #e2e0ee;
+
+    --sl-sidebar-item-border-radius: 0.375rem;
+}
+
+.site-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.site-title img {
+    height: 2.5rem;
+    width: auto;
+}
+
+.sidebar-pane {
+    font-size: 0.875rem;
+}
+
+:root {
+    --sl-font-mono:
+        "JetBrains Mono", "Fira Code", "Cascadia Code", ui-monospace, monospace;
+}
+
+:root img[src*="#light"],
+[data-theme="dark"] img[src*="#light"] {
+    display: none !important;
+}
+
+:root img[src*="#dark"],
+[data-theme="dark"] img[src*="#dark"] {
+    display: block !important;
+}
+
+[data-theme="light"] img[src*="#light"] {
+    display: block !important;
+}
+
+[data-theme="light"] img[src*="#dark"] {
+    display: none !important;
+}
