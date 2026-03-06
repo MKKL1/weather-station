@@ -1,0 +1,119 @@
+---
+interface Props {
+    terraform?: string; // path within github repo, e.g. "deploy/gateway.tf"
+    azure?: string; // full azure docs URL
+    repo?: string; // github repo
+    inline?: boolean;
+}
+
+const {
+    terraform,
+    azure,
+    repo = "MKKL1/weather-station",
+    inline = false,
+} = Astro.props;
+
+const terraformUrl = terraform
+    ? `https://github.com/${repo}/blob/main/${terraform}`
+    : null;
+---
+
+<span class:list={["doc-links", inline && "doc-links--inline"]}>
+    {
+        terraformUrl && (
+            <a
+                href={terraformUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="doc-link doc-link--tf"
+                title={`Terraform: ${terraform}`}
+            >
+                tf
+            </a>
+        )
+    }
+    {
+        azure && (
+            <a
+                href={azure}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="doc-link doc-link--azure"
+                title="Azure documentation"
+            >
+                docs
+            </a>
+        )
+    }
+</span>
+
+<style>
+    .doc-links {
+        display: inline-flex;
+        gap: 0.35rem;
+        margin-left: 0.75rem;
+        vertical-align: middle;
+        float: right;
+        align-items: center;
+        height: 100%;
+    }
+
+    .doc-link {
+        display: inline-flex;
+        align-items: center;
+        font-size: 0.7rem;
+        font-family: var(--sl-font-mono, monospace);
+        font-weight: 600;
+        letter-spacing: 0.03em;
+        text-transform: lowercase;
+        padding: 0.3em 0.65em;
+        border-radius: 4px;
+        text-decoration: none;
+        line-height: 1;
+        min-height: 1.75rem;
+        min-width: 2.5rem;
+        justify-content: center;
+        transition: opacity 0.15s ease;
+        opacity: 0.5;
+    }
+
+    .doc-link:hover {
+        opacity: 1;
+        text-decoration: none;
+    }
+
+    .doc-link--tf {
+        background-color: color-mix(
+            in srgb,
+            var(--sl-color-accent) 12%,
+            transparent
+        );
+        color: var(--sl-color-accent);
+        border: 1px solid
+            color-mix(in srgb, var(--sl-color-accent) 25%, transparent);
+    }
+
+    .doc-link--azure {
+        background-color: color-mix(
+            in srgb,
+            var(--sl-color-gray-4) 30%,
+            transparent
+        );
+        color: var(--sl-color-gray-2);
+        border: 1px solid
+            color-mix(in srgb, var(--sl-color-gray-4) 50%, transparent);
+    }
+
+    .doc-links--inline {
+        float: none;
+        margin-left: 0.3rem;
+        vertical-align: middle;
+    }
+
+    .doc-links--inline .doc-link {
+        min-height: 1.2rem;
+        min-width: unset;
+        font-size: 0.6rem;
+        padding: 0.15em 0.4em;
+    }
+</style>

@@ -68,3 +68,26 @@ Light Green   #adfc92  (lime green)
 [data-theme="light"] img[src*="#dark"] {
     display: none !important;
 }
+
+.starlight-aside {
+    background-color: transparent;
+    border-left: 2px solid var(--sl-color-hairline);
+    border-radius: 0;
+    padding: 0.5rem 0 0.5rem 1rem;
+}
+
+.starlight-aside--note {
+    border-left-color: var(--sl-color-accent);
+}
+
+.starlight-aside__title {
+    display: none;
+}
+
+.starlight-aside__icon {
+    display: none;
+}
+
+.starlight-aside p {
+    color: var(--sl-color-text);
+}

@@ -1,6 +1,139 @@
 ---
 title: Cloud architecture
-description:
+description: Azure cloud infrastructure
 sidebar:
     order: 2
 ---
+
+**Azure** was choosen as cloud service provider in this project. Any mention of "cloud" means that it's using some Azure
+specific infrastructure.
+
+Main components are shown below.
+
+![Cloud infrastructure diagram](/assets/cloud-infra-light.svg#light)
+![Cloud infrastructure diagram](/assets/cloud-infra-dark.svg#dark)
+
+This document explain every element above and choices made when designing this infrastructure.
+
+---
+
+## Serverless
+
+It's important to mention before going any further that every element of this system is fully serverless, or to be more
+precise, scales to 0. Only constant cost is that of background worker which runs every 24 hours.
+
+{% aside %}
+That's why there is no queue, cache, event listeners, mqtt...
+{% /aside %}
+
+## The gateway {% ref terraform="deploy/apim.tf#L1" azure="https://learn.microsoft.com/azure/api-management/" /%}
+
+Starting with main entry point of cloud infrastructure, the gateway. It's Azure's API Management consumption tier. Every
+request (from devices and the application) enters through it.
+
+The gateway does two things before any backend sees a request. It validates the JWT token attached to the request, and
+it routes the request to the correct service based on the URL path.
+
+Authorization is handled at the gateway level. It doesn't trust the device's token directly for
+backend calls. Any JWT is first validated, then it's device ID is extracted from the claims. The backend never sees the
+device's original credential.
+
+Authorization is described in detail in [[Authorization]]
+
+{% aside %}
+JWT validation relies on OpenID configuration hosted on a Azure static web app. This lets the gateway verify tokens
+without sharing private keys, it only needs the public key endpoint.
+{% /aside %}
+
+---
+
+## Services {% ref terraform="deploy/functions.tf" azure="https://learn.microsoft.com/azure/azure-functions/" /%}
+
+Behind the gateway sit two Azure Function Apps, each on its own service plan (Flex Consumption FC1). They handle
+different concerns and never call each other.
+
+**Provisioning service** {% ref terraform="deploy/functions.tf#L67" inline=true /%} manages device identity. It handles the provisioning flow and user claiming (more in [[Authorization]]). It runs a custom runtime (Go) and has access to [Key Vault](#key-vault) for the token-signing private key.
+
+**Worker service** {% ref terraform="deploy/functions.tf#L10" inline=true /%} handles weather data. It is the ingress for all telemetry and runs the daily finalization flow. It runs on .NET 8 isolated runtime.
+
+Both services authenticate to their backends through [managed identity](#identity). The gateway obtains a token from Azure AD on behalf of the function app it's calling (the function never exposes a shared key or connection string to the outside).
+
+Both services write to the same CosmosDB account but touch different containers. They share no state except the database
+itself.
+
+---
+
+## The database {% ref terraform="deploy/database.tf#L1" azure="https://learn.microsoft.com/azure/cosmos-db/serverless" /%}
+
+Database of choice for this project is CosmosDB. It runs in serverless mode (pay-per-request, no provisioned throughput).
+
+The account uses session consistency (the default) and a single region (West Europe) with no geo-replication.
+
+There are three containers, all partitioned by `/deviceId`:
+
+**Device registry** stores one record per device: its HMAC secret, claim status, and owner. The provisioning service is
+the only writer.
+
+**Views** holds the materialized aggregates that dashboards read (daily buckets, weekly buckets). The worker writes here on every telemetry upload.
+
+**Telemetry raw** is the audit log. An exact copy of every payload, auto-deleted after 30 days via TTL.
+
+![Database write pattern](/assets/cloud-database-light.svg#light)
+![Database write pattern](/assets/cloud-database-dark.svg#dark)
+
+{% aside %}
+Partitioning by device ID means every dashboard query is a single-partition read which is the cheapest possible CosmosDB operation. The trade-off is that cross-device queries (eg. "show me all stations in a region") would be expensive. Those are handled by the relational database instead.
+{% /aside %}
+---
+
+## Key Vault {% ref terraform="deploy/security.tf#L3" azure="https://learn.microsoft.com/azure/key-vault/general" /%}
+
+Key Vault stores the RSA private key used by the provisioning service to sign device session tokens. The provisioning function reads it at startup through a Key Vault reference in its app settings, no secret ever appears in source code or deployment config.
+
+---
+
+## Static Web App (JWKS host) {% ref terraform="deploy/web.tf#L1" azure="https://learn.microsoft.com/azure/static-web-apps" /%}
+
+Gateway needs to know public key of given signature to verify JWT's validity. This project uses Static Web App to simulate OpenID configuration endpoint which gateway uses.
+
+Luckly Azure Static Web App has generous free tier which easily fullfils this requirement.
+
+It serves two OpenID configuration documents, one for device tokens (`/device/.well-known/openid-configuration`) and one for provisioning tokens (`/provisioning/.well-known/openid-configuration`). The gateway's `validate-jwt` policy points at these URLs. When a request arrives, the gateway fetches the public key from the static app and validates the signature locally.
+
+{% aside %}
+This is deployed automatically by Terraform via the SWA CLI {% ref azure="https://azure.github.io/static-web-apps-cli/" inline=true /%}.
+{% /aside %}
+
+---
+
+## Storage Account {% ref terraform="deploy/storage.tf#L1" azure="https://learn.microsoft.com/azure/storage/common/storage-account-overview" /%}
+
+A single Storage Account (Standard LRS) holds deployment packages for both function apps in separate blob containers. It also serves as the backing store for Azure Functions' internal state (AzureWebJobsStorage).
+
+---
+
+## Identity {% ref terraform="deploy/identity.tf#L1" azure="https://learn.microsoft.com/azure/active-directory/managed-identities-azure-resources/overview" /%}
+
+Services don't authenticate to each other with shared secrets. The system uses Azure AD app registrations and managed identities instead.
+
+Each function app has its own Azure AD app registration with an `APIM.Access` role. The gateway's system-assigned
+managed identity is granted that role, which lets it request tokens for the function app it's calling.
+
+The claim endpoint uses a third identity: an external worker service principal. The application server authenticates as this service principal when it calls the provisioning service to claim a device on behalf of a user. This keeps the application's credentials separate from the gateway's credentials.
+
+---
+
+## Observability {% ref terraform="deploy/observability.tf#L1" azure="https://learn.microsoft.com/azure/azure-monitor/app/app-insights-overview" /%}
+
+Application Insights collects traces from both function apps. Both functions include the Application Insights agent extension, which provides distributed tracing, dependency tracking, and failure alerts.
+---
+
+## What this costs
+
+At low volume (a handful of devices), the entire cloud layer runs within Azure's free tiers. API Management Consumption charges per call. Functions charge per execution. CosmosDB Serverless charges per request unit consumed. Most of the costs come from reading storage account on cold starts.
+
+The trade-off is cold starts. Serverless functions that haven't run recently take a few seconds to warm up. A device waking from deep sleep won't notice, but a user opening up a dashboard might.
+
+{% aside %}
+It's not perfect as device has to stay awake for longer and at some point users may notice long loading times at very low usage. It's a trade-off I was willing to take.
+{% /aside %}
