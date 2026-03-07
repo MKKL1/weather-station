@@ -5,6 +5,7 @@ import markdoc from "@astrojs/markdoc";
 
 export default defineConfig({
   site: process.env.SITE,
+  base: process.env.BASE_URL,
   integrations: [
     markdoc(),
     starlight({
