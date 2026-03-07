@@ -27,6 +27,9 @@ jobs:
         uses: withastro/action@v5
         with:
           path: ./docs
+        env:
+          SITE: https://${{ github.repository_owner }}.github.io
+          BASE_URL: /${{ github.event.repository.name }}
 
   deploy:
     needs: build
