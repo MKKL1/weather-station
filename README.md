@@ -13,8 +13,7 @@ Heavy Weather is an end-to-end weather monitoring solution designed for scalabil
 | **deploy** | Reusable Terraform module defining Azure infrastructure. |
 | **firmware** | PlatformIO project for the ESP32. |
 | **provisioning-service** | Go service for device registration and JWT issuance. |
-| **server** | .NET 8 backend API. |
-| **telemetry-worker** | Azure Functions worker for telemetry ingestion and processing. |
+| **server** | .NET 8 API for weather history and device management to end users. |
 
 ## Getting started
 ...Link to physical station instructions
