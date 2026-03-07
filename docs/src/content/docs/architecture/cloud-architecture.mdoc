@@ -2,7 +2,7 @@
 title: Cloud architecture
 description: Azure cloud infrastructure
 sidebar:
-    order: 2
+  order: 2
 ---
 
 **Azure** was choosen as cloud service provider in this project. Any mention of "cloud" means that it's using some Azure
@@ -98,27 +98,36 @@ Gateway needs to know public key of given signature to verify JWT's validity. Th
 
 Luckly Azure Static Web App has generous free tier which easily fullfils this requirement.
 
-It serves two OpenID configuration documents, one for device tokens (`/device/.well-known/openid-configuration`) and one for provisioning tokens (`/provisioning/.well-known/openid-configuration`). The gateway's `validate-jwt` policy points at these URLs. When a request arrives, the gateway fetches the public key from the static app and validates the signature locally.
+It serves two OpenID configuration documents, one for device tokens (`/device/.well-known/openid-configuration`) and one
+for provisioning tokens (`/provisioning/.well-known/openid-configuration`). The gateway's `validate-jwt` policy points
+at these URLs. When a request arrives, the gateway fetches the public key from the static app and validates the
+signature locally.
 
 {% aside %}
-This is deployed automatically by Terraform via the SWA CLI {% ref azure="https://azure.github.io/static-web-apps-cli/" inline=true /%}.
+This is deployed automatically by Terraform via the SWA CLI {% ref azure="https://azure.github.io/static-web-apps-cli/"
+inline=true /%}.
 {% /aside %}
 
 ---
 
 ## Storage Account {% ref terraform="deploy/storage.tf#L1" azure="https://learn.microsoft.com/azure/storage/common/storage-account-overview" /%}
 
-A single Storage Account (Standard LRS) holds deployment packages for both function apps in separate blob containers. It also serves as the backing store for Azure Functions' internal state (AzureWebJobsStorage).
+A single Storage Account (Standard LRS) holds deployment packages for both function apps in separate blob containers. It
+also serves as the backing store for Azure Functions' internal state (AzureWebJobsStorage).
 
 ---
 
 ## Identity {% ref terraform="deploy/identity.tf#L1" azure="https://learn.microsoft.com/azure/active-directory/managed-identities-azure-resources/overview" /%}
 
-The system uses Azure AD for all inter-service authentication — no shared secrets, no connection strings passed between services.
+The system uses Azure AD for all inter-service authentication — no shared secrets, no connection strings passed between
+services.
 
-The flow differs by endpoint type. For device endpoints, a device sends its JWT to the gateway, where it's validated and then the request gets forwarded to the appropriate service.
+The flow differs by endpoint type. For device endpoints, a device sends its JWT to the gateway, where it's validated and
+then the request gets forwarded to the appropriate service.
 
-Administrative endpoints are different, the application must independently prove it's identity to Azure AD. The application retrieves its secret from config, exchanges it for an access token, and attaches that token to the request. The gateway then validates it in the same way it does for device requests.
+Administrative endpoints are different, the application must independently prove it's identity to Azure AD. The
+application retrieves its secret from config, exchanges it for an access token, and attaches that token to the request.
+The gateway then validates it in the same way it does for device requests.
 
 ![Cloud identity diagram](/assets/cloud-identity-light.svg#light)
 ![Cloud identity diagram](/assets/cloud-identity-dark.svg#dark)
@@ -127,15 +136,20 @@ Administrative endpoints are different, the application must independently prove
 
 ## Observability {% ref terraform="deploy/observability.tf#L1" azure="https://learn.microsoft.com/azure/azure-monitor/app/app-insights-overview" /%}
 
-Application Insights collects traces from both function apps. Both functions include the Application Insights agent extension, which provides distributed tracing, dependency tracking, and failure alerts.
+Application Insights collects traces from both function apps. Both functions include the Application Insights agent
+extension, which provides distributed tracing, dependency tracking, and failure alerts.
 ---
 
 ## What this costs
 
-At low volume (a handful of devices), the entire cloud layer runs within Azure's free tiers. API Management Consumption charges per call. Functions charge per execution. CosmosDB Serverless charges per request unit consumed. Most of the costs come from reading storage account on cold starts.
+At low volume (a handful of devices), the entire cloud layer runs within Azure's free tiers. API Management Consumption
+charges per call. Functions charge per execution. CosmosDB Serverless charges per request unit consumed. Most of the
+costs come from reading storage account on cold starts.
 
-The trade-off is cold start time. Serverless functions that haven't run recently take a few seconds to warm up. A device waking from deep sleep won't notice, but a user opening up a dashboard might.
+The trade-off is cold start time. Serverless functions that haven't run recently take a few seconds to warm up. A device
+waking from deep sleep won't notice, but a user opening up a dashboard might.
 
 {% aside %}
-It's not perfect as device has to stay awake for longer and at some point users may notice long loading times at very low usage. It's a trade-off I was willing to take.
+It's not perfect as device has to stay awake for longer and at some point users may notice long loading times at very
+low usage. It's a trade-off I was willing to take.
 {% /aside %}
