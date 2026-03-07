@@ -1,0 +1,17 @@
+{
+  "name": "opposite-orbit",
+  "type": "module",
+  "version": "0.0.1",
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/markdoc": "^0.15.10",
+    "@astrojs/starlight": "^0.37.6",
+    "@astrojs/starlight-markdoc": "^0.5.1",
+    "astro": "^5.17.1"
+  }
+}
