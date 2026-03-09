@@ -27,10 +27,21 @@ export default defineMarkdocConfig({
       render: component("./src/components/DocLinks.astro"),
       attributes: {
         terraform: { type: String },
+        src: { type: String },
         azure: { type: String },
         repo: { type: String },
         inline: { type: Boolean },
       },
+    },
+    "api-btn": {
+      render: component("./src/components/ApiButton.astro"),
+      attributes: {
+        method: { type: String, required: true },
+        path: { type: String, required: true },
+        spec: { type: String },
+        tag: { type: String },
+      },
+      selfClosing: true,
     },
   },
 });

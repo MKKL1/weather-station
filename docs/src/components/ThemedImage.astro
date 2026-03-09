@@ -13,10 +13,14 @@ const resolve = (src: string) => (src.startsWith("/") ? `${base}${src}` : src);
 ---
 
 <div class="themed-image">
-  <Zoom label={alt}>
-    <img src={resolve(light)} alt={alt} class="dark:sl-hidden" loading="lazy" decoding="async" />
-  </Zoom>
-  <Zoom label={alt}>
-    <img src={resolve(dark)} alt={alt} class="light:sl-hidden" loading="lazy" decoding="async" />
-  </Zoom>
+  <div class="dark:sl-hidden">
+    <Zoom label={alt}>
+      <img src={resolve(light)} alt={alt} loading="lazy" decoding="async" />
+    </Zoom>
+  </div>
+  <div class="light:sl-hidden">
+    <Zoom label={alt}>
+      <img src={resolve(dark)} alt={alt} loading="lazy" decoding="async" />
+    </Zoom>
+  </div>
 </div>

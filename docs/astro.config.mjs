@@ -13,7 +13,7 @@ export default defineConfig({
     starlight({
       plugins: [starlightHeadingBadges(), starlightImageZoom()],
       components: {
-        MarkdownContent: './src/components/overrides/MarkdownContent.astro',
+        MarkdownContent: "./src/components/overrides/MarkdownContent.astro",
       },
       title: "Heavy Weather",
       description: "Documentation for the Heavy Weather platform.",
@@ -36,12 +36,12 @@ export default defineConfig({
             {
               label: "Main API",
               link: "/api-reference/main",
-              attrs: { target: "_blank", class: "external-sidebar-link" }
+              attrs: { target: "_blank", class: "external-sidebar-link" },
             },
             {
-              label: "API Gateway",
+              label: "Gateway API",
               link: "/api-reference/gateway",
-              attrs: { target: "_blank", class: "external-sidebar-link" }
+              attrs: { target: "_blank", class: "external-sidebar-link" },
             },
           ],
         },

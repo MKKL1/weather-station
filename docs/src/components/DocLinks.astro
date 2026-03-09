@@ -1,13 +1,15 @@
 ---
 interface Props {
     terraform?: string; // path within github repo, e.g. "deploy/gateway.tf"
-    azure?: string; // full azure docs URL
-    repo?: string; // github repo
+    src?: string;       // path within github repo, e.g. "server/src/WeatherStation.API/Token/ApimAuthenticationHandler.cs"
+    azure?: string;     // full azure docs URL
+    repo?: string;      // github repo
     inline?: boolean;
 }
 
 const {
     terraform,
+    src,
     azure,
     repo = "MKKL1/weather-station",
     inline = false,
@@ -15,6 +17,9 @@ const {
 
 const terraformUrl = terraform
     ? `https://github.com/${repo}/blob/main/${terraform}`
+    : null;
+const srcUrl = src
+    ? `https://github.com/${repo}/blob/main/${src}`
     : null;
 ---
 
@@ -29,6 +34,19 @@ const terraformUrl = terraform
                 title={`Terraform: ${terraform}`}
             >
                 tf
+            </a>
+        )
+    }
+    {
+        srcUrl && (
+            <a
+                href={srcUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="doc-link doc-link--src"
+                title={`Source: ${src}`}
+            >
+                src
             </a>
         )
     }
@@ -91,6 +109,17 @@ const terraformUrl = terraform
         color: var(--sl-color-accent);
         border: 1px solid
             color-mix(in srgb, var(--sl-color-accent) 25%, transparent);
+    }
+
+    .doc-link--src {
+        background-color: color-mix(
+            in srgb,
+            var(--sl-color-orange) 12%,
+            transparent
+        );
+        color: var(--sl-color-orange);
+        border: 1px solid
+            color-mix(in srgb, var(--sl-color-orange) 25%, transparent);
     }
 
     .doc-link--azure {
