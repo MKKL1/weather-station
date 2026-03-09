@@ -14,6 +14,15 @@ export default defineMarkdocConfig({
     },
   },
   tags: {
+    "themed-image": {
+      render: component("./src/components/ThemedImage.astro"),
+      attributes: {
+        light: { type: String, required: true },
+        dark: { type: String, required: true },
+        alt: { type: String },
+      },
+      selfClosing: true,
+    },
     ref: {
       render: component("./src/components/DocLinks.astro"),
       attributes: {

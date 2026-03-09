@@ -12,6 +12,9 @@
     "@astrojs/markdoc": "^0.15.10",
     "@astrojs/starlight": "^0.37.6",
     "@astrojs/starlight-markdoc": "^0.5.1",
-    "astro": "^5.17.1"
+    "@scalar/astro": "^0.2.0",
+    "astro": "^5.17.1",
+    "starlight-heading-badges": "^0.6.1",
+    "starlight-image-zoom": "^0.13.2"
   }
 }

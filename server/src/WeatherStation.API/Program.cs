@@ -42,6 +42,7 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter());
     });
 
+builder.Services.AddOpenApi();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo
@@ -222,11 +223,22 @@ app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapOpenApi();
 
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<WeatherStationDbContext>();
-    await db.Database.MigrateAsync();
+    try
+    {
+        var db = scope.ServiceProvider.GetRequiredService<WeatherStationDbContext>();
+        await db.Database.MigrateAsync();
+    }
+    catch (Exception ex)
+    {
+        // Suppress migration errors during build-time tooling (like OpenAPI generation) 
+        // where the database isn't reachable.
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogWarning(ex, "Failed to migrate database. This is expected during build-time tooling.");
+    }
 }
 
 await app.RunAsync();

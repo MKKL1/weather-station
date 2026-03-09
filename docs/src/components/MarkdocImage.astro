@@ -1,4 +1,6 @@
 ---
+import { Zoom } from 'starlight-image-zoom/components';
+
 interface Props {
   src: string;
   alt?: string;
@@ -10,4 +12,6 @@ const base = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
 const resolvedSrc = src.startsWith("/") ? `${base}${src}` : src;
 ---
 
-<img src={resolvedSrc} alt={alt} title={title} />
+<Zoom label={alt}>
+  <img src={resolvedSrc} alt={alt} title={title} />
+</Zoom>

@@ -1,0 +1,146 @@
+---
+import { ScalarComponent } from '@scalar/astro'
+
+export function getStaticPaths() {
+  return [
+    { params: { slug: undefined } },
+    { params: { slug: 'main' } },
+    { params: { slug: 'gateway' } }
+  ];
+}
+
+const { slug } = Astro.params;
+const baseUrl = (import.meta.env.BASE_URL ?? '/').replace(/\/$/, '')
+---
+
+<ScalarComponent configuration={{
+  sources: [
+    {
+      title: 'Main API',
+      slug: 'main',
+      url: `${baseUrl}/specs/server.json`,
+      default: !slug || slug === 'main',
+    },
+    {
+      title: 'API Gateway',
+      slug: 'gateway',
+      url: `${baseUrl}/specs/gateway.yml`,
+      default: slug === 'gateway',
+    },
+  ],
+  theme: 'purple',
+  pageTitle: 'Heavy Weather – API Reference',
+  favicon: `${baseUrl}/favicon.svg`,
+  agent: { disabled: true },
+}} />
+
+<a id="docs-back-link" class="docs-link" href={baseUrl || '/'}></a>
+
+<script>
+  const backLink = document.getElementById('docs-back-link');
+  if (backLink) {
+    // If the user navigated here from our own site, show the return arrow and text.
+    // If they landed here directly (empty referrer) or from google/external, just say "Docs"
+    const isFromDocs = document.referrer.includes(window.location.hostname);
+    
+    if (isFromDocs) {
+      backLink.innerHTML = `
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="return-icon"><path d="m15 18-6-6 6-6"/></svg>
+        Return to Docs
+      `;
+    } else {
+      backLink.innerHTML = 'Docs';
+    }
+  }
+</script>
+
+<script>
+  // Wait for Scalar to render, then inject the title above the search bar inside the sidebar
+  const observer = new MutationObserver(() => {
+    // Find the search button which indicates the sidebar is rendered
+    const searchButton = document.querySelector('button[role="search"]') || document.querySelector('.bg-sidebar-b-search');
+    if (searchButton) {
+      // Find the sidebar element (an aside, or the wrapper of the search button)
+      const sidebarContainer = searchButton.closest('aside') || searchButton.parentElement?.parentElement;
+      if (sidebarContainer && !document.querySelector('.brand-wrapper')) {
+        const brandWrapper = document.createElement('div');
+        brandWrapper.className = 'brand-wrapper';
+        brandWrapper.style.padding = '12px 12px 0 12px'; // padding to match search wrapper
+
+        const brand = document.createElement('div');
+        brand.className = 'brand-injected';
+        brand.textContent = 'Heavy Weather API';
+        brand.style.fontWeight = '600';
+        brand.style.fontSize = '1.125rem';
+        brand.style.color = 'var(--scalar-color-1)';
+        brand.style.fontFamily = 'var(--scalar-font, system-ui, -apple-system, sans-serif)';
+        
+        brandWrapper.appendChild(brand);
+        
+        // Insert as first child of the sidebar container
+        sidebarContainer.insertBefore(brandWrapper, sidebarContainer.firstChild);
+        observer.disconnect();
+      }
+    }
+  });
+
+  observer.observe(document.body, { childList: true, subtree: true });
+
+  const backLinkObserver = new MutationObserver(() => {
+    const topBarNav = document.querySelector('.ml-auto')?.parentElement;
+    const backLink = document.getElementById('docs-back-link');
+    
+    if (topBarNav && backLink && !topBarNav.contains(backLink)) {
+      // Add a separator space before the docs button
+      const separator = document.createElement('div');
+      separator.style.width = '1px';
+      separator.style.height = '1.25rem';
+      separator.style.backgroundColor = 'var(--scalar-border-color)';
+      separator.style.marginLeft = '8px';
+      separator.style.marginRight = '8px';
+      
+      topBarNav.appendChild(separator);
+      topBarNav.appendChild(backLink);
+      backLink.style.position = 'static'; // Cancel fixed layout once embedded
+      backLinkObserver.disconnect();
+    }
+  });
+
+  backLinkObserver.observe(document.body, { childList: true, subtree: true });
+</script>
+
+<style>
+  :global(body) {
+    margin: 0;
+  }
+
+  /* Styling for the nav button */
+  .docs-link {
+    position: fixed; /* Fallback until JS mounts it into the scalar layout */
+    top: 0.875rem;
+    right: 1.5rem;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-family: var(--scalar-font, system-ui, -apple-system, sans-serif);
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-decoration: none;
+    color: var(--scalar-color-1, #000);
+    background: transparent;
+    padding: 0;
+    border: none;
+    transition: opacity 0.15s ease;
+  }
+
+  .docs-link .return-icon {
+    width: 1.1em;
+    height: 1.1em;
+    stroke-width: 2.5;
+  }
+
+  .docs-link:hover {
+    opacity: 0.7;
+  }
+</style>

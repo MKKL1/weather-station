@@ -2,6 +2,8 @@
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 import markdoc from "@astrojs/markdoc";
+import starlightHeadingBadges from "starlight-heading-badges";
+import starlightImageZoom from "starlight-image-zoom";
 
 export default defineConfig({
   site: process.env.SITE,
@@ -9,6 +11,10 @@ export default defineConfig({
   integrations: [
     markdoc(),
     starlight({
+      plugins: [starlightHeadingBadges(), starlightImageZoom()],
+      components: {
+        MarkdownContent: './src/components/overrides/MarkdownContent.astro',
+      },
       title: "Heavy Weather",
       description: "Documentation for the Heavy Weather platform.",
       logo: {
@@ -23,7 +29,22 @@ export default defineConfig({
           autogenerate: { directory: "getting-started" },
         },
         { label: "Architecture", autogenerate: { directory: "architecture" } },
-        { label: "API Reference", autogenerate: { directory: "api" } },
+        {
+          label: "API Reference",
+          items: [
+            { label: "Overview", link: "/api/" },
+            {
+              label: "Main API",
+              link: "/api-reference/main",
+              attrs: { target: "_blank", class: "external-sidebar-link" }
+            },
+            {
+              label: "API Gateway",
+              link: "/api-reference/gateway",
+              attrs: { target: "_blank", class: "external-sidebar-link" }
+            },
+          ],
+        },
         { label: "Guides", autogenerate: { directory: "guides" } },
       ],
       lastUpdated: true,

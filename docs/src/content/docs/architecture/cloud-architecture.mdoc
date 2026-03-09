@@ -5,15 +5,14 @@ sidebar:
   order: 2
 ---
 
-**Azure** was choosen as cloud service provider in this project. Any mention of "cloud" means that it's using some Azure
+**Azure** was chosen as cloud service provider in this project. Any mention of "cloud" means that it's using some Azure
 specific infrastructure.
 
 Main components are shown below.
 
-![Cloud infrastructure diagram](/assets/cloud-infra-light.svg#light)
-![Cloud infrastructure diagram](/assets/cloud-infra-dark.svg#dark)
+{% themed-image light="/assets/cloud-infra-light.svg" dark="/assets/cloud-infra-dark.svg" alt="Cloud infrastructure diagram" /%}
 
-This document explain every element above and choices made when designing this infrastructure.
+This document explains every element above and choices made when designing this infrastructure.
 
 ---
 
@@ -35,7 +34,7 @@ The gateway does two things before any backend sees a request. It validates the 
 it routes the request to the correct service based on the URL path.
 
 Authorization is handled at the gateway level. It doesn't trust the device's token directly for
-backend calls. Any JWT is first validated, then it's device ID is extracted from the claims. The backend never sees the
+backend calls. Any JWT is first validated, then its device ID is extracted from the claims. The backend never sees the
 device's original credential.
 
 Authorization is described in detail in [[Authorization]]
@@ -52,11 +51,16 @@ without sharing private keys, it only needs the public key endpoint.
 Behind the gateway sit two Azure Function Apps, each on its own service plan (Flex Consumption FC1). They handle
 different concerns and never call each other.
 
-**Provisioning service** {% ref terraform="deploy/functions.tf#L67" inline=true /%} manages device identity. It handles the provisioning flow and user claiming (more in [[Authorization]]). It runs a custom runtime (Go) and has access to [Key Vault](#key-vault) for the token-signing private key.
+**Provisioning service** {% ref terraform="deploy/functions.tf#L67" inline=true /%} manages device identity. It handles
+the provisioning flow and user claiming (more in [[Authorization]]). It runs a custom runtime (Go) and has access to
+[Key Vault](#key-vault) for the token-signing private key.
 
-**Worker service** {% ref terraform="deploy/functions.tf#L10" inline=true /%} handles weather data. It is the ingress for all telemetry and runs the daily finalization flow. It runs on .NET 8 isolated runtime.
+**Worker service** {% ref terraform="deploy/functions.tf#L10" inline=true /%} handles weather data. It is the ingress
+for all telemetry and runs the daily finalization flow. It runs on .NET 8 isolated runtime.
 
-Both services authenticate to their backends through [managed identity](#identity). The gateway obtains a token from Azure AD on behalf of the function app it's calling (the function never exposes a shared key or connection string to the outside).
+Both services authenticate to their backends through [managed identity](#identity). The gateway obtains a token from
+Azure AD on behalf of the function app it's calling (the function never exposes a shared key or connection string to the
+outside).
 
 Both services write to the same CosmosDB account but touch different containers. They share no state except the database
 itself.
@@ -65,7 +69,8 @@ itself.
 
 ## The database {% ref terraform="deploy/database.tf#L1" azure="https://learn.microsoft.com/azure/cosmos-db/serverless" /%}
 
-Database of choice for this project is CosmosDB. It runs in serverless mode (pay-per-request, no provisioned throughput).
+Database of choice for this project is CosmosDB. It runs in serverless mode (pay-per-request, no provisioned
+throughput).
 
 The account uses session consistency (the default) and a single region (West Europe) with no geo-replication.
 
@@ -74,29 +79,34 @@ There are three containers, all partitioned by `/deviceId`:
 **Device registry** stores one record per device: its HMAC secret, claim status, and owner. The provisioning service is
 the only writer.
 
-**Views** holds the materialized aggregates that dashboards read (daily buckets, weekly buckets). The worker writes here on every telemetry upload.
+**Views** holds the materialized aggregates that dashboards read (daily buckets, weekly buckets). The worker writes here
+on every telemetry upload.
 
 **Telemetry raw** is the audit log. An exact copy of every payload, auto-deleted after 30 days via TTL.
 
-![Database write pattern](/assets/cloud-database-light.svg#light)
-![Database write pattern](/assets/cloud-database-dark.svg#dark)
+{% themed-image light="/assets/cloud-database-light.svg" dark="/assets/cloud-database-dark.svg" alt="Database write pattern" /%}
 
 {% aside %}
-Partitioning by device ID means every dashboard query is a single-partition read which is the cheapest possible CosmosDB operation. The trade-off is that cross-device queries (eg. "show me all stations in a region") would be expensive. Those are handled by the relational database instead.
+Partitioning by device ID means every dashboard query is a single-partition read which is the cheapest possible CosmosDB
+operation. The trade-off is that cross-device queries (eg. "show me all stations in a region") would be expensive. Those
+are handled by the relational database instead.
 {% /aside %}
 ---
 
 ## Key Vault {% ref terraform="deploy/security.tf#L3" azure="https://learn.microsoft.com/azure/key-vault/general" /%}
 
-Key Vault stores the RSA private key used by the provisioning service to sign device session tokens. The provisioning function reads it at startup through a Key Vault reference in its app settings, no secret ever appears in source code or deployment config.
+Key Vault stores the RSA private key used by the provisioning service to sign device session tokens. The provisioning
+function reads it at startup through a Key Vault reference in its app settings, no secret ever appears in source code or
+deployment config.
 
 ---
 
 ## Static Web App (JWKS host) {% ref terraform="deploy/web.tf#L1" azure="https://learn.microsoft.com/azure/static-web-apps" /%}
 
-Gateway needs to know public key of given signature to verify JWT's validity. This project uses Static Web App to simulate OpenID configuration endpoint which gateway uses.
+The gateway needs the public key to verify a JWT's signature. This project uses Static Web App to simulate OpenID
+configuration endpoint which gateway uses.
 
-Luckly Azure Static Web App has generous free tier which easily fullfils this requirement.
+Azure Static Web App has a generous free tier that covers this use case.
 
 It serves two OpenID configuration documents, one for device tokens (`/device/.well-known/openid-configuration`) and one
 for provisioning tokens (`/provisioning/.well-known/openid-configuration`). The gateway's `validate-jwt` policy points
@@ -129,8 +139,7 @@ Administrative endpoints are different, the application must independently prove
 application retrieves its secret from config, exchanges it for an access token, and attaches that token to the request.
 The gateway then validates it in the same way it does for device requests.
 
-![Cloud identity diagram](/assets/cloud-identity-light.svg#light)
-![Cloud identity diagram](/assets/cloud-identity-dark.svg#dark)
+{% themed-image light="/assets/cloud-identity-light.svg" dark="/assets/cloud-identity-dark.svg" alt="Cloud identity diagram" /%}
 
 ---
 
@@ -142,8 +151,8 @@ extension, which provides distributed tracing, dependency tracking, and failure 
 
 ## What this costs
 
-At low volume (a handful of devices), the entire cloud layer runs within Azure's free tiers. API Management Consumption
-charges per call. Functions charge per execution. CosmosDB Serverless charges per request unit consumed. Most of the
+At low volume (a handful of devices), the entire cloud layer runs within Azure's free tiers. API Management charges
+per call, Functions charge per execution, and CosmosDB Serverless charges per request unit consumed. Most of the
 costs come from reading storage account on cold starts.
 
 The trade-off is cold start time. Serverless functions that haven't run recently take a few seconds to warm up. A device
