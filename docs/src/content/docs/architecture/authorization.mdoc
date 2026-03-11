@@ -212,10 +212,11 @@ This mechanic is explained in [cloud architecture section](/architecture/cloud-a
 ## Authorization flow on example
 
 This section walks through the entire lifecycle from a fresh device to sending weather data. Every endpoint and
-payload shown here uses the same device ID (`H1-AGAQEZML3D772QT4UKS43NJQ`) so the examples connect into a single,
-coherent story.
+payload shown here uses the same device ID (`H1-AGAQEZML3D772QT4UKS43NJQ`).
 
 ### 1. Device registration
+
+{% themed-image light="/assets/auth-process-1-light.svg" dark="/assets/auth-process-1-dark.svg" alt="Authentication overview" /%}
 
 A device boots for the first time and connects to the internet. It carries the
 [provisioning token](#provisioning-token) from the factory. Using that token as its `Bearer` credential, it
@@ -243,6 +244,8 @@ At this point the device has two credentials: the original provisioning token an
 
 ### 2. Token request
 
+{% themed-image light="/assets/auth-process-2-light.svg" dark="/assets/auth-process-2-dark.svg" alt="Authentication overview" /%}
+
 The device now needs a short-lived [access token](#access-token). To get one, it signs a message with the HMAC
 secret it just received. The message combines the device ID and a current timestamp:
 
@@ -269,10 +272,6 @@ Authorization: Bearer <provisioning-token>
 The provisioning service verifies the provisioning token, recomputes the HMAC, and checks that the timestamp is
 recent. If everything matches, it returns an access token.
 
-This is where multi-factor authentication comes in. The device has to present two independent credentials: the
-provisioning token (something it received at the factory) and the HMAC signature (something it received during
-registration). Neither is sufficient on its own.
-
 {% aside %}
 Because the device is not yet claimed, the returned token will not contain the `weather-telemetry-write` role.
 The device can authenticate, but it can't push data yet.
@@ -280,11 +279,15 @@ The device can authenticate, but it can't push data yet.
 
 ### 3. User login
 
+{% themed-image light="/assets/auth-process-3-light.svg" dark="/assets/auth-process-3-dark.svg" alt="Authentication overview" /%}
+
 On the user's side, the flow is a standard OIDC login through the identity provider. After authenticating, the
 user's browser holds a JWT that it sends with every request to the application API. There is nothing device-specific
 about this step.
 
 ### 4. Claim code generation
+
+{% themed-image light="/assets/auth-process-4-light.svg" dark="/assets/auth-process-4-dark.svg" alt="Authentication overview" /%}
 
 The user presses a button on the device's local Wi-Fi configuration page. The device then requests a temporary
 claim code from the provisioning service:
@@ -300,6 +303,8 @@ The service generates a short alphanumeric code (for example, `MQWYJH9U7`) and s
 The device displays this code to the user.
 
 ### 5. User claims the device
+
+{% themed-image light="/assets/auth-process-5-light.svg" dark="/assets/auth-process-5-dark.svg" alt="Authentication overview" /%}
 
 The user opens the web application and provides two things:
 
@@ -346,6 +351,9 @@ Authorization: Bearer <application-token>
 The provisioning service validates the claim code and marks the device as claimed.
 
 ### 6. Sending data
+
+{% themed-image light="/assets/auth-process-6-light.svg" dark="/assets/auth-process-6-dark.svg" alt="Authentication overview" /%}
+
 
 The device is still running with its old access token, which doesn't carry write permissions. To pick up the new
 role, it restarts its normal operating cycle and requests a fresh token using the same HMAC flow described in
