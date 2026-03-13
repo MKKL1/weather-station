@@ -228,6 +228,11 @@
   dependencies:
     "@expressive-code/core" "^0.41.7"
 
+"@fontsource/lexend@^5.2.11":
+  version "5.2.11"
+  resolved "https://registry.npmjs.org/@fontsource/lexend/-/lexend-5.2.11.tgz"
+  integrity sha512-bShbQr2g2sWl7GJNyIxdllZST1faVbebXN6H7AEEDCRms/g4orDLxWnmTVodOtiErdZVUJURq4jpafZ34nIkTw==
+
 "@img/colour@^1.0.0":
   version "1.1.0"
   resolved "https://registry.npmjs.org/@img/colour/-/colour-1.1.0.tgz"

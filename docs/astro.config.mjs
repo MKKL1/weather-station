@@ -14,6 +14,7 @@ export default defineConfig({
       plugins: [starlightHeadingBadges(), starlightImageZoom()],
       components: {
         MarkdownContent: "./src/components/overrides/MarkdownContent.astro",
+        ThemeSelect: "./src/components/overrides/ThemeSelect.astro",
       },
       title: "Heavy Weather",
       description: "Documentation for the Heavy Weather platform.",
@@ -22,7 +23,7 @@ export default defineConfig({
         dark: "./src/assets/logo-dark.svg",
         replacesTitle: false,
       },
-      customCss: ["./src/styles/custom.css"],
+      customCss: ["@fontsource/lexend", "./src/styles/custom.css"],
       sidebar: [
         {
           label: "Getting Started",

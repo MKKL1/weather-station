@@ -37,7 +37,7 @@ Authorization is handled at the gateway level. It doesn't trust the device's tok
 backend calls. Any JWT is first validated, then its device ID is extracted from the claims. The backend never sees the
 device's original credential.
 
-Authorization is described in detail in [[Authorization]]
+Authorization is described in detail [here](/architecture/authorization#gateway-as-the-trust-boundary).
 
 {% aside %}
 JWT validation relies on OpenID configuration hosted on a Azure static web app. This lets the gateway verify tokens
@@ -52,7 +52,7 @@ Behind the gateway sit two Azure Function Apps, each on its own service plan (Fl
 different concerns and never call each other.
 
 **Provisioning service** {% ref terraform="deploy/functions.tf#L67" inline=true /%} manages device identity. It handles
-the provisioning flow and user claiming (more in [[Authorization]]). It runs a custom runtime (Go) and has access to
+the provisioning flow and user claiming (more in [Authorization](/architecture/authorizationy)). It runs a custom runtime (Go) and has access to
 [Key Vault](#key-vault) for the token-signing private key.
 
 **Worker service** {% ref terraform="deploy/functions.tf#L10" inline=true /%} handles weather data. It is the ingress

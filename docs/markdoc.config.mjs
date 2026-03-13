@@ -43,5 +43,35 @@ export default defineMarkdocConfig({
       },
       selfClosing: true,
     },
+    section: {
+      render: component("./src/components/LandingSection.astro"),
+      attributes: {
+        class: { type: String },
+      },
+    },
+    "feature-card": {
+      render: component("./src/components/FeatureCard.astro"),
+      attributes: {
+        icon: { type: String, required: true },
+        title: { type: String, required: true },
+      },
+    },
+    "tech-strip": {
+      render: component("./src/components/TechStrip.astro"),
+      selfClosing: true,
+    },
+    "value-flow": {
+      render: component("./src/components/ValueFlow.astro"),
+      selfClosing: true,
+    },
+    showcase: {
+      render: component("./src/components/ShowcaseItem.astro"),
+      attributes: {
+        title: { type: String, required: true },
+        image: { type: String },
+        reverse: { type: Boolean },
+      },
+    },
+
   },
 });

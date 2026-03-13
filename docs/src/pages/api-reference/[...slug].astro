@@ -1,5 +1,6 @@
 ---
 import { ScalarComponent } from '@scalar/astro'
+import '@fontsource/lexend'
 
 export function getStaticPaths() {
   return [
@@ -112,6 +113,10 @@ const baseUrl = (import.meta.env.BASE_URL ?? '/').replace(/\/$/, '')
 <style>
   :global(body) {
     margin: 0;
+  }
+
+  :global(:root) {
+    --scalar-font: 'Lexend', sans-serif;
   }
 
   /* Styling for the nav button */

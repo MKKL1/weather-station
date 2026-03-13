@@ -69,38 +69,24 @@ const href = `${base}/api-reference/${spec}#${fragment}`;
     flex-shrink: 0;
   }
 
-  .api-btn--post {
-    --_clr: var(--api-btn-clr, #49cc90);
-  }
-
-  .api-btn--get {
-    --_clr: var(--api-btn-clr, #61affe);
-  }
-
-  .api-btn--put {
-    --_clr: var(--api-btn-clr, #fca130);
-  }
-
-  .api-btn--delete {
-    --_clr: var(--api-btn-clr, #f93e3e);
-  }
+  .api-btn--post { --api-btn-clr: #10b981; }
+  .api-btn--get { --api-btn-clr: #3b82f6; }
+  .api-btn--put { --api-btn-clr: #f59e0b; }
+  .api-btn--delete { --api-btn-clr: #ef4444; }
 
   .api-btn {
-    background-color: color-mix(in srgb, var(--_clr) 12%, transparent);
-    color: var(--_clr);
-    border: 1px solid color-mix(in srgb, var(--_clr) 25%, transparent);
+    background-color: color-mix(in srgb, var(--api-btn-clr) 8%, transparent);
+    color: color-mix(in srgb, var(--api-btn-clr) 65%, var(--sl-color-gray-2));
+    border: 1px solid color-mix(in srgb, var(--api-btn-clr) 25%, var(--sl-color-hairline));
   }
 
-  :global([data-theme="light"]) .api-btn--post {
-    --api-btn-clr: #1a8f55;
-  }
-  :global([data-theme="light"]) .api-btn--get {
-    --api-btn-clr: #1a6fbf;
-  }
-  :global([data-theme="light"]) .api-btn--put {
-    --api-btn-clr: #b5750a;
-  }
-  :global([data-theme="light"]) .api-btn--delete {
-    --api-btn-clr: #c22525;
+  :global([data-theme="light"]) .api-btn--post { --api-btn-clr: #059669; }
+  :global([data-theme="light"]) .api-btn--get { --api-btn-clr: #2563eb; }
+  :global([data-theme="light"]) .api-btn--put { --api-btn-clr: #d97706; }
+  :global([data-theme="light"]) .api-btn--delete { --api-btn-clr: #dc2626; }
+
+  :global([data-theme="light"]) .api-btn {
+    color: color-mix(in srgb, var(--api-btn-clr) 75%, var(--sl-color-gray-3));
+    border-color: color-mix(in srgb, var(--api-btn-clr) 25%, var(--sl-color-hairline));
   }
 </style>
