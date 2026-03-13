@@ -1,6 +1,5 @@
 ---
 import { ScalarComponent } from '@scalar/astro'
-import '@fontsource/lexend'
 
 export function getStaticPaths() {
   return [
@@ -111,6 +110,8 @@ const baseUrl = (import.meta.env.BASE_URL ?? '/').replace(/\/$/, '')
 </script>
 
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&display=block');
+
   :global(body) {
     margin: 0;
   }
