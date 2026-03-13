@@ -55,12 +55,12 @@ export default defineConfig({
             { label: "Overview", link: "/api/" },
             {
               label: "Main API",
-              link: "/api-reference/main",
+              link: "api-reference/main",
               attrs: { target: "_blank", class: "external-sidebar-link" },
             },
             {
               label: "Gateway API",
-              link: "/api-reference/gateway",
+              link: "api-reference/gateway",
               attrs: { target: "_blank", class: "external-sidebar-link" },
             },
           ],
