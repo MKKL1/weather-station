@@ -76,21 +76,21 @@ starlight-custom-theme-select {
     border: 2px solid var(--sl-color-hairline) !important;
 }
 
-.starlight-aside--note { 
-    background-color: color-mix(in srgb, #3b82f6 5%, transparent) !important; 
-    border-color: color-mix(in srgb, #3b82f6 40%, transparent) !important; 
+.starlight-aside--note {
+    background-color: transparent !important;
+    border-color: color-mix(in srgb, #3b82f6 40%, transparent) !important;
 }
-.starlight-aside--tip { 
-    background-color: color-mix(in srgb, #10b981 5%, transparent) !important; 
-    border-color: color-mix(in srgb, #10b981 40%, transparent) !important; 
+.starlight-aside--tip {
+    background-color: transparent !important;
+    border-color: color-mix(in srgb, #10b981 40%, transparent) !important;
 }
-.starlight-aside--caution { 
-    background-color: color-mix(in srgb, #f59e0b 5%, transparent) !important; 
-    border-color: color-mix(in srgb, #f59e0b 40%, transparent) !important; 
+.starlight-aside--caution {
+    background-color: color-mix(in srgb, #f59e0b 5%, transparent) !important;
+    border-color: color-mix(in srgb, #f59e0b 40%, transparent) !important;
 }
-.starlight-aside--danger { 
-    background-color: color-mix(in srgb, #ef4444 5%, transparent) !important; 
-    border-color: color-mix(in srgb, #ef4444 40%, transparent) !important; 
+.starlight-aside--danger {
+    background-color: color-mix(in srgb, #ef4444 5%, transparent) !important;
+    border-color: color-mix(in srgb, #ef4444 40%, transparent) !important;
 }
 
 .starlight-aside__title {
@@ -139,6 +139,10 @@ starlight-custom-theme-select {
     padding-top: 0;
 }
 
+body {
+    overflow-x: clip;
+}
+
 .hero::before {
     content: "";
     position: absolute;
@@ -147,7 +151,7 @@ starlight-custom-theme-select {
     transform: translateX(-50%);
     width: 100vw;
     height: 160%;
-    background-image: url('/assets/flyd-xRXXVwNgAXE-unsplash.jpg');
+    background-image: url('/assets/flyd-xRXXVwNgAXE-unsplash.webp');
     background-size: cover;
     background-position: center top;
     z-index: -1;
@@ -159,7 +163,7 @@ starlight-custom-theme-select {
 }
 
 [data-theme="light"] .hero::before {
-    opacity: 0.70;
+    opacity: 0.95;
     mix-blend-mode: multiply;
 }
 
@@ -218,7 +222,6 @@ html[data-has-hero] header.header .header {
     margin-bottom: 1rem;
     background-color: var(--sl-color-bg);
     color: var(--sl-color-accent-high);
-    border: 1px solid var(--sl-color-hairline);
 }
 
 .feature-card__title {
@@ -272,8 +275,6 @@ html[data-has-hero] header.header .header {
     letter-spacing: -0.01em;
 }
 
-/* [data-theme="light"] overrides removed in favor of theme-aware variables */
-
 .showcase-item__body {
     font-size: 1rem;
     line-height: 1.7;
@@ -316,7 +317,6 @@ html[data-has-hero] header.header .header {
     font-weight: 500;
 }
 
-/* Architecture section */
 .landing-architecture {
     text-align: center;
     padding-top: 4rem;
@@ -361,7 +361,6 @@ html[data-has-hero] header.header .header {
     background: color-mix(in srgb, var(--sl-color-accent-low) 50%, transparent);
 }
 
-/* Tech strip */
 .landing-tech {
     text-align: center;
     padding-top: 3rem;
@@ -410,7 +409,6 @@ html[data-has-hero] header.header .header {
     flex-shrink: 0;
 }
 
-/* Responsive */
 @media (max-width: 48rem) {
     .hero::before {
         height: 120%;

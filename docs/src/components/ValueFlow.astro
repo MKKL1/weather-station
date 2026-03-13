@@ -7,7 +7,7 @@
       <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" /></svg>
     </div>
     <div class="step-content">
-      <h4>IoT Devices</h4>
+      <h3>IoT Devices</h3>
       <p>Secure hardware collects & transmits environmental data reliably.</p>
     </div>
   </div>
@@ -22,7 +22,7 @@
       <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
     </div>
     <div class="step-content">
-      <h4>Zero-Trust Cloud</h4>
+      <h3>Zero-Trust Cloud</h3>
       <p>Every payload securely verified before entering the system.</p>
     </div>
   </div>
@@ -37,7 +37,7 @@
       <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 7v10c0 2.21 3.58 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.58 4 8 4s8-1.79 8-4M4 7c0-2.21 3.58-4 8-4s8 1.79 8 4m0 5c0 2.21-3.58 4-8 4s-8-1.79-8-4" /></svg>
     </div>
     <div class="step-content">
-      <h4>NoSQL Database</h4>
+      <h3>NoSQL Database</h3>
       <p>Seamlessly scales from zero to handle massive surges in telemetry data effortlessly.</p>
     </div>
   </div>
@@ -52,7 +52,7 @@
       <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
     </div>
     <div class="step-content">
-      <h4>Global Dashboard</h4>
+      <h3>Global Dashboard</h3>
       <p>Real-time telemetry and analytics anywhere via blazing-fast client.</p>
     </div>
   </div>
@@ -99,7 +99,7 @@
     justify-content: center;
   }
 
-  .step-content h4 {
+  .step-content h3 {
     margin: 0 0 0.5rem;
     font-size: 1rem;
     font-weight: 600;
@@ -141,10 +141,10 @@
   }
 
   @keyframes movePacket {
-    0% { left: 0; opacity: 0; }
+    0% { transform: translate(0, -50%); opacity: 0; }
     20% { opacity: 1; }
     80% { opacity: 1; }
-    100% { left: 100%; opacity: 0; }
+    100% { transform: translate(var(--flow-dist, 40px), -50%); opacity: 0; }
   }
 
   @media (max-width: 900px) {
@@ -153,6 +153,7 @@
       gap: 0;
     }
     .flow-arrow {
+      --flow-dist: 24px;
       width: 24px;
       height: 40px;
       transform: rotate(90deg);

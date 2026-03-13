@@ -18,28 +18,30 @@ export default defineConfig({
       },
       title: "Heavy Weather",
       description: "Documentation for the Heavy Weather platform.",
+      favicon: "/assets/logo-light.svg",
       logo: {
-        light: "./src/assets/logo-light.svg",
-        dark: "./src/assets/logo-dark.svg",
+        light: "./public/assets/logo-light.svg",
+        dark: "./public/assets/logo-dark.svg",
         replacesTitle: false,
       },
-      customCss: ["./src/styles/custom.css"],
+      social: [
+        {
+          icon: 'github',
+          label: 'GitHub',
+          href: 'https://github.com/MKKL1/weather-station',
+        },
+      ],
+      customCss: ["./src/styles/lexend-fonts.css", "./src/styles/custom.css"],
       head: [
-        {
-          tag: "link",
-          attrs: { rel: "preconnect", href: "https://fonts.googleapis.com" },
-        },
-        {
-          tag: "link",
-          attrs: { rel: "preconnect", href: "https://fonts.gstatic.com", crossorigin: true },
-        },
+
         {
           tag: "link",
           attrs: {
-            rel: "stylesheet",
-            href: "https://fonts.googleapis.com/css2?family=Lexend:wght@400;500;600;700&display=block",
-          },
-        },
+            rel: "preload",
+            as: "image",
+            href: "/assets/flyd-xRXXVwNgAXE-unsplash.webp"
+          }
+        }
       ],
       sidebar: [
         {
@@ -69,4 +71,7 @@ export default defineConfig({
       tableOfContents: { minHeadingLevel: 2, maxHeadingLevel: 4 },
     }),
   ],
+  experimental: {
+    svgo: true
+  },
 });
