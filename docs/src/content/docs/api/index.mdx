@@ -1,0 +1,27 @@
+---
+title: API Reference Overview
+description: High level context around the Heavy Weather APIs.
+---
+
+Heavy Weather's API surface is divided into two distinct components meant for different stages of a device's lifecycle.
+We use [Scalar](https://scalar.com) to render our OpenAPI documentation.
+
+You can browse the APIs using the links below, and easily switch between them directly within the documentation UI via
+the top-left dropdown!
+
+import { CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+<CardGrid>
+  <LinkCard
+    title="Main API"
+    description="So called 'Application'"
+    href="/api-reference/main"
+    target="_blank"
+  />
+  <LinkCard
+    title="Gateway API"
+    description="Azure API Management"
+    href="/api-reference/gateway"
+    target="_blank"
+  />
+</CardGrid>

@@ -1,0 +1,19 @@
+---
+const techs = [
+  { name: 'ESP32', color: '#e7352c' },
+  { name: 'Azure', color: '#0078d4' },
+  { name: 'CosmosDB', color: '#00a4ef' },
+  { name: '.NET', color: '#512bd4' },
+  { name: 'Go', color: '#00add8' },
+  { name: 'Terraform', color: '#844fba' },
+];
+---
+
+<div class="tech-strip">
+  {techs.map(t => (
+    <span class="tech-badge" style={`--badge-accent: ${t.color}`}>
+      <span class="tech-badge__dot" />
+      {t.name}
+    </span>
+  ))}
+</div>

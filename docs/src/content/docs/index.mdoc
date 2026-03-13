@@ -4,13 +4,72 @@ description: Documentation for the Heavy Weather platform.
 template: splash
 hero:
   title: Heavy Weather
-  tagline: Monitor environmental data from your IoT weather stations.
+  tagline: Securely stream and visualize telemetry from your distributed weather stations.
+  image:
+    alt: Heavy Weather logo
+    dark: ../../../public/assets/logo-dark.svg
+    light: ../../../public/assets/logo-light.svg
   actions:
     - text: Get Started
       link: getting-started/introduction/
       icon: right-arrow
       variant: primary
     - text: API Reference
-      link: api/overview/
+      link: api/
       variant: minimal
 ---
+
+
+{% section class="landing-features" %}
+
+{% feature-card icon="platform" title="Everything in One Place" %}
+Your sensors, data, and dashboards all live in one place. No juggling multiple tools or trying to get different systems to talk to each other.
+{% /feature-card %}
+
+{% feature-card icon="security" title="Built With Security in Mind" %}
+Your data is encrypted and verified at every step of the way.
+{% /feature-card %}
+
+{% feature-card icon="scale" title="Grows With You" %}
+Start small and expand when you're ready. Adding more stations doesn't mean a big jump in cost or complexity.
+{% /feature-card %}
+
+{% /section %}
+
+{% section class="landing-showcase" %}
+
+## What you can do
+
+{% showcase title="Live Dashboard" %}
+Experience your environmental data as a living, breathing pulse. Instantly stream precise, real-time telemetry straight into stunning visualization panels with absolutely zero latency.
+{% /showcase %}
+
+{% showcase title="Global Temperature Maps" reverse=true %}
+Visualize weather patterns as they unfold across your entire network. Seamlessly map thousands of individual data points into rich, dynamic heatmaps that tell the full story of your environment.
+{% /showcase %}
+
+{% showcase title="Instant Historical Data" %}
+Travel back in time through your entire dataset without breaking a sweat. Effortlessly query past metrics and compare long-term climate trends with lightning-fast retrieval.
+{% /showcase %}
+
+{% /section %}
+
+{% section class="landing-architecture" %}
+
+## See the big picture
+
+Your data journey should be frictionless. From the moment a sensor wakes up in the field to the second a dashboard comes alive on your screen, Heavy Weather ensures every reading is secure, lightning-fast, and infinitely scalable. See how data flows seamlessly through our ecosystem.
+
+{% value-flow /%}
+
+[Explore the full architecture →](/architecture/overview/)
+
+{% /section %}
+
+{% section class="landing-tech" %}
+
+### Built with
+
+{% tech-strip /%}
+
+{% /section %}

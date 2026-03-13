@@ -1,0 +1,726 @@
+{
+  "openapi": "3.0.4",
+  "info": {
+    "title": "WeatherStation.API | v1",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/v1/devices/{deviceId}/claim": {
+      "post": {
+        "tags": [
+          "DeviceClaim"
+        ],
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimDeviceRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimDeviceRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ClaimDeviceRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": { }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Bad Gateway",
+            "content": {
+              "application/json": { }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices": {
+      "get": {
+        "tags": [
+          "Device"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/DeviceResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{deviceId}": {
+      "get": {
+        "tags": [
+          "Device"
+        ],
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{deviceId}/measurements/latest": {
+      "get": {
+        "tags": [
+          "Measurement"
+        ],
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeasurementSnapshotResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/devices/{deviceId}/measurements/history": {
+      "get": {
+        "tags": [
+          "Measurement"
+        ],
+        "parameters": [
+          {
+            "name": "deviceId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "start",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "metrics",
+            "in": "query",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "integer"
+              }
+            }
+          },
+          {
+            "name": "granularity",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeasurementHistoryResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ClaimDeviceRequest": {
+        "required": [
+          "claimCode",
+          "key"
+        ],
+        "type": "object",
+        "properties": {
+          "claimCode": {
+            "maxLength": 20,
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9]+$",
+            "type": "string"
+          },
+          "key": {
+            "maxLength": 200,
+            "minLength": 1,
+            "type": "string"
+          }
+        }
+      },
+      "DeviceResponse": {
+        "required": [
+          "id",
+          "ownerId"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "ownerId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          }
+        }
+      },
+      "MeasurementHistoryResponse": {
+        "required": [
+          "deviceId",
+          "startTime",
+          "endTime",
+          "granularity",
+          "timeSeries"
+        ],
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string"
+          },
+          "startTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endTime": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "granularity": {
+            "type": "string"
+          },
+          "timeSeries": {
+            "$ref": "#/components/schemas/MeasurementTimeSeries"
+          }
+        }
+      },
+      "MeasurementSnapshotResponse": {
+        "required": [
+          "deviceId",
+          "timestamp",
+          "measurements"
+        ],
+        "type": "object",
+        "properties": {
+          "deviceId": {
+            "type": "string"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "measurements": {
+            "$ref": "#/components/schemas/MeasurementsResponse"
+          }
+        }
+      },
+      "MeasurementsResponse": {
+        "required": [
+          "temperature",
+          "humidity",
+          "pressure",
+          "precipitation",
+          "airQuality",
+          "windSpeed",
+          "windDirection"
+        ],
+        "type": "object",
+        "properties": {
+          "temperature": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "humidity": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "pressure": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "precipitation": {
+            "$ref": "#/components/schemas/PrecipitationStatResponse"
+          },
+          "airQuality": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "windSpeed": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "windDirection": {
+            "$ref": "#/components/schemas/WindDirectionStatResponse"
+          }
+        }
+      },
+      "MeasurementTimeSeries": {
+        "required": [
+          "timestamps"
+        ],
+        "type": "object",
+        "properties": {
+          "timestamps": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          "temperature": {
+            "$ref": "#/components/schemas/RangeMetricSeries"
+          },
+          "humidity": {
+            "$ref": "#/components/schemas/RangeMetricSeries"
+          },
+          "pressure": {
+            "$ref": "#/components/schemas/RangeMetricSeries"
+          },
+          "airQuality": {
+            "$ref": "#/components/schemas/RangeMetricSeries"
+          },
+          "precipitation": {
+            "$ref": "#/components/schemas/PrecipitationMetricSeries"
+          },
+          "windSpeed": {
+            "$ref": "#/components/schemas/WindSpeedMetricSeries"
+          },
+          "windDirection": {
+            "$ref": "#/components/schemas/WindDirectionMetricSeries"
+          }
+        }
+      },
+      "PrecipitationMetricSeries": {
+        "required": [
+          "total",
+          "maxRate",
+          "durationMinutes"
+        ],
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "double",
+              "nullable": true
+            }
+          },
+          "maxRate": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "double",
+              "nullable": true
+            }
+          },
+          "durationMinutes": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "double",
+              "nullable": true
+            }
+          },
+          "pattern": {
+            "$ref": "#/components/schemas/PrecipitationPatternSeries"
+          }
+        },
+        "nullable": true
+      },
+      "PrecipitationPatternResponse": {
+        "required": [
+          "intervalSeconds",
+          "intensities"
+        ],
+        "type": "object",
+        "properties": {
+          "intervalSeconds": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "intensities": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "double"
+            }
+          }
+        },
+        "nullable": true
+      },
+      "PrecipitationPatternSeries": {
+        "required": [
+          "intervalMinutes",
+          "series"
+        ],
+        "type": "object",
+        "properties": {
+          "intervalMinutes": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "series": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "type": "number",
+                "format": "double"
+              }
+            }
+          }
+        },
+        "nullable": true
+      },
+      "PrecipitationStatResponse": {
+        "required": [
+          "total",
+          "maxRate",
+          "durationSeconds"
+        ],
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "format": "double",
+            "nullable": true
+          },
+          "maxRate": {
+            "type": "number",
+            "format": "double"
+          },
+          "durationSeconds": {
+            "type": "number",
+            "format": "double"
+          },
+          "pattern": {
+            "$ref": "#/components/schemas/PrecipitationPatternResponse"
+          }
+        },
+        "nullable": true
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "nullable": true
+          },
+          "title": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true
+          },
+          "instance": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "RangeMetricSeries": {
+        "required": [
+          "min",
+          "max",
+          "avg"
+        ],
+        "type": "object",
+        "properties": {
+          "min": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "double",
+              "nullable": true
+            }
+          },
+          "max": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "double",
+              "nullable": true
+            }
+          },
+          "avg": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "double",
+              "nullable": true
+            }
+          }
+        },
+        "nullable": true
+      },
+      "WindDirectionMetricSeries": {
+        "required": [
+          "dominant",
+          "variability"
+        ],
+        "type": "object",
+        "properties": {
+          "dominant": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "format": "int32",
+              "nullable": true
+            }
+          },
+          "variability": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "nullable": true
+      },
+      "WindDirectionStatResponse": {
+        "required": [
+          "dominant"
+        ],
+        "type": "object",
+        "properties": {
+          "dominant": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "nullable": true
+      },
+      "WindSpeedMetricSeries": {
+        "required": [
+          "min",
+          "max",
+          "avg",
+          "gust"
+        ],
+        "type": "object",
+        "properties": {
+          "min": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "double",
+              "nullable": true
+            }
+          },
+          "max": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "double",
+              "nullable": true
+            }
+          },
+          "avg": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "double",
+              "nullable": true
+            }
+          },
+          "gust": {
+            "type": "array",
+            "items": {
+              "type": "number",
+              "format": "double",
+              "nullable": true
+            }
+          }
+        },
+        "nullable": true
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "DeviceClaim"
+    },
+    {
+      "name": "Device"
+    },
+    {
+      "name": "Measurement"
+    }
+  ]
+}

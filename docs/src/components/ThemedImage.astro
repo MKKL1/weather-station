@@ -1,0 +1,26 @@
+---
+import { Zoom } from 'starlight-image-zoom/components';
+
+interface Props {
+  light: string;
+  dark: string;
+  alt?: string;
+}
+
+const { light, dark, alt = "" } = Astro.props;
+const base = (import.meta.env.BASE_URL ?? "/").replace(/\/$/, "");
+const resolve = (src: string) => (src.startsWith("/") ? `${base}${src}` : src);
+---
+
+<div class="themed-image">
+  <div class="dark:sl-hidden">
+    <Zoom label={alt}>
+      <img src={resolve(light)} alt={alt} loading="lazy" decoding="async" />
+    </Zoom>
+  </div>
+  <div class="light:sl-hidden">
+    <Zoom label={alt}>
+      <img src={resolve(dark)} alt={alt} loading="lazy" decoding="async" />
+    </Zoom>
+  </div>
+</div>

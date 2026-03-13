@@ -8,8 +8,8 @@ sidebar:
 Heavy Weather is an IoT platform for weather monitoring. This project includes everything from firmware to frontend
 dashboard.
 
-What makes it different is that it was made with small scale in mind, while not ... on security, availability and cost
-effectivnes. It also has potential to scale without the need to change firmware or data structure.
+What makes it different is that it was designed for small scale, without compromising on security, availability, or cost
+efficiency. It can also scale without changes to firmware or data structure.
 
 Architecture serves three constraints:
 - Dashboards must load instantly, regardless of how much data exists.
@@ -25,11 +25,10 @@ Every structural decision flows from those.
 There are 4 distinct layers to this system:
 - **Device** - an ESP32 microcontroller that sends weather data.
 - **Cloud** - serverless services that receive the data from devices.
-- **Application** - API server which serve user requests.
-- **User** - an actor owning the device.
+- **Application** - API server which serves user requests.
+- **User** - owner of the device.
 
-![System architecture overview](/assets/infra1-light.svg#light)
-![System architecture overview](/assets/infra1-dark.svg#dark)
+{% themed-image light="/assets/infra1-light.svg" dark="/assets/infra1-dark.svg" alt="System architecture overview" /%}
 
 The cloud never initiates contact with anything. Devices push data in and go back to sleep. Users pull data out through
 the application.
@@ -39,7 +38,7 @@ There is one exception to this rule. When user claims a device, application writ
 knows device is claimed as well. This will be covered in detail later on.
 {% /aside %}
 
-You might wonder why the application isn't simply the part of the cloud. The answer is cost. While cloud services are
+You might wonder why the application isn't simply part of the cloud. The answer is cost. While cloud services are
 highly available (important requirement for weather data), they are also expensive to keep running. Everything that
 doesn't have to be in cloud, is handled by what I call "application" or an API server for user.
 
@@ -47,17 +46,17 @@ doesn't have to be in cloud, is handled by what I call "application" or an API s
 
 ## Complex writes, easy reads
 
-Weather data by it's nature accumulates forever. A single station raports every 30 minutes, giving us 17520 readings a
+Weather data by its nature accumulates forever. A single station reports every 30 minutes, giving us 17520 readings a
 year. Saving all of this data is not a problem, but reading it quickly is the biggest problem users will feel (slow
 dashboard).
 
 Heavy Weather solves this issue by trading write complexity for read performance. Every incoming measurement is merged
 into buckets on write.
 
-![Bucket architecture explanation](/assets/infra2-light.svg#light)
-![Bucket architecture explanation](/assets/infra2-dark.svg#dark)
+{% themed-image light="/assets/infra2-light.svg" dark="/assets/infra2-dark.svg" alt="Bucket architecture explanation" /%}
 
-There are only two types of aggregates: daily and weekly (there is also so called "latest"). This pre-aggregation makes
+There are three types of aggregates: daily, weekly, and a special "latest" bucket. Daily and weekly are the main ones.
+This pre-aggregation makes
 reads simple. User asks for "what were temperatures in last week", server can ask for 7 daily aggregates, or 1 weekly if
 accuracy is not required.
 
@@ -73,7 +72,7 @@ happening in entire project.
 As a result of "application" being separated from cloud, there are two distinct databases: NoSQL database in cloud and
 relational database serving application.
 
-With the idea of "everything that doesn't have to be in cloud, isn't", system has two databases with no overlap.
+With the idea of "everything that doesn't have to be in cloud, isn't", the system has two databases with no overlap.
 
 NoSQL cloud database holds weather data and simple device registry for authorization (described in detail later).
 Relational database stores user data, additional metadata for each device like it's geographical location, device owner

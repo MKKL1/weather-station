@@ -1,0 +1,27 @@
+---
+interface Props {
+  title: string;
+  image?: string;
+  reverse?: boolean;
+}
+
+const { title, image, reverse = false } = Astro.props;
+---
+
+<div class:list={["showcase-item", { "showcase-item--reverse": reverse }]}>
+  <div class="showcase-item__content">
+    <h3 class="showcase-item__title">{title}</h3>
+    <div class="showcase-item__body">
+      <slot />
+    </div>
+  </div>
+  <div class="showcase-item__media">
+    {image ? (
+      <img src={image} alt={title} loading="lazy" />
+    ) : (
+      <div class="showcase-item__placeholder">
+        <span>Screenshot coming soon</span>
+      </div>
+    )}
+  </div>
+</div>
