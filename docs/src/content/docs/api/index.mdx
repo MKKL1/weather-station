@@ -15,13 +15,13 @@ import { CardGrid, LinkCard } from '@astrojs/starlight/components';
   <LinkCard
     title="Main API"
     description="So called 'Application'"
-    href="/api-reference/main"
+    href={`${import.meta.env.BASE_URL}/api-reference/main`.replace(/\/+/g, '/')}
     target="_blank"
   />
   <LinkCard
     title="Gateway API"
     description="Azure API Management"
-    href="/api-reference/gateway"
+    href={`${import.meta.env.BASE_URL}/api-reference/gateway`.replace(/\/+/g, '/')}
     target="_blank"
   />
 </CardGrid>

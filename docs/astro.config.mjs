@@ -32,17 +32,6 @@ export default defineConfig({
         },
       ],
       customCss: ["./src/styles/lexend-fonts.css", "./src/styles/custom.css"],
-      head: [
-
-        {
-          tag: "link",
-          attrs: {
-            rel: "preload",
-            as: "image",
-            href: "/assets/flyd-xRXXVwNgAXE-unsplash.webp"
-          }
-        }
-      ],
       sidebar: [
         {
           label: "Getting Started",
@@ -52,7 +41,7 @@ export default defineConfig({
         {
           label: "API Reference",
           items: [
-            { label: "Overview", link: "/api/" },
+            { label: "Overview", link: "api/" },
             {
               label: "Main API",
               link: "api-reference/main",
