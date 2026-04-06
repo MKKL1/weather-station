@@ -1,4 +1,6 @@
 using System.Globalization;
+using System.Net.Http;
+using System.Security.Authentication;
 using FluentValidation;
 using Microsoft.Azure.Cosmos;
 using Microsoft.Azure.Functions.Worker;
@@ -36,10 +38,25 @@ builder.Services.AddSingleton<CosmosDbConfiguration>(sp =>
 builder.Services.AddSingleton<CosmosClient>(sp =>
 {
     var config = sp.GetRequiredService<CosmosDbConfiguration>();
-    return new CosmosClient(config.ConnectionString, new CosmosClientOptions()
+    var tlsInsecure = string.Equals(
+        Environment.GetEnvironmentVariable("COSMOS_TLS_INSECURE"),
+        "true",
+        StringComparison.OrdinalIgnoreCase);
+
+    var options = new CosmosClientOptions { AllowBulkExecution = true };
+
+    if (tlsInsecure)
     {
-        AllowBulkExecution = true 
-    });
+        options.ConnectionMode = ConnectionMode.Gateway;
+        options.HttpClientFactory = () => new HttpClient(
+            new HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback =
+                    HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+            });
+    }
+
+    return new CosmosClient(config.ConnectionString, options);
 });
 
 builder.Services.AddSingleton<WeatherViewsContainer>(sp =>

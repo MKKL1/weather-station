@@ -11,6 +11,7 @@ import (
 	"encoding/pem"
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"provisioning-service/domain"
@@ -64,6 +65,7 @@ type TokenService struct {
 type TokenServiceConfig struct {
 	DeviceRepo       domain.DeviceRepository
 	PrivateKeyBase64 string
+	PrivateKeyPath   string
 	Logger           zerolog.Logger
 	Issuer           string
 	Audience         string
@@ -72,11 +74,24 @@ type TokenServiceConfig struct {
 
 // NewTokenService creates a new TokenService instance.
 func NewTokenService(config TokenServiceConfig) (*TokenService, error) {
-	if config.PrivateKeyBase64 == "" {
+	var pemData []byte
+	var err error
+
+	if config.PrivateKeyPath != "" {
+		pemData, err = os.ReadFile(config.PrivateKeyPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read private key from file %s: %w", config.PrivateKeyPath, err)
+		}
+	} else if config.PrivateKeyBase64 != "" {
+		pemData, err = base64.StdEncoding.DecodeString(config.PrivateKeyBase64)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decode Base64 private key: %w", err)
+		}
+	} else {
 		return nil, ErrMissingPrivateKey
 	}
 
-	privateKey, err := parseRSAPrivateKey(config.PrivateKeyBase64)
+	privateKey, err := parseRSAPrivateKey(pemData)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse RSA private key: %w", err)
 	}
@@ -200,14 +215,8 @@ func (s *TokenService) generateJWT(deviceID string, canSendTelemetry bool) (stri
 	return signedToken, nil
 }
 
-func parseRSAPrivateKey(base64PemKey string) (*rsa.PrivateKey, error) {
-	decoded, err := base64.StdEncoding.DecodeString(base64PemKey)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode RSA private key: %w", err)
-	}
-	base64PemKey = string(decoded)
-
-	block, _ := pem.Decode([]byte(base64PemKey))
+func parseRSAPrivateKey(pemData []byte) (*rsa.PrivateKey, error) {
+	block, _ := pem.Decode(pemData)
 	if block == nil {
 		return nil, errors.New("failed to decode PEM block")
 	}

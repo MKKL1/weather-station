@@ -14,6 +14,7 @@ using WeatherStation.Core;
 using Container = Microsoft.Azure.Cosmos.Container;
 using Microsoft.Extensions.Options;
 using WeatherStation.API;
+using WeatherStation.API.Authentication;
 using WeatherStation.API.Options;
 using WeatherStation.API.Token;
 using WeatherStation.Core.Dto;
@@ -200,7 +201,23 @@ builder.Services.AddAuthentication(options =>
                 principal.AddIdentity(idIdentity);
             }
         };
+    }).AddScheme<AdminApiKeyOptions, AdminApiKeyAuthenticationHandler>(
+        AdminApiKeyOptions.SchemeN, options =>
+        {
+            builder.Configuration
+                .GetSection(AdminApiKeyOptions.SectionName)
+                .Bind(options);
+        });
+
+builder.Services.AddAuthorization(o =>
+    {
+        o.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder(
+                JwtBearerDefaults.AuthenticationScheme,
+                AdminApiKeyOptions.SchemeN)
+            .RequireAuthenticatedUser()
+            .Build();
     });
+
 
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
@@ -234,8 +251,6 @@ using (var scope = app.Services.CreateScope())
     }
     catch (Exception ex)
     {
-        // Suppress migration errors during build-time tooling (like OpenAPI generation) 
-        // where the database isn't reachable.
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
         logger.LogWarning(ex, "Failed to migrate database. This is expected during build-time tooling.");
     }

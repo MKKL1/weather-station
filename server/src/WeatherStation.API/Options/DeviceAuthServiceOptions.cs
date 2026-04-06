@@ -9,19 +9,12 @@ public class DeviceAuthServiceOptions
     [Required]
     [Url]
     public required string BaseUrl { get; set; }
+    
+    public string? Instance { get; set; } = "https://login.microsoftonline.com/";
+    public string? TenantId { get; set; }
+    public string? ClientId { get; set; }
+    public string? ClientSecret { get; set; }
+    public string? Scope { get; set; }
 
-    [Url]
-    public string Instance { get; set; } = "https://login.microsoftonline.com/";
-
-    [Required]
-    public required string TenantId { get; set; }
-
-    [Required]
-    public required string ClientId { get; set; }
-
-    [Required]
-    public required string ClientSecret { get; set; }
-
-    [Required]
-    public required string Scope { get; set; }
+    public string? SharedSecret { get; set; }
 }
