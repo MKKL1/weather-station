@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 DB_FILENAME = "hw.db"
 
+
 def get_app_dir() -> Path:
     """Get the application data directory."""
     env_path = os.getenv("HW_CLI_DATA_DIR")
@@ -20,8 +21,7 @@ def get_app_dir() -> Path:
 
 class Database:
     """
-    SQLite database wrapper for application data (Devices, Tokens, State).
-    Replaces the previous file-locked JSON storage.
+    SQLite database wrapper for application data
     """
 
     def __init__(self):
@@ -29,15 +29,12 @@ class Database:
         self.app_dir.mkdir(parents=True, exist_ok=True)
         self.db_path = self.app_dir / DB_FILENAME
         self._conn = sqlite3.connect(self.db_path, check_same_thread=False)
-        self._conn.row_factory = sqlite3.Row  # Allow accessing columns by name
+        self._conn.row_factory = sqlite3.Row
         self._init_schema()
 
     def _init_schema(self):
         """Initialize SQL tables."""
         with self._conn:
-            # 1. Devices Table
-            # We store the bulk of the config as a JSON blob to maintain compatibility
-            # with the flexible Python dictionary model without strict schema migration.
             self._conn.execute("""
                 CREATE TABLE IF NOT EXISTS devices (
                     device_id TEXT PRIMARY KEY,
@@ -45,8 +42,6 @@ class Database:
                 )
             """)
 
-            # 2. Token Cache Table
-            # Native columns for expiry allow us to query 'expired' tokens efficiently.
             self._conn.execute("""
                 CREATE TABLE IF NOT EXISTS tokens (
                     device_id TEXT PRIMARY KEY,
@@ -57,8 +52,6 @@ class Database:
                 )
             """)
 
-            # 3. App Settings (Key-Value)
-            # Used for things like 'default_device_id'
             self._conn.execute("""
                 CREATE TABLE IF NOT EXISTS settings (
                     key TEXT PRIMARY KEY,
@@ -69,8 +62,6 @@ class Database:
     def close(self):
         self._conn.close()
 
-    # --- Generic Settings Methods ---
-
     def get_setting(self, key: str) -> Optional[str]:
         cur = self._conn.execute("SELECT value FROM settings WHERE key = ?", (key,))
         row = cur.fetchone()
@@ -80,17 +71,17 @@ class Database:
         with self._conn:
             self._conn.execute(
                 "INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)",
-                (key, value)
+                (key, value),
             )
 
     def delete_setting(self, key: str) -> None:
         with self._conn:
             self._conn.execute("DELETE FROM settings WHERE key = ?", (key,))
 
-    # --- Device Methods ---
-
     def get_device(self, device_id: str) -> Optional[Dict[str, Any]]:
-        cur = self._conn.execute("SELECT data FROM devices WHERE device_id = ?", (device_id,))
+        cur = self._conn.execute(
+            "SELECT data FROM devices WHERE device_id = ?", (device_id,)
+        )
         row = cur.fetchone()
         if row:
             try:
@@ -115,43 +106,54 @@ class Database:
         with self._conn:
             self._conn.execute(
                 "INSERT OR REPLACE INTO devices (device_id, data) VALUES (?, ?)",
-                (device_id, json_str)
+                (device_id, json_str),
             )
 
     def delete_device(self, device_id: str) -> bool:
         with self._conn:
-            cur = self._conn.execute("DELETE FROM devices WHERE device_id = ?", (device_id,))
+            cur = self._conn.execute(
+                "DELETE FROM devices WHERE device_id = ?", (device_id,)
+            )
             return cur.rowcount > 0
 
     def device_exists(self, device_id: str) -> bool:
-        cur = self._conn.execute("SELECT 1 FROM devices WHERE device_id = ?", (device_id,))
+        cur = self._conn.execute(
+            "SELECT 1 FROM devices WHERE device_id = ?", (device_id,)
+        )
         return cur.fetchone() is not None
-
-    # --- Token Cache Methods ---
 
     def get_token_entry(self, device_id: str) -> Optional[Dict[str, Any]]:
         cur = self._conn.execute(
             "SELECT token, expires_at, cached_at, expires_in FROM tokens WHERE device_id = ?",
-            (device_id,)
+            (device_id,),
         )
         row = cur.fetchone()
         if row:
             return dict(row)
         return None
 
-    def save_token(self, device_id: str, token: str, expires_at: int, cached_at: int, expires_in: int) -> None:
+    def save_token(
+        self,
+        device_id: str,
+        token: str,
+        expires_at: int,
+        cached_at: int,
+        expires_in: int,
+    ) -> None:
         with self._conn:
             self._conn.execute(
                 """
                 INSERT OR REPLACE INTO tokens (device_id, token, expires_at, cached_at, expires_in)
                 VALUES (?, ?, ?, ?, ?)
                 """,
-                (device_id, token, expires_at, cached_at, expires_in)
+                (device_id, token, expires_at, cached_at, expires_in),
             )
 
     def delete_token(self, device_id: str) -> bool:
         with self._conn:
-            cur = self._conn.execute("DELETE FROM tokens WHERE device_id = ?", (device_id,))
+            cur = self._conn.execute(
+                "DELETE FROM tokens WHERE device_id = ?", (device_id,)
+            )
             return cur.rowcount > 0
 
     def get_all_tokens(self) -> Dict[str, Dict[str, Any]]:
@@ -174,11 +176,10 @@ class Database:
             return cur.rowcount
 
 
-# Singleton instance
 _db_instance: Optional[Database] = None
 
+
 def get_data() -> Database:
-    """Get the database singleton."""
     global _db_instance
     if _db_instance is None:
         _db_instance = Database()

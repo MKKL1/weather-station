@@ -35,8 +35,8 @@ def show_config():
 
 @app.command("create")
 def create_config(
-        path: Optional[Path] = typer.Option(None, "--path", "-p", help="Config file path"),
-        force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing"),
+    path: Optional[Path] = typer.Option(None, "--path", "-p", help="Config file path"),
+    force: bool = typer.Option(False, "--force", "-f", help="Overwrite existing"),
 ):
     """Create a default configuration file."""
     mgr = ConfigManager()
@@ -77,7 +77,7 @@ def edit_config():
 
 
 @app.command("path")
-def config_path():
+def config_path(ctx: typer.Context):
     """Show storage paths and file status."""
     mgr = ConfigManager()
 
@@ -85,15 +85,12 @@ def config_path():
     config_file = mgr.resolve_path()
     data_file = get_data().db_path
 
-    rich_print(f"[bold cyan]Storage Directory:[/bold cyan] {app_dir}", file=sys.stderr)
-    rich_print(f"  Exists: {'[green]Yes[/green]' if app_dir.exists() else '[red]No[/red]'}", file=sys.stderr)
+    print_info("Storage Locations:", file=sys.stderr)
 
-    rich_print(f"\n[bold cyan]Configuration File:[/bold cyan] {config_file}", file=sys.stderr)
-    rich_print(
-        f"  Status: {'[green]Found[/green]' if config_file.exists() else '[yellow]Not created (using defaults)[/yellow]'}",
-        file=sys.stderr
-    )
+    status_cfg = "(found)" if config_file.exists() else "(not found, using defaults)"
+    print(f"  Config:  {config_file:<60} {status_cfg}", file=sys.stderr)
 
-    rich_print(f"\n[bold cyan]Data Storage:[/bold cyan] {data_file}", file=sys.stderr)
-    rich_print(f"  Status: {'[green]Found[/green]' if data_file.exists() else '[yellow]Empty[/yellow]'}",
-               file=sys.stderr)
+    status_data = "(found)" if data_file.exists() else "(empty)"
+    print(f"  Data:    {data_file:<60} {status_data}", file=sys.stderr)
+
+    print(f"  App Dir: {app_dir}", file=sys.stderr)

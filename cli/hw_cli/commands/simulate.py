@@ -1,108 +1,74 @@
 import asyncio
 import json
 import random
+import sys
 import time
 from contextlib import asynccontextmanager
-from typing import Optional, Any
+from dataclasses import asdict
+from datetime import datetime
+from typing import Any, Optional
 
 import httpx
+import rich
+import rich.console
 import typer
 from rich import print as rich_print
-from rich.console import Group
-from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn
-from rich.rule import Rule
-from rich.syntax import Syntax
-from rich.table import Table
 
 from hw_cli.core.api.client import WeatherIoTClient
 from hw_cli.core.data_generator import DataGenerator
 from hw_cli.core.device_manager import DeviceManager
-from hw_cli.core.models import DeviceConfig
 from hw_cli.utils.console import print_error, print_info, print_success, print_warning
 
 app = typer.Typer(help="Simulation commands", no_args_is_help=True)
 
 
-def _get_device(device_ref: Optional[str]) -> DeviceConfig:
-    """Resolve device by name/ID or get default."""
-    mgr = DeviceManager()
-    if device_ref:
-        device = mgr.get_device_by_name(device_ref) or mgr.get_device_by_id(device_ref)
-        if device:
-            return device
-        print_error(f"Device '{device_ref}' not found")
-        raise typer.Exit(1)
-
-    device = mgr.get_default_device()
-    if not device:
-        print_error("No default device. Use --device-id or 'hw devices set-default'")
-        raise typer.Exit(1)
-    return device
-
-
-def _patch_data_for_api(data: Any) -> Any:
-    """
-    Ensure generated data passes strict API validation.
-    Patches empty rain histograms which cause HTTP 400 errors.
-    """
-    if data.reading.rain is not None:
-        if not data.reading.rain.data:
-            data.reading.rain.data = {"0": 0}
-    return data
-
-
-def _print_telemetry_table(data: Any, format_type: str = "text") -> None:
-    """Print telemetry data summary in the requested format."""
+def _print_telemetry_summary(data: Any, format_type: str = "text") -> None:
     if format_type == "json":
-        rich_print(json.dumps(data.to_api_payload(), indent=2))
+        print(json.dumps(asdict(data), indent=2))
         return
 
     r = data.reading
     rain_tips = sum(r.rain.data.values()) if r.rain and r.rain.data else 0
 
-    table = Table(show_header=True, header_style="bold magenta", box=None)
-    table.add_column("Metric", style="dim")
-    table.add_column("Value")
-    table.add_column("Unit")
-
-    table.add_row("Timestamp", str(data.timestamp), "")
-    table.add_row("Temperature", f"{r.temperature:.2f}", "°C")
-    table.add_row("Humidity", f"{r.humidity:.1f}", "%")
-    table.add_row("Pressure", f"{r.pressure:.1f}", "hPa")
-    table.add_row("Rain Tips", str(rain_tips), "count")
-
-    rich_print(Panel(table, title="Telemetry Summary", expand=False))
+    ts_str = datetime.fromtimestamp(data.timestamp).strftime("%Y-%m-%d %H:%M:%S")
+    print(f"Timestamp:   {ts_str} ({data.timestamp})")
+    print(f"Temperature: {r.temperature:.2f} C")
+    print(f"Humidity:    {r.humidity:.1f} %")
+    print(f"Pressure:    {r.pressure:.1f} hPa")
+    print(f"Rain Tips:   {rain_tips}")
 
 
-def _print_debug_info(req: httpx.Request, res: Optional[httpx.Response], format_type: str) -> None:
-    """
-    Print raw request/response details with strict separation of Headers and Body.
-    Handles JSON decoding safely and falls back to text/string representations.
-    """
+def _print_debug_info(
+    req: httpx.Request, res: Optional[httpx.Response], format_type: str
+) -> None:
+    from rich.console import Group
+    from rich.panel import Panel
+    from rich.rule import Rule
+    from rich.syntax import Syntax
+
     debug_data = {
         "request": {
             "method": req.method,
             "url": str(req.url),
             "headers": dict(req.headers),
-            "body": None
+            "body": None,
         },
-        "response": None
+        "response": None,
     }
 
     try:
         if req.content:
             debug_data["request"]["body"] = json.loads(req.content)
-        else:
-            debug_data["request"]["body"] = None
     except (json.JSONDecodeError, UnicodeDecodeError):
-        debug_data["request"]["body"] = req.content.decode('utf-8', errors='replace') if req.content else None
+        debug_data["request"]["body"] = (
+            req.content.decode("utf-8", errors="replace") if req.content else None
+        )
 
     if res:
         debug_data["response"] = {
             "status_code": res.status_code,
             "headers": dict(res.headers),
-            "body": None
+            "body": None,
         }
         try:
             debug_data["response"]["body"] = res.json()
@@ -110,45 +76,47 @@ def _print_debug_info(req: httpx.Request, res: Optional[httpx.Response], format_
             debug_data["response"]["body"] = res.text
 
     if format_type == "json":
-        rich_print(json.dumps(debug_data))
+        print(json.dumps(debug_data))
         return
 
     def render_body(content: Any, style_theme: str = "monokai") -> Any:
         if isinstance(content, (dict, list)):
-            return Syntax(json.dumps(content, indent=2), "json", theme=style_theme, word_wrap=True)
+            return Syntax(
+                json.dumps(content, indent=2), "json", theme=style_theme, word_wrap=True
+            )
         return str(content) if content else "[dim]Empty Body[/dim]"
 
-    req_headers = "\n".join([f"[cyan]{k}[/cyan]: {v}" for k, v in debug_data["request"]["headers"].items()])
     req_group = Group(
         f"[bold]{req.method}[/bold] [green]{req.url}[/green]",
         Rule(style="dim"),
-        Panel(req_headers, title="Request Headers", border_style="dim"),
-        Panel(render_body(debug_data["request"]["body"]), title="Request Body", border_style="blue"),
+        Panel(
+            render_body(debug_data["request"]["body"]),
+            title="Request Body",
+            border_style="blue",
+        ),
     )
-    rich_print(Panel(req_group, title="[bold blue]HTTP REQUEST[/bold blue]", expand=True))
+    rich_print(Panel(req_group, title="HTTP REQUEST", expand=True), file=sys.stderr)
 
     if res:
         status_color = "green" if res.status_code < 400 else "red"
-        res_headers = "\n".join([f"[cyan]{k}[/cyan]: {v}" for k, v in debug_data["response"]["headers"].items()])
         res_group = Group(
             f"Status: [bold {status_color}]{res.status_code} {res.reason_phrase}[/bold {status_color}]",
             Rule(style="dim"),
-            Panel(res_headers, title="Response Headers", border_style="dim"),
-            Panel(render_body(debug_data["response"]["body"]), title="Response Body", border_style=status_color),
+            Panel(
+                render_body(debug_data["response"]["body"]),
+                title="Response Body",
+                border_style=status_color,
+            ),
         )
-        rich_print(Panel(res_group, title=f"[bold {status_color}]HTTP RESPONSE[/bold {status_color}]", expand=True))
-    else:
-        rich_print(Panel("[dim]No response received[/dim]", title="HTTP RESPONSE", border_style="dim"))
+        rich_print(
+            Panel(res_group, title="HTTP RESPONSE", expand=True), file=sys.stderr
+        )
 
 
 @asynccontextmanager
 async def _debug_hooks(client: WeatherIoTClient, enabled: bool):
-    """
-    Context manager to attach/detach debug hooks to the underlying HTTP client.
-    """
     captured = {"req": [], "res": []}
 
-    #TODO access thru getter
     if not enabled or not client._client:
         yield captured
         return
@@ -157,134 +125,120 @@ async def _debug_hooks(client: WeatherIoTClient, enabled: bool):
         captured["req"].append(request)
 
     async def on_response(response: httpx.Response):
-        # Must read stream to ensure body is available for printing
         await response.aread()
         captured["res"].append(response)
 
-    client._client.event_hooks['request'].append(on_request)
-    client._client.event_hooks['response'].append(on_response)
+    client._client.event_hooks["request"].append(on_request)
+    client._client.event_hooks["response"].append(on_response)
 
     try:
         yield captured
     finally:
         if client._client:
             try:
-                client._client.event_hooks['request'].remove(on_request)
-                client._client.event_hooks['response'].remove(on_response)
+                client._client.event_hooks["request"].remove(on_request)
+                client._client.event_hooks["response"].remove(on_response)
             except ValueError:
                 pass
 
 
-async def _ensure_registered(client: WeatherIoTClient, device: DeviceConfig,
-                             device_manager: DeviceManager, progress: Optional[Progress] = None) -> DeviceConfig:
-    if device.is_registered:
-        return device
-
-    msg = "Device not registered, registering..."
-    if progress:
-        progress.update(progress.task_ids[0], description=msg)
-    else:
-        print_info(msg)
-
-    secret = await client.register()
-    device.hmac_secret = secret
-    device_manager.update_device(device)
-    client.update_device(device)
-
-    if not progress:
-        print_success("Device registered successfully")
-    return device
-
-
-async def _send_telemetry_safe(
-        client: WeatherIoTClient,
-        data: Any,
-        debug: bool,
-        format_type: str,
-        dry_run: bool = False,
-        quiet: bool = False,
-) -> None:
-    if dry_run:
-        if debug:
-            req = httpx.Request("POST", f"{client.device.api_base_url}/telemetry", json=data.to_api_payload())
-            _print_debug_info(req, None, format_type)
-        elif not quiet:
-            if format_type == "json":
-                _print_telemetry_table(data, "json")
-            else:
-                rich_print("[yellow]Generated (Dry Run)[/yellow]")
-                _print_telemetry_table(data, "text")
-        return
-
-    async with _debug_hooks(client, debug) as captured:
-        try:
-            await client.send_telemetry(data)
-
-            if debug and captured["req"]:
-                _print_debug_info(captured["req"][-1], captured["res"][-1] if captured["res"] else None, format_type)
-            elif not debug and not quiet:  # Only print if not quiet
-                if format_type == "text":
-                    print_success("✓ Telemetry sent successfully")
-                    _print_telemetry_table(data, "text")
-                else:
-                    _print_telemetry_table(data, "json")
-
-        except httpx.HTTPStatusError as e:
-            if debug:
-                req = captured["req"][-1] if captured["req"] else e.request
-                res = captured["res"][-1] if captured["res"] else e.response
-                _print_debug_info(req, res, format_type)
-            else:
-                print_error(f"HTTP Error {e.response.status_code}: {e.response.text}")
-            raise
-
-
 @app.command("once")
 def simulate_once(
-        device_id: Optional[str] = typer.Option(None, "--device-id", "-d", help="Device name or device_id"),
-        dry_run: bool = typer.Option(False, "--dry-run", help="Print data without sending"),
-        force_token: bool = typer.Option(False, "--force-token", help="Force new token (ignore cache)"),
-        format: str = typer.Option("text", "--format", "-f", help="Output format: text or json"),
-        debug: bool = typer.Option(False, "--debug", help="Print full request/response headers and body"),
+    ctx: typer.Context,
+    device: Optional[str] = typer.Option(
+        None,
+        "--device",
+        "--name",
+        "-n",
+        "--device-id",
+        "-d",
+        help="Device name or device_id",
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Print data without sending"),
+    force_token: bool = typer.Option(
+        False, "--force-token", help="Force new token (ignore cache)"
+    ),
+    format: str = typer.Option(
+        "text", "--format", "-f", help="Output format: text or json"
+    ),
+    debug: bool = typer.Option(
+        False, "--debug", help="Print full request/response headers and body"
+    ),
 ):
-    """
-    Send a single telemetry message and exit.
-    """
     if format not in ["text", "json"]:
         print_error("Format must be 'text' or 'json'")
         raise typer.Exit(1)
 
     async def run():
-        device = _get_device(device_id)
-        device_manager = DeviceManager()
-        generator = DataGenerator()
+        mgr = DeviceManager()
+        device_obj = mgr.resolve_device(device)
+        output_format = ctx.obj["output"]
+        quiet = ctx.obj["quiet"]
 
-        print_info(f"Using device: [bold]{device.name}[/bold] ({device.device_id})")
-        data = _patch_data_for_api(generator.generate(device))
+        if not device_obj:
+            print_error("Device not found or no default set")
+            raise typer.Exit(1)
+
+        if not device_obj.is_registered:
+            print_error(
+                f"Device '{device_obj.name}' not registered. Run 'hw devices register {device_obj.name}' first."
+            )
+            raise typer.Exit(1)
+
+        generator = DataGenerator()
+        data = generator.generate(device_obj)
+
+        if dry_run:
+            if not quiet and format == "text":
+                print_info("(Dry Run)", file=sys.stderr)
+            _print_telemetry_summary(data, format)
+            return
 
         try:
-            use_spinner = (not debug) and (format == "text") and (not dry_run)
-
-            async with WeatherIoTClient(device) as client:
+            async with WeatherIoTClient(device_obj) as client:
                 if force_token:
                     client.invalidate_token()
 
-                if use_spinner:
-                    with Progress(SpinnerColumn(), TextColumn("{task.description}"), transient=True) as progress:
-                        task = progress.add_task("Connecting...", total=None)
-                        await _ensure_registered(client, device, device_manager, progress)
-                        progress.update(task, description="Sending telemetry...")
+                use_spinner = (not debug) and (format == "text") and (not quiet)
 
-                        await _send_telemetry_safe(client, data, debug, format, dry_run, quiet=True)
+                async with _debug_hooks(client, debug) as captured:
+                    if use_spinner:
+                        from rich.progress import Progress, SpinnerColumn, TextColumn
 
-                    print_success("✓ Telemetry sent successfully")
-                    _print_telemetry_table(data, format)
+                        with Progress(
+                            SpinnerColumn(),
+                            TextColumn("{task.description}"),
+                            transient=True,
+                            console=rich.console.Console(stderr=True),
+                        ) as progress:
+                            progress.add_task("Sending telemetry...", total=None)
+                            await client.send_telemetry(data)
+                    else:
+                        await client.send_telemetry(data)
+
+                if debug and captured["req"]:
+                    _print_debug_info(
+                        captured["req"][-1],
+                        captured["res"][-1] if captured["res"] else None,
+                        format,
+                    )
                 else:
-                    if not dry_run:
-                        await _ensure_registered(client, device, device_manager)
-                    await _send_telemetry_safe(client, data, debug, format, dry_run, quiet=False)
+                    if not quiet and format == "text":
+                        print_success("Telemetry sent", file=sys.stderr)
+                    _print_telemetry_summary(data, format)
 
-        except httpx.HTTPStatusError:
+        except httpx.HTTPStatusError as e:
+            if debug and "captured" in locals():
+                req = captured["req"][-1] if captured["req"] else e.request
+                res = captured["res"][-1] if captured["res"] else e.response
+                _print_debug_info(req, res, format)
+            else:
+                if e.response.status_code == 401:
+                    print_error(
+                        f"HTTP 401 - token may be invalid. Run: hw cache clear -d {device_obj.name}"
+                    )
+                else:
+                    print_error(f"HTTP {e.response.status_code}: {e.response.text}")
             raise typer.Exit(1)
         except Exception as e:
             print_error(f"Failed: {e}")
@@ -293,92 +247,155 @@ def simulate_once(
     try:
         asyncio.run(run())
     except KeyboardInterrupt:
-        print_warning("\nOperation cancelled by user")
+        print_warning("\nOperation cancelled")
         raise typer.Exit(130)
 
 
 @app.command("loop")
 def simulate_loop(
-        device_id: Optional[str] = typer.Option(None, "--device-id", "-d", help="Device name or device_id"),
-        interval: int = typer.Option(1800, "--interval", "-i", help="Interval in seconds", min=1),
-        jitter: float = typer.Option(5.0, "--jitter", "-j", help="Random jitter seconds", min=0),
-        max_messages: Optional[int] = typer.Option(None, "--max-messages", "-m", help="Max messages to send", min=1),
-        seed: Optional[int] = typer.Option(None, "--seed", "-s", help="Random seed for deterministic data"),
-        dry_run: bool = typer.Option(False, "--dry-run", help="Print without sending"),
-        force_token: bool = typer.Option(False, "--force-token", help="Force new token (ignore cache)"),
-        format: str = typer.Option("text", "--format", "-f", help="Output format: text or json"),
-        debug: bool = typer.Option(False, "--debug", help="Print full request/response"),
+    ctx: typer.Context,
+    device: Optional[str] = typer.Option(
+        None,
+        "--device",
+        "--name",
+        "-n",
+        "--device-id",
+        "-d",
+        help="Device name or device_id",
+    ),
+    interval: int = typer.Option(
+        300, "--interval", "-i", help="Interval in seconds", min=1
+    ),
+    jitter: float = typer.Option(
+        5.0, "--jitter", "-j", help="Random jitter seconds", min=0
+    ),
+    max_messages: Optional[int] = typer.Option(
+        None, "--max-messages", "-m", help="Max messages to send", min=1
+    ),
+    seed: Optional[int] = typer.Option(
+        None, "--seed", "-s", help="Random seed for deterministic data"
+    ),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Print without sending"),
+    force_token: bool = typer.Option(
+        False, "--force-token", help="Force new token (ignore cache)"
+    ),
+    format: str = typer.Option(
+        "text", "--format", "-f", help="Output format: text or json"
+    ),
+    debug: bool = typer.Option(False, "--debug", help="Print full request/response"),
 ):
-    """
-    Run continuous telemetry simulation.
-    """
+    """Run continuous telemetry simulation."""
     if jitter >= interval:
         print_error(f"Jitter ({jitter}s) must be less than interval ({interval}s)")
         raise typer.Exit(1)
 
     async def run():
-        device = _get_device(device_id)
-        device_manager = DeviceManager()
+        mgr = DeviceManager()
+        device_obj = mgr.resolve_device(device)
+        quiet = ctx.obj["quiet"]
+
+        if not device_obj:
+            print_error("Device not found or no default set")
+            raise typer.Exit(1)
+
+        if not device_obj.is_registered:
+            print_error(
+                f"Device '{device_obj.name}' not registered. Run 'hw devices register {device_obj.name}' first."
+            )
+            raise typer.Exit(1)
+
         generator = DataGenerator(seed=seed)
 
-        stats = {'sent': 0, 'errors': 0, 'start_time': time.time()}
+        stats = {"sent": 0, "errors": 0, "start_time": time.time()}
         consecutive_errors = 0
         MAX_CONSECUTIVE_ERRORS = 5
 
-        print_info(f"Starting continuous simulation for: [bold]{device.name}[/bold]")
-        print_info(f"Interval: {interval}s (±{jitter}s jitter)")
-        if debug:
-            print_warning("DEBUG MODE ENABLED: Output will be verbose")
+        if not quiet:
+            print_info(f"Starting simulation for: {device_obj.name}", file=sys.stderr)
+            print_info(f"Interval: {interval}s (+/-{jitter}s jitter)", file=sys.stderr)
 
-        async with WeatherIoTClient(device) as client:
+        async with WeatherIoTClient(device_obj) as client:
             if force_token:
                 client.invalidate_token()
 
-            if not dry_run:
-                try:
-                    await _ensure_registered(client, device, device_manager)
-                except Exception as e:
-                    print_error(f"Initial registration failed: {e}")
-                    raise typer.Exit(1)
-
-            while max_messages is None or stats['sent'] < max_messages:
-                data = _patch_data_for_api(generator.generate(device))
+            while max_messages is None or stats["sent"] < max_messages:
+                data = generator.generate(device_obj)
 
                 try:
-                    await _send_telemetry_safe(client, data, debug, format, dry_run, quiet=True)
-
-                    stats['sent'] += 1
-                    consecutive_errors = 0
-
-                    if not debug:
+                    if dry_run:
                         if format == "text":
-                            status = "[green]✓ Sent[/green]" if not dry_run else "[yellow]Generated (Dry Run)[/yellow]"
-                            rich_print(f"[dim][{stats['sent']}][/dim] {status} @ {data.timestamp}")
+                            if not quiet:
+                                print(
+                                    f"[{stats['sent']}] Generated @ {data.timestamp}",
+                                    file=sys.stderr,
+                                )
+                            print(f"{data.timestamp} | Generated (Dry Run)")
                         elif format == "json":
-                            rich_print(json.dumps(data.to_api_payload(), indent=None))
+                            print(json.dumps(asdict(data)))
+                    else:
+                        async with _debug_hooks(client, debug) as captured:
+                            await client.send_telemetry(data)
 
-                except (httpx.HTTPStatusError, Exception) as e:
+                        stats["sent"] += 1
+                        consecutive_errors = 0
+
+                        if debug and captured["req"]:
+                            _print_debug_info(
+                                captured["req"][-1],
+                                captured["res"][-1] if captured["res"] else None,
+                                format,
+                            )
+                        elif not debug:
+                            if format == "text":
+                                if not quiet:
+                                    print(
+                                        f"[{stats['sent']}] Sent @ {data.timestamp}",
+                                        file=sys.stderr,
+                                    )
+                                print(f"{data.timestamp} | Sent")
+                            elif format == "json":
+                                print(json.dumps(asdict(data)))
+
+                except httpx.HTTPStatusError as e:
                     consecutive_errors += 1
-                    stats['errors'] += 1
+                    stats["errors"] += 1
 
-                    if not debug:
-                        print_error(f"Send failed: {e}")
+                    if debug and "captured" in locals():
+                        req = captured["req"][-1] if captured["req"] else e.request
+                        res = captured["res"][-1] if captured["res"] else e.response
+                        _print_debug_info(req, res, format)
+                    else:
+                        if e.response.status_code == 401:
+                            print_error(
+                                f"HTTP 401 - token may be invalid. Run: hw cache clear -d {device_obj.name}"
+                            )
+                        else:
+                            print_error(f"HTTP {e.response.status_code}")
 
                     if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
-                        print_error(f"Aborting: {MAX_CONSECUTIVE_ERRORS} consecutive errors.")
+                        print_error(
+                            f"Aborting: {MAX_CONSECUTIVE_ERRORS} consecutive errors."
+                        )
+                        break
+                except Exception as e:
+                    consecutive_errors += 1
+                    stats["errors"] += 1
+                    print_error(f"Failed: {e}")
+
+                    if consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
+                        print_error(
+                            f"Aborting: {MAX_CONSECUTIVE_ERRORS} consecutive errors."
+                        )
                         break
 
-                if max_messages and stats['sent'] >= max_messages:
+                if max_messages and stats["sent"] >= max_messages:
                     break
 
-                target_timestamp = stats['start_time'] + (stats['sent'] * interval)
+                target_timestamp = stats["start_time"] + (stats["sent"] * interval)
                 target_timestamp += random.uniform(-jitter, jitter)
 
                 now = time.time()
-                sleep_secs = target_timestamp - now
-
-                if sleep_secs < 0:
-                    sleep_secs = 0.1
+                sleep_secs = max(0.1, target_timestamp - now)
 
                 remaining = sleep_secs
                 while remaining > 0:
@@ -386,14 +403,18 @@ def simulate_loop(
                     await asyncio.sleep(chunk)
                     remaining -= chunk
 
-        elapsed = time.time() - stats['start_time']
-        print_info("\nSimulation stopped!")
-        rich_print(f"Sent: [bold]{stats['sent']}[/bold] | Errors: [red]{stats['errors']}[/red] | Time: {elapsed:.1f}s")
+        elapsed = time.time() - stats["start_time"]
+        if not quiet:
+            print_info("\nStopped", file=sys.stderr)
+            print(
+                f"Sent: {stats['sent']} | Errors: {stats['errors']} | Time: {elapsed:.1f}s",
+                file=sys.stderr,
+            )
 
     try:
         asyncio.run(run())
     except KeyboardInterrupt:
         pass
     except Exception as e:
-        print_error(f"Fatal error: {e}")
+        print_error(f"Fatal: {e}")
         raise typer.Exit(1)

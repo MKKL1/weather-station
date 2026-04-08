@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "heavyweather-cli"
-version = "0.3.0"
+version = "0.4.0"
 description = "Heavy Weather CLI"
 authors = ["MKKL1"]
 readme = "README.md"
@@ -9,7 +9,6 @@ readme = "README.md"
 python = ">=3.9,<4.0"
 typer = {extras = ["rich"], version = "^0.17.4"}
 httpx = "^0.28.0"
-click-repl = "^0.3.0"
 
 [[tool.poetry.packages]]
 include = "hw_cli"

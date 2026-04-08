@@ -4,9 +4,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class DeviceAuthenticator:
-    """Handles device authentication logic."""
 
+class DeviceAuthenticator:
     def __init__(self, device_id: str, hmac_secret: str):
         self.device_id = device_id
         self.hmac_secret = hmac_secret
@@ -15,8 +14,6 @@ class DeviceAuthenticator:
         """Generate HMAC-SHA256 signature for auth challenge."""
         message = f"{self.device_id}:{timestamp}"
         sig = hmac.new(
-            self.hmac_secret.encode(),
-            message.encode(),
-            hashlib.sha256
+            self.hmac_secret.encode(), message.encode(), hashlib.sha256
         ).hexdigest()
         return sig

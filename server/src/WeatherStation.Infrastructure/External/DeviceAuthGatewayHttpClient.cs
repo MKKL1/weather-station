@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 using Microsoft.Extensions.Logging;
 using WeatherStation.Core;
@@ -52,7 +53,10 @@ public class DeviceAuthGatewayHttpClient(
                 innerException: ex);
         }
 
-        if (!response.IsSuccessStatusCode)
+        if (!response.IsSuccessStatusCode && 
+            response.StatusCode != HttpStatusCode.Conflict && 
+            response.StatusCode != HttpStatusCode.BadRequest &&
+            response.StatusCode != HttpStatusCode.NotFound)
         {
             await HandleErrorResponse(response, claimRequest.DeviceId);
         }
@@ -82,7 +86,7 @@ public class DeviceAuthGatewayHttpClient(
         {
             throw new ExternalServiceException(
                 ServiceName, Operation,
-                "Received a successful HTTP response but the body could not be deserialized.",
+                "Received an HTTP response but the body could not be deserialized.",
                 (int)response.StatusCode, ex);
         }
 
@@ -90,7 +94,7 @@ public class DeviceAuthGatewayHttpClient(
         {
             throw new ExternalServiceException(
                 ServiceName, Operation,
-                "Received a successful HTTP response with an empty body.",
+                "Received an HTTP response with an empty body.",
                 (int)response.StatusCode);
         }
 

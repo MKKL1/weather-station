@@ -39,7 +39,8 @@ services:
     volumes:
       - cosmos-data:/tmp/cosmos/appdata
     healthcheck:
-      test: ["CMD", "curl", "-fsk", "https://localhost:8081/_explorer/emulator.pem"]
+      test:
+        ["CMD", "curl", "-fsk", "https://localhost:8081/_explorer/emulator.pem"]
       interval: 15s
       timeout: 10s
       retries: 10
@@ -87,7 +88,11 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
     healthcheck:
-      test: ["CMD-SHELL", "curl --head -fsS http://localhost:9000/health/ready | echo $?"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl --head -fsS http://localhost:9000/health/ready | echo $?",
+        ]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -153,7 +158,7 @@ services:
         condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__PostgresConnection: >-
+      ConnectionStrings__PortainerConnection: >-
         Host=postgres:5432;
         Database=${POSTGRES_DB};
         Username=${POSTGRES_USER};
@@ -161,6 +166,9 @@ services:
       Keycloak__Authority: "http://keycloak:8080/realms/${KEYCLOAK_REALM}"
       CosmosDb__ConnectionString: >-
         AccountEndpoint=${COSMOS_ENDPOINT};AccountKey=${COSMOS_KEY}
+      CosmosDb__DatabaseName: ${COSMOS_DATABASE}
+      CosmosDb__ViewsContainerName: ${COSMOS_CONTAINER_VIEWS}
+      COSMOS_TLS_INSECURE: ${COSMOS_TLS_INSECURE}
       AuthService__BaseUrl: "http://provisioning-function:8080/api/v1/devices/"
       AuthService__SharedSecret: ${WORKER_SHARED_SECRET}
       AdminApiKey__ApiKey: ${ADMIN_API_KEY}
@@ -168,7 +176,7 @@ services:
   telemetry-worker:
     build:
       context: ..
-      dockerfile: telemetry-worker/Dockerfile
+      dockerfile: telemetry-worker/Worker/Dockerfile
     container_name: telemetry-worker
     networks: [internal]
     depends_on:
@@ -186,6 +194,7 @@ services:
         AccountKey=${AZURITE_KEY};
         BlobEndpoint=http://azurite:10000/${AZURITE_ACCOUNT};
         QueueEndpoint=http://azurite:10001/${AZURITE_ACCOUNT};
+        TableEndpoint=http://azurite:10002/${AZURITE_ACCOUNT};
       COSMOS_CONNECTION: >-
         AccountEndpoint=${COSMOS_ENDPOINT};AccountKey=${COSMOS_KEY}
       COSMOS_DATABASE: ${COSMOS_DATABASE}
@@ -209,5 +218,5 @@ services:
       DEVICE_ISSUER: ${JWT_ISSUER_DEVICE}
       PROVISIONING_ISSUER: ${JWT_ISSUER_PROVISIONING}
       WORKER_SHARED_SECRET: ${WORKER_SHARED_SECRET}
-      MAIN_FN_URL: "http://telemetry-worker:7071"
+      MAIN_FN_URL: "http://telemetry-worker:80"
       PROVISIONING_FN_URL: "http://provisioning-function:8080"

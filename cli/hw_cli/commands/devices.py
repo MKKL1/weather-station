@@ -7,44 +7,40 @@ from typing import Optional
 import typer
 from rich import print as rich_print
 from rich.prompt import Confirm, Prompt
-from rich.table import Table
 
-from hw_cli.core.config import load_config
+from hw_cli.core.api.client import WeatherIoTClient
 from hw_cli.core.device_manager import DeviceManager
 from hw_cli.core.models import DeviceConfig
-from hw_cli.utils.console import print_error, print_info, print_success, print_warning
+from hw_cli.utils.console import (
+    print_error,
+    print_info,
+    print_success,
+    print_table_header,
+    print_table_row,
+    print_warning,
+)
 
 app = typer.Typer(help="Device management commands", no_args_is_help=True)
 
 
-def _get_default_api_url() -> str:
-    """Get default API URL from config or fallback."""
-    config = load_config()
-    return config.api.base_url
-
-
 def _extract_device_id_from_jwt(token: str) -> Optional[str]:
-    """Extract device_id (sub claim) from JWT token without verification."""
     try:
-        # JWT format: header.payload.signature
-        parts = token.split('.')
+        parts = token.split(".")
         if len(parts) != 3:
             return None
 
-        # Decode payload (add padding if needed)
         payload_b64 = parts[1]
-        padding = '=' * (4 - len(payload_b64) % 4)
+        padding = "=" * (4 - len(payload_b64) % 4)
         payload_json = base64.urlsafe_b64decode(payload_b64 + padding)
         payload = json.loads(payload_json)
 
-        return payload.get('sub')
+        return payload.get("sub")
     except Exception as e:
-        print_error(f"Failed to parse JWT token: {e}")
+        print_error(f"Failed to parse JWT: {e}")
         return None
 
 
 def _generate_unique_name(base_name: str, mgr: DeviceManager) -> str:
-    """Generate unique name by adding numeric suffix if needed."""
     if not mgr.device_exists_by_name(base_name):
         return base_name
 
@@ -58,75 +54,51 @@ def _generate_unique_name(base_name: str, mgr: DeviceManager) -> str:
 
 @app.command("add")
 def add_device(
-        name: Optional[str] = typer.Option(
-            None,
-            "--name",
-            "-n",
-            help="Friendly name for the device (defaults to device_id from token)",
-        ),
-        provisioning_token: Optional[str] = typer.Option(
-            None,
-            "--token",
-            "-t",
-            help="Factory provisioning token (JWT). If not provided, will prompt securely.",
-        ),
-        api_url: Optional[str] = typer.Option(
-            None,
-            "--api-url",
-            "-u",
-            help="API base URL (defaults to config value)",
-        ),
-        hmac_secret: Optional[str] = typer.Option(
-            None,
-            "--hmac-secret",
-            help="HMAC secret (if already registered)",
-        ),
-        set_default: bool = typer.Option(False, "--set-default", help="Set as default device"),
+    ctx: typer.Context,
+    name: Optional[str] = typer.Option(None, "--name", "-n", help="Friendly name"),
+    provisioning_token: Optional[str] = typer.Option(
+        None, "--token", "-t", help="Provisioning token (JWT)"
+    ),
+    api_url: Optional[str] = typer.Option(None, "--api-url", "-u", help="API base URL"),
+    hmac_secret: Optional[str] = typer.Option(
+        None, "--hmac-secret", help="HMAC secret"
+    ),
+    set_default: bool = typer.Option(
+        False, "--set-default", help="Set as default device"
+    ),
 ):
-    """Add a new device configuration using JWT token."""
+    """Add a new device configuration."""
     mgr = DeviceManager()
 
-    # Secure token input
     if not provisioning_token:
-        # Check environment variable first
         provisioning_token = os.getenv("HW_PROVISIONING_TOKEN")
         if not provisioning_token:
-            # Prompt securely without echoing
-            provisioning_token = Prompt.ask(
-                "Provisioning token (JWT)",
-                password=True
-            )
+            provisioning_token = Prompt.ask("Provisioning token (JWT)", password=True)
 
     if not provisioning_token or not provisioning_token.strip():
         print_error("Provisioning token is required")
         raise typer.Exit(1)
 
-    # Extract device_id from JWT token
     device_id = _extract_device_id_from_jwt(provisioning_token)
     if not device_id:
-        print_error("Could not extract device_id from JWT token")
+        print_error("Could not extract device_id from JWT")
         raise typer.Exit(1)
 
-    # Use device_id as name if not provided
     device_name = name or device_id
-
-    # Check if device with this device_id already exists (by actual ID)
     existing = mgr.get_device_by_id(device_id)
+
     if existing:
-        print_warning(f"Device with device_id '{device_id}' already exists (named '{existing.name}')")
+        print_warning(f"Device '{device_id}' already exists (named '{existing.name}')")
         if not Confirm.ask("Overwrite?"):
             raise typer.Exit(1)
-        # Keep the same name when overwriting
         device_name = existing.name
     else:
-        # Generate unique name if there's a conflict
         device_name = _generate_unique_name(device_name, mgr)
         if device_name != (name or device_id):
-            print_info(f"Name '{name or device_id}' already exists, using '{device_name}' instead")
+            print_info(f"Using unique name '{device_name}'")
 
-    # Get API URL from config if not provided
     if not api_url:
-        api_url = _get_default_api_url()
+        api_url = ctx.obj["config"].api.base_url
 
     device = DeviceConfig(
         device_id=device_id,
@@ -139,98 +111,202 @@ def add_device(
 
     if set_default or not mgr.get_default_device_id():
         mgr.set_default_device(device_id)
-        print_info(f"Set '{device_name}' as default device")
+        if not ctx.obj["quiet"]:
+            print_info(f"Default device set: {device_name}", file=sys.stderr)
 
-    print_success(f"Device '{device_name}' added successfully (device_id: {device_id})")
+    if not ctx.obj["quiet"]:
+        print_success(f"Device '{device_name}' added", file=sys.stderr)
+
+
+@app.command("register")
+def register_device(
+    ctx: typer.Context,
+    device_ref: Optional[str] = typer.Argument(None, help="Device name or device_id"),
+    raw: bool = typer.Option(
+        False, "--raw", help="Output only claim code, suppress all status"
+    ),
+):
+    """Register device and get claim code."""
+
+    async def run():
+        mgr = DeviceManager()
+        device = mgr.resolve_device(device_ref)
+        output_format = ctx.obj["output"]
+        quiet = ctx.obj["quiet"] or raw
+
+        if not device:
+            print_error("Device not found")
+            raise typer.Exit(1)
+
+        try:
+            async with WeatherIoTClient(device) as client:
+                use_spinner = (output_format == "text") and (not quiet)
+
+                if use_spinner:
+                    import rich.console
+                    from rich.progress import Progress, SpinnerColumn, TextColumn
+
+                    with Progress(
+                        SpinnerColumn(),
+                        TextColumn("{task.description}"),
+                        transient=True,
+                        console=rich.console.Console(stderr=True),
+                    ) as progress:
+                        progress.add_task(f"Registering {device.name}...", total=None)
+                        secret = await client.register()
+
+                        device.hmac_secret = secret
+                        mgr.update_device(device)
+                        client.update_device(device)
+
+                        progress.add_task("Requesting claim code...", total=None)
+                        code = await client.get_claim_code()
+                else:
+                    if not quiet:
+                        print_info(f"Registering {device.name}...", file=sys.stderr)
+                    secret = await client.register()
+
+                    device.hmac_secret = secret
+                    mgr.update_device(device)
+                    client.update_device(device)
+
+                    if not quiet:
+                        print_info("Requesting claim code...", file=sys.stderr)
+                    code = await client.get_claim_code()
+
+                if not quiet:
+                    print_success("Registration successful", file=sys.stderr)
+                    print_info(
+                        "Enter this code in the server app UI to claim ownership.",
+                        file=sys.stderr,
+                    )
+
+                if output_format == "json":
+                    import dataclasses
+
+                    print(json.dumps({"claim_code": code}))
+                else:
+                    print(code)
+
+        except Exception as e:
+            print_error(f"Registration failed: {e}")
+            raise typer.Exit(1)
+
+    import asyncio
+
+    asyncio.run(run())
 
 
 @app.command("list")
-def list_devices():
+def list_devices(
+    ctx: typer.Context,
+):
     """List all configured devices."""
     mgr = DeviceManager()
     devices = mgr.get_devices()
+    output = ctx.obj["output"]
+    quiet = ctx.obj["quiet"]
 
     if not devices:
-        print_warning("No devices configured. Use 'hw devices add' to add one.")
+        if output == "json":
+            print("[]")
+        else:
+            if not quiet:
+                print_warning("No devices configured")
+        return
+
+    if output == "json":
+        import dataclasses
+
+        data = [dataclasses.asdict(d) for d in devices]
+        for entry in data:
+            entry.pop("provisioning_token", None)
+            entry.pop("hmac_secret", None)
+        print(json.dumps(data, indent=2, default=str))
         return
 
     default_id = mgr.get_default_device_id()
-    table = Table(title="Devices")
-    table.add_column("Name", style="cyan")
-    table.add_column("Device ID", style="dim")
-    table.add_column("API URL", style="dim")
-    table.add_column("Registered", style="dim")
-    table.add_column("Default", style="green")
+
+    cols = [("Name", 18), ("Device ID", 32), ("Registered", 12), ("Default", 7)]
+    print_table_header(cols)
 
     for d in devices:
-        table.add_row(
+        row = [
             d.name,
             d.device_id,
-            d.api_base_url,
-            "✓" if d.is_registered else "✗",
-            "✓" if d.device_id == default_id else "",
-        )
+            "Yes" if d.is_registered else "No",
+            "*" if d.device_id == default_id else "",
+        ]
+        print_table_row(row, [c[1] for c in cols])
 
-    rich_print(table)
+    if not quiet:
+        print_info(f"\nFound {len(devices)} devices", file=sys.stderr)
 
 
 @app.command("show")
-def show_device(device_ref: str = typer.Argument(..., help="Device name or device_id")):
+def show_device(
+    ctx: typer.Context,
+    device_ref: str = typer.Argument(..., help="Device name or device_id"),
+):
     """Show device details."""
-    device = _resolve_device(device_ref)
+    device = DeviceManager().resolve_device(device_ref)
+    output = ctx.obj["output"]
+
     if not device:
+        print_error(f"Device '{device_ref}' not found")
         raise typer.Exit(1)
 
-    rich_print(f"\n[cyan]Device: {device.name}[/cyan]", file=sys.stderr)
-    rich_print(f"Device ID: {device.device_id}", file=sys.stderr)
-    rich_print(f"API URL: {device.api_base_url}", file=sys.stderr)
-    rich_print(f"Registered: {'Yes' if device.is_registered else 'No'}", file=sys.stderr)
-    rich_print(f"mm per tip: {device.mm_per_tip}", file=sys.stderr)
-    rich_print(f"Created: {device.created_at.isoformat()}", file=sys.stderr)
+    if output == "json":
+        import dataclasses
+
+        data = dataclasses.asdict(device)
+        data.pop("provisioning_token", None)
+        data.pop("hmac_secret", None)
+        print(json.dumps(data, indent=2, default=str))
+        return
+
+    print(f"{'Name:':<14} {device.name}")
+    print(f"{'Device ID:':<14} {device.device_id}")
+    print(f"{'API URL:':<14} {device.api_base_url}")
+    print(f"{'Registered:':<14} {'Yes' if device.is_registered else 'No'}")
+    print(f"{'Created:':<14} {device.created_at.isoformat()}")
 
 
 @app.command("remove")
 def remove_device(
-        device_ref: str = typer.Argument(..., help="Device name or device_id"),
-        force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
+    ctx: typer.Context,
+    device_ref: str = typer.Argument(..., help="Device name or device_id"),
+    force: bool = typer.Option(False, "--force", "-f", help="Skip confirmation"),
 ):
     """Remove a device."""
-    device = _resolve_device(device_ref)
+    mgr = DeviceManager()
+    device = mgr.resolve_device(device_ref)
     if not device:
+        print_error(f"Device '{device_ref}' not found")
         raise typer.Exit(1)
 
-    if not force and not Confirm.ask(f"Remove device '{device.name}' (device_id: {device.device_id})?"):
-        print_info("Cancelled")
+    if not force and not Confirm.ask(f"Remove device '{device.name}'?"):
+        if not ctx.obj["quiet"]:
+            print_info("Cancelled", file=sys.stderr)
         raise typer.Exit(1)
 
-    DeviceManager().remove_device(device.device_id)
-    print_success(f"Device '{device.name}' removed")
+    mgr.remove_device(device.device_id)
+    if not ctx.obj["quiet"]:
+        print_success(f"Device removed", file=sys.stderr)
 
 
 @app.command("set-default")
-def set_default(device_ref: str = typer.Argument(..., help="Device name or device_id")):
+def set_default(
+    ctx: typer.Context,
+    device_ref: str = typer.Argument(..., help="Device name or device_id"),
+):
     """Set the default device."""
-    device = _resolve_device(device_ref)
+    mgr = DeviceManager()
+    device = mgr.resolve_device(device_ref)
     if not device:
+        print_error(f"Device '{device_ref}' not found")
         raise typer.Exit(1)
 
-    DeviceManager().set_default_device(device.device_id)
-    print_success(f"Set '{device.name}' as default")
-
-
-def _resolve_device(ref: str) -> Optional[DeviceConfig]:
-    """Resolve device by name or device_id."""
-    mgr = DeviceManager()
-
-    # Try by name first
-    device = mgr.get_device_by_name(ref)
-    if device:
-        return device
-
-    # Try by device_id
-    device = mgr.get_device_by_id(ref)
-    if device:
-        return device
-
-    print_error(f"Device '{ref}' not found")
-    return None
+    mgr.set_default_device(device.device_id)
+    if not ctx.obj["quiet"]:
+        print_success(f"Default set to {device.name}", file=sys.stderr)
