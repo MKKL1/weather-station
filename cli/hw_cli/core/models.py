@@ -5,8 +5,8 @@ from typing import Any, Dict, Optional
 
 @dataclass
 class DeviceConfig:
-    device_id: str  # The actual device ID from JWT
-    name: str  # Human-friendly name for CLI reference
+    device_id: str
+    name: str
     api_base_url: str
     provisioning_token: str
     hmac_secret: Optional[str] = None
@@ -32,9 +32,7 @@ class DeviceConfig:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "DeviceConfig":
-        # Handle migration: if 'name' is missing, use device_id as name
         name = data.get("name", data["device_id"])
-
         return cls(
             device_id=data["device_id"],
             name=name,
@@ -57,9 +55,9 @@ class RainfallHistogram:
 
 @dataclass
 class WeatherReading:
-    temperature: Optional[float] = None  # Celsius
-    pressure: Optional[float] = None  # hPa
-    humidity: Optional[float] = None  # 0-100%
+    temperature: Optional[float] = None
+    pressure: Optional[float] = None
+    humidity: Optional[float] = None
     precipitation_mm: Optional[float] = None
     rain: Optional[RainfallHistogram] = None
 
@@ -67,24 +65,4 @@ class WeatherReading:
 @dataclass
 class TelemetryData:
     timestamp: int
-    reading: WeatherReading
-
-    def to_api_payload(self) -> Dict[str, Any]:
-        dat: Dict[str, Any] = {}
-        r = self.reading
-        if r.temperature is not None:
-            dat["tmp"] = r.temperature
-        if r.pressure is not None:
-            dat["prs"] = r.pressure
-        if r.humidity is not None:
-            dat["hum"] = r.humidity
-        if r.precipitation_mm is not None:
-            dat["mmpt"] = r.precipitation_mm
-        if r.rain:
-            dat["rain"] = {
-                "dat": r.rain.data,
-                "sec": r.rain.bucket_seconds,
-                "sts": r.rain.start_timestamp,
-                "n": r.rain.num_buckets,
-            }
-        return {"ts": self.timestamp, "dat": dat}
+    reading: WeatherReading

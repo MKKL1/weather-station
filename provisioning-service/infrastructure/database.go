@@ -2,10 +2,13 @@ package infrastructure
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -29,9 +32,12 @@ type CosmosDB struct {
 }
 
 // NewCosmosDB creates a new CosmosDB instance connected to the specified Cosmos DB.
-func NewCosmosDB(connectionString, database, container string) (*CosmosDB, error) {
-	if connectionString == "" {
-		return nil, errors.New("cosmos DB connection string is required")
+func NewCosmosDB(endpoint, key, database, container string, tlsInsecure bool) (*CosmosDB, error) {
+	if endpoint == "" {
+		return nil, errors.New("cosmos DB endpoint is required")
+	}
+	if key == "" {
+		return nil, errors.New("cosmos DB key is required")
 	}
 	if database == "" {
 		return nil, errors.New("cosmos DB database name is required")
@@ -40,7 +46,26 @@ func NewCosmosDB(connectionString, database, container string) (*CosmosDB, error
 		return nil, errors.New("cosmos DB container name is required")
 	}
 
-	client, err := azcosmos.NewClientFromConnectionString(connectionString, nil)
+	cred, err := azcosmos.NewKeyCredential(key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create cosmos DB credential: %w", err)
+	}
+
+	var opts *azcosmos.ClientOptions
+	if tlsInsecure {
+		transport := &http.Client{
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			},
+		}
+		opts = &azcosmos.ClientOptions{
+			ClientOptions: policy.ClientOptions{
+				Transport: transport,
+			},
+		}
+	}
+
+	client, err := azcosmos.NewClientWithKey(endpoint, cred, opts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create cosmos DB client: %w", err)
 	}

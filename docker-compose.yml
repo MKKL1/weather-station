@@ -1,0 +1,190 @@
+name: weather-station-local
+
+networks:
+  internal:
+
+volumes:
+  cosmos-data:
+  postgres-data:
+  keycloak-data:
+  azurite-data:
+  keys-data:
+
+services:
+  setup:
+    image: ghcr.io/mkkl1/weather-station/hw-setup
+    networks: [internal]
+    volumes:
+      - keys-data:/keys:ro
+      - ${SETUP_OUTPUT_DIR}:/output
+    environment:
+      JWT_ISSUER: ${JWT_ISSUER_PROVISIONING}
+      JWT_KID: ${JWT_KID_PROVISIONING}
+      JWT_AUDIENCE: ${JWT_AUDIENCE_PROVISIONING}
+      CLAIM_BASE_URL: ${CLAIM_BASE_URL}
+      DEVICE_COUNT: ${DEVICE_COUNT}
+
+  cosmos-emulator:
+    image: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-EN20260331
+    networks: [internal]
+    environment:
+      AZURE_COSMOS_EMULATOR_PARTITION_COUNT: 3
+      AZURE_COSMOS_EMULATOR_ENABLE_DATA_PERSISTENCE: "true"
+    volumes:
+      - cosmos-data:/tmp/cosmos/appdata
+    healthcheck:
+      test:
+        ["CMD", "curl", "-fsk", "https://localhost:8081/_explorer/emulator.pem"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  cosmos-init:
+    image: ghcr.io/mkkl1/weather-station/hw-cosmos-init
+    networks: [internal]
+    depends_on:
+      cosmos:
+        condition: service_healthy
+    environment:
+      COSMOS_ENDPOINT: ${COSMOS_ENDPOINT}
+      COSMOS_KEY: ${COSMOS_KEY}
+      COSMOS_DATABASE: ${COSMOS_DATABASE}
+
+  postgres:
+    image: postgres:18-alpine
+    networks: [internal]
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4
+    command: start-dev
+    networks: [internal]
+    ports:
+      - "8001:8080"
+    volumes:
+      - keycloak-data:/opt/keycloak/data
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "curl --head -fsS http://localhost:9000/health/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.35.0
+    networks: [internal]
+    volumes:
+      - azurite-data:/data
+    command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 10000"]
+      interval: 5s
+      retries: 10
+      start_period: 10s
+
+  provisioning-function:
+    image: ghcr.io/mkkl1/weather-station/hw-provisioning-service
+    networks: [internal]
+    depends_on:
+      cosmos:
+        condition: service_healthy
+      cosmos-init:
+        condition: service_completed_successfully
+      setup:
+        condition: service_completed_successfully
+    volumes:
+      - keys-data:/keys:ro
+    environment:
+      COSMOS_ENDPOINT: ${COSMOS_ENDPOINT}
+      COSMOS_KEY: ${COSMOS_KEY}
+      COSMOS_DATABASE: ${COSMOS_DATABASE}
+      COSMOS_CONTAINER: ${COSMOS_CONTAINER_REGISTRY}
+      COSMOS_TLS_INSECURE: ${COSMOS_TLS_INSECURE}
+      JWT_ISSUER: ${JWT_ISSUER_DEVICE}
+      ACCESS_TOKEN_PRIVATE_KEY_PATH: "/keys/private.pem"
+      SERVER_PORT: "8080"
+      ENVIRONMENT: development
+
+  server:
+    image: ghcr.io/mkkl1/weather-station/hw-server
+    networks: [internal]
+    ports:
+      - "8002:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ConnectionStrings__PortainerConnection: >-
+        Host=postgres:5432;
+        Database=${POSTGRES_DB};
+        Username=${POSTGRES_USER};
+        Password=${POSTGRES_PASSWORD}
+      Keycloak__Authority: "http://keycloak:8080/realms/${KEYCLOAK_REALM}"
+      CosmosDb__ConnectionString: >-
+        AccountEndpoint=${COSMOS_ENDPOINT};AccountKey=${COSMOS_KEY}
+      CosmosDb__DatabaseName: ${COSMOS_DATABASE}
+      CosmosDb__ViewsContainerName: ${COSMOS_CONTAINER_VIEWS}
+      COSMOS_TLS_INSECURE: ${COSMOS_TLS_INSECURE}
+      AuthService__BaseUrl: "http://provisioning-function:8080/api/v1/devices/"
+      AuthService__SharedSecret: ${WORKER_SHARED_SECRET}
+      AdminApiKey__ApiKey: ${ADMIN_API_KEY}
+
+  telemetry-worker:
+    image: ghcr.io/mkkl1/weather-station/hw-telemetry-worker
+    networks: [internal]
+    depends_on:
+      cosmos:
+        condition: service_healthy
+      cosmos-init:
+        condition: service_completed_successfully
+      azurite:
+        condition: service_healthy
+    environment:
+      FUNCTIONS_WORKER_RUNTIME: dotnet-isolated
+      AzureWebJobsStorage: >-
+        DefaultEndpointsProtocol=http;
+        AccountName=${AZURITE_ACCOUNT};
+        AccountKey=${AZURITE_KEY};
+        BlobEndpoint=http://azurite:10000/${AZURITE_ACCOUNT};
+        QueueEndpoint=http://azurite:10001/${AZURITE_ACCOUNT};
+        TableEndpoint=http://azurite:10002/${AZURITE_ACCOUNT};
+      COSMOS_CONNECTION: >-
+        AccountEndpoint=${COSMOS_ENDPOINT};AccountKey=${COSMOS_KEY}
+      COSMOS_DATABASE: ${COSMOS_DATABASE}
+      COSMOS_CONTAINER: ${COSMOS_CONTAINER_REGISTRY}
+      COSMOS_VIEWS_CONTAINER: ${COSMOS_CONTAINER_VIEWS}
+      COSMOS_TELEMETRY_CONTAINER: ${COSMOS_CONTAINER_TELEMETRY}
+      COSMOS_TLS_INSECURE: ${COSMOS_TLS_INSECURE}
+
+  gateway:
+    image: ghcr.io/mkkl1/weather-station/hw-gateway
+    networks: [internal]
+    ports:
+      - "8000:8000"
+    volumes:
+      - keys-data:/keys:ro
+    environment:
+      DEVICE_PUB_KEY_PATH: /keys/public.pem
+      PROVISIONING_PUB_KEY_PATH: /keys/provisioning-public.pem
+      DEVICE_ISSUER: ${JWT_ISSUER_DEVICE}
+      PROVISIONING_ISSUER: ${JWT_ISSUER_PROVISIONING}
+      WORKER_SHARED_SECRET: ${WORKER_SHARED_SECRET}
+      MAIN_FN_URL: "http://telemetry-worker:80"
+      PROVISIONING_FN_URL: "http://provisioning-function:8080"

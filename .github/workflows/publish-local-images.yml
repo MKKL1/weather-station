@@ -1,0 +1,61 @@
+name: Publish LocalDev images
+
+on:
+  push:
+    tags: ["local-v*"]
+    branches: [main]
+    paths:
+      - "local/cosmos-init/**"
+      - "local/setup/**"
+      - ".github/workflows/publish-local-images.yml"
+      - ".github/actions/docker-publish/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  security-events: write
+
+jobs:
+  publish-cosmos-init:
+    name: Publish cosmos-init
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Publish Docker image
+        uses: ./.github/actions/docker-publish
+        with:
+          image-name: hw-cosmos-init
+          context: ./local/cosmos-init
+          dockerfile: ./local/cosmos-init/Dockerfile
+          tag-prefix: local-v
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+          trivy-config: trivy.yaml
+          trivy-category: trivy-cosmos-init
+
+  publish-setup:
+    name: Publish setup
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Publish Docker image
+        uses: ./.github/actions/docker-publish
+        with:
+          image-name: hw-setup
+          context: ./local/setup
+          dockerfile: ./local/setup/Dockerfile
+          tag-prefix: local-v
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+          trivy-config: trivy.yaml
+          trivy-category: trivy-setup

@@ -58,9 +58,11 @@ func main() {
 	}()
 
 	db, err := infrastructure.NewCosmosDB(
-		config.CosmosConnection,
+		config.CosmosEndpoint,
+		config.CosmosKey,
 		config.CosmosDatabase,
 		config.CosmosContainer,
+		config.CosmosTLSInsecure,
 	)
 	if err != nil {
 		logger.Fatal().
@@ -76,6 +78,7 @@ func main() {
 	tokenService, err := service.NewTokenService(service.TokenServiceConfig{
 		DeviceRepo:       deviceRepo,
 		PrivateKeyBase64: config.AccessTokenPrivateKeyB64,
+		PrivateKeyPath:   config.AccessTokenPrivateKeyPath,
 		Logger:           logger,
 		Issuer:           config.JwtIssuer,
 		Audience:         config.JwtAudience,

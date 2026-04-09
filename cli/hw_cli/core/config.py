@@ -34,6 +34,7 @@ class LoggingConfig:
 @dataclass
 class AppConfig:
     """Application configuration."""
+
     verbose: bool = False
     simulation: SimulationDefaults = field(default_factory=SimulationDefaults)
     api: ApiDefaults = field(default_factory=ApiDefaults)
@@ -58,8 +59,6 @@ class AppConfig:
 
 
 class ConfigManager:
-    """Stateless manager for configuration I/O."""
-
     CONFIG_FILE = "config.json"
 
     def resolve_path(self, path: Optional[Path] = None) -> Path:
@@ -78,16 +77,17 @@ class ConfigManager:
                     data = json.load(f)
                     return AppConfig.from_dict(data)
             except json.JSONDecodeError as e:
-                # UX FIX: Do not silence syntax errors.
-                # Users need to know their config is invalid.
-                print(f"[ERROR] Config file is invalid JSON: {config_path}", file=sys.stderr)
+                print(
+                    f"[ERROR] Config file is invalid JSON: {config_path}",
+                    file=sys.stderr,
+                )
                 print(f"Details: {e}", file=sys.stderr)
                 sys.exit(1)
             except TypeError as e:
-                # This usually means the structure of the JSON doesn't match
-                # what the dataclasses expect (Validation error).
                 logger.warning(f"Config structure mismatch in {config_path}: {e}")
-                logger.warning("Falling back to default configuration for missing fields.")
+                logger.warning(
+                    "Falling back to default configuration for missing fields."
+                )
                 return AppConfig()
 
         return AppConfig()
@@ -109,5 +109,4 @@ class ConfigManager:
 
 
 def load_config(path: Optional[Path] = None) -> AppConfig:
-    """Helper function to load configuration."""
     return ConfigManager().load(path)

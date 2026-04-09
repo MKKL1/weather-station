@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
@@ -6,12 +6,12 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <NoWarn>$(NoWarn);1591</NoWarn>
-    <OpenApiGenerateDocuments>true</OpenApiGenerateDocuments>
+    <OpenApiGenerateDocuments>false</OpenApiGenerateDocuments>
     <OpenApiDocumentsDirectory>..\..\..\docs\public\specs</OpenApiDocumentsDirectory>
   </PropertyGroup>
 
   <!-- Rename the generated assembly-named OpenAPI doc to a clean 'server.json' -->
-  <Target Name="RenameOpenApiOutput" AfterTargets="Build">
+  <Target Name="RenameOpenApiOutput" AfterTargets="Build" Condition="'$(OpenApiGenerateDocuments)' != 'false'">
     <Move SourceFiles="..\..\..\docs\public\specs\$(AssemblyName).json" DestinationFiles="..\..\..\docs\public\specs\server.json" OverwriteReadOnlyFiles="true" />
   </Target>
 

@@ -1,5 +1,3 @@
-API_PATH_REGISTER = "/provisioning/register"
-API_PATH_TOKEN = "/device/auth/token"
 API_PATH_TELEMETRY = "/device/telemetry"
 
 BASE_TEMP_C = 20.0

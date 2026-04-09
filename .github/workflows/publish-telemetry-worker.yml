@@ -1,0 +1,44 @@
+name: Publish TelemetryWorker Docker image
+
+on:
+  push:
+    tags: ["func-v*"]
+    branches: [main]
+    paths:
+      - "telemetry-worker/**"
+      - ".github/workflows/publish-telemetry-worker.yml"
+      - ".github/actions/docker-publish/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  security-events: write
+
+jobs:
+  build-test:
+    name: Build & test
+    uses: ./.github/workflows/build-function.yml
+
+  publish:
+    name: Publish to GHCR & Docker Hub
+    needs: build-test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Publish Docker image
+        uses: ./.github/actions/docker-publish
+        with:
+          image-name: hw-telemetry-worker
+          context: .
+          dockerfile: ./telemetry-worker/Worker/Dockerfile
+          tag-prefix: func-v
+          platforms: linux/amd64,linux/arm64
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+          trivy-config: trivy.yaml
+          trivy-category: trivy-telemetry-worker

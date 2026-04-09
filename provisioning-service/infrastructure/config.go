@@ -23,6 +23,7 @@ const (
 	defaultLogLevel          = "info"
 	defaultJWTAudience       = "weather-api"
 	defaultJWTKeyID          = "device-access-token"
+	defaultCosmosTLSInsecure = false
 )
 
 type Config struct {
@@ -30,15 +31,18 @@ type Config struct {
 	FailedAttemptsTTL        time.Duration `koanf:"failed_attempts_ttl" validate:"required,min=1m"`
 	MaxFailedAttempts        int           `koanf:"max_failed_attempts" validate:"required,min=1,max=100"`
 	ServerPort               string        `koanf:"server_port" validate:"required"`
-	CosmosConnection         string        `koanf:"cosmos_connection" validate:"required"`
+	CosmosEndpoint           string        `koanf:"cosmos_endpoint" validate:"required,url"`
+	CosmosKey                string        `koanf:"cosmos_key" validate:"required"`
 	CosmosDatabase           string        `koanf:"cosmos_database" validate:"required"`
 	CosmosContainer          string        `koanf:"cosmos_container" validate:"required"`
+	CosmosTLSInsecure        bool          `koanf:"cosmos_tls_insecure"`
 	LogLevel                 string        `koanf:"log_level" validate:"required,oneof=trace debug info warn error fatal panic"`
 	OtlpEndpoint             string        `koanf:"otlp_endpoint"`
 	ServiceVersion           string        `koanf:"service_version" validate:"required"`
 	Environment              string        `koanf:"environment" validate:"required,oneof=development staging production"`
-	AccessTokenPrivateKeyB64 string        `koanf:"access_token_private_key_b64" validate:"required,base64"`
-	JwtIssuer                string        `koanf:"jwt_issuer" validate:"required,url"`
+	AccessTokenPrivateKeyB64  string        `koanf:"access_token_private_key_b64" validate:"omitempty,base64"`
+	AccessTokenPrivateKeyPath string        `koanf:"access_token_private_key_path" validate:"omitempty"`
+	JwtIssuer                string        `koanf:"jwt_issuer" validate:"required"`
 	JwtAudience              string        `koanf:"jwt_audience" validate:"required"`
 	JwtKeyID                 string        `koanf:"jwt_key_id" validate:"required"`
 }
@@ -47,21 +51,23 @@ func NewConfig() (*Config, error) {
 	k := koanf.New(".")
 
 	if err := k.Load(confmap.Provider(map[string]any{
-		"activation_code_ttl":      defaultActivationCodeTTL,
-		"failed_attempts_ttl":      defaultFailedAttemptsTTL,
-		"max_failed_attempts":      defaultMaxFailedAttempts,
-		"server_port":              defaultServerPort,
-		"cosmos_container":         defaultContainerName,
-		"service_version":          defaultServiceVersion,
-		"environment":              defaultEnvironment,
-		"log_level":                defaultLogLevel,
-		"jwt_audience":             defaultJWTAudience,
-		"jwt_key_id":               defaultJWTKeyID,
-		"jwt_issuer":               "",
-		"otlp_endpoint":            "",
-		"cosmos_connection":        "",
-		"cosmos_database":          "",
-		"access_token_private_key": "",
+		"activation_code_ttl":         defaultActivationCodeTTL,
+		"failed_attempts_ttl":         defaultFailedAttemptsTTL,
+		"max_failed_attempts":         defaultMaxFailedAttempts,
+		"server_port":                 defaultServerPort,
+		"cosmos_container":            defaultContainerName,
+		"cosmos_tls_insecure":         defaultCosmosTLSInsecure,
+		"service_version":             defaultServiceVersion,
+		"environment":                 defaultEnvironment,
+		"log_level":                   defaultLogLevel,
+		"jwt_audience":                defaultJWTAudience,
+		"jwt_key_id":                  defaultJWTKeyID,
+		"jwt_issuer":                  "",
+		"otlp_endpoint":               "",
+		"cosmos_endpoint":             "",
+		"cosmos_key":                  "",
+		"cosmos_database":             "",
+		"access_token_private_key":    "",
 	}, "."), nil); err != nil {
 		return nil, fmt.Errorf("failed to load defaults: %w", err)
 	}
@@ -95,6 +101,10 @@ func validateConfig(cfg *Config) error {
 
 	if err := validate.Struct(cfg); err != nil {
 		return formatValidationError(err)
+	}
+
+	if cfg.AccessTokenPrivateKeyB64 == "" && cfg.AccessTokenPrivateKeyPath == "" {
+		return fmt.Errorf("configuration validation failed: ACCESS_TOKEN_PRIVATE_KEY_B64 or ACCESS_TOKEN_PRIVATE_KEY_PATH must be provided")
 	}
 
 	return nil

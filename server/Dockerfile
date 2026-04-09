@@ -1,52 +1,48 @@
-# Build stage
+# syntax=docker/dockerfile:1.10
 FROM mcr.microsoft.com/dotnet/sdk:9.0-alpine AS build
+
+ARG TARGETARCH=amd64
+
 WORKDIR /src
 
-COPY WeatherStation.sln ./
-COPY src/WeatherStation.API/*.csproj ./src/WeatherStation.API/
-COPY src/WeatherStation.Application/*.csproj ./src/WeatherStation.Application/
-COPY src/WeatherStation.Domain/*.csproj ./src/WeatherStation.Domain/
-COPY src/WeatherStation.Infrastructure/*.csproj ./src/WeatherStation.Infrastructure/
-COPY tests/WeatherStation.API.Tests/*.csproj ./tests/WeatherStation.API.Tests/
-COPY tests/WeatherStation.Application.Tests/*.csproj ./tests/WeatherStation.Application.Tests/
-COPY tests/WeatherStation.Domain.Tests/*.csproj ./tests/WeatherStation.Domain.Tests/
-COPY tests/WeatherStation.Infrastructure.Tests/*.csproj ./tests/WeatherStation.Infrastructure.Tests/
+COPY server/WeatherStation.sln                                                          ./server/
+COPY server/src/WeatherStation.API/WeatherStation.API.csproj                            ./server/src/WeatherStation.API/
+COPY server/src/WeatherStation.Core/WeatherStation.Core.csproj                          ./server/src/WeatherStation.Core/
+COPY server/src/WeatherStation.Infrastructure/WeatherStation.Infrastructure.csproj      ./server/src/WeatherStation.Infrastructure/
+COPY server/tests/WeatherStation.API.Tests/WeatherStation.API.Tests.csproj              ./server/tests/WeatherStation.API.Tests/
+COPY server/tests/WeatherStation.Core.Tests/WeatherStation.Core.Tests.csproj            ./server/tests/WeatherStation.Core.Tests/
+COPY shared/WeatherStation.Shared.csproj                                                ./shared/
 
-COPY Directory.Build.props* ./
-COPY Directory.Packages.props* ./
-COPY nuget.config* ./
+RUN dotnet restore server/WeatherStation.sln
 
-RUN dotnet restore WeatherStation.sln
+COPY server/src/   ./server/src/
+COPY server/tests/ ./server/tests/
+COPY shared/       ./shared/
 
-COPY . .
-RUN dotnet build WeatherStation.sln --configuration Release
+RUN DOTNET_RID=$(case "${TARGETARCH}" in \
+      arm64) echo "linux-arm64" ;; \
+      arm)   echo "linux-arm"   ;; \
+      *)     echo "linux-x64"   ;; \
+    esac) && \
+    dotnet publish server/src/WeatherStation.API/WeatherStation.API.csproj \
+      --configuration Release \
+      --output /app/publish \
+      --runtime "${DOTNET_RID}" \
+      --self-contained true \
+      -p:PublishSingleFile=true \
+      -p:OpenApiGenerateDocuments=false
 
-# Publish stage
-FROM build AS publish
-RUN dotnet publish src/WeatherStation.API/WeatherStation.API.csproj \
-    --configuration Release \
-    --output /app/publish \
-    /p:UseAppHost=false
+FROM gcr.io/distroless/cc-debian13:nonroot AS final
 
-# Runtime stage
-FROM mcr.microsoft.com/dotnet/aspnet:9.0-alpine AS final
 WORKDIR /app
 
-RUN addgroup -g 1000 appuser && \
-    adduser -u 1000 -G appuser -s /bin/sh -D appuser && \
-    chown -R appuser:appuser /app
-
-COPY --from=publish --chown=appuser:appuser /app/publish .
-
-USER appuser
-
-EXPOSE 80
-
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+COPY --from=build /app/publish .
 
 ENV ASPNETCORE_ENVIRONMENT=Production \
     ASPNETCORE_URLS=http://+:80 \
-    DOTNET_EnableDiagnostics=0
+    DOTNET_EnableDiagnostics=0 \
+    DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
 
-ENTRYPOINT ["dotnet", "WeatherStation.API.dll"]
+EXPOSE 80
+
+ENTRYPOINT ["./WeatherStation.API"]

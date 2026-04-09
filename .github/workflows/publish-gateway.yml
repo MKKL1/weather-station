@@ -1,0 +1,39 @@
+name: Publish Gateway Docker image
+
+on:
+  push:
+    tags: ["gateway-v*"]
+    branches: [main]
+    paths:
+      - "local/gateway/**"
+      - ".github/workflows/publish-gateway.yml"
+      - ".github/actions/docker-publish/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  security-events: write
+
+jobs:
+  publish:
+    name: Publish to GHCR & Docker Hub
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Publish Docker image
+        uses: ./.github/actions/docker-publish
+        with:
+          image-name: hw-gateway
+          context: ./local/gateway
+          dockerfile: ./local/gateway/Dockerfile
+          tag-prefix: gateway-v
+          platforms: linux/amd64,linux/arm64
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+          trivy-config: trivy.yaml
+          trivy-category: trivy-gateway

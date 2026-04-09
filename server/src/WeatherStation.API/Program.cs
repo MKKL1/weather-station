@@ -14,6 +14,7 @@ using WeatherStation.Core;
 using Container = Microsoft.Azure.Cosmos.Container;
 using Microsoft.Extensions.Options;
 using WeatherStation.API;
+using WeatherStation.API.Authentication;
 using WeatherStation.API.Options;
 using WeatherStation.API.Token;
 using WeatherStation.Core.Dto;
@@ -98,14 +99,33 @@ builder.Services.AddOptions<DeviceAuthServiceOptions>()
 builder.Services.AddSingleton<CosmosClient>(sp =>
 {
     var options = sp.GetRequiredService<IOptions<CosmosDbOptions>>().Value;
-    return new CosmosClient(options.ConnectionString, new CosmosClientOptions()
+    var clientOptions = new CosmosClientOptions
     {
-        AllowBulkExecution = true,
+        AllowBulkExecution = false,
         SerializerOptions = new CosmosSerializationOptions
         {
             PropertyNamingPolicy = CosmosPropertyNamingPolicy.CamelCase
         }
-    });
+    };
+
+    var cosmosInsecure = Environment.GetEnvironmentVariable("COSMOS_TLS_INSECURE");
+    if (cosmosInsecure?.Equals("true", StringComparison.OrdinalIgnoreCase) == true)
+    {
+        clientOptions.HttpClientFactory = () =>
+        {
+            HttpMessageHandler httpMessageHandler = new HttpClientHandler
+            {
+                ServerCertificateCustomValidationCallback =
+                    HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+            };
+
+            return new HttpClient(httpMessageHandler);
+        };
+
+        clientOptions.ConnectionMode = ConnectionMode.Gateway;
+    }
+
+    return new CosmosClient(options.ConnectionString, clientOptions);
 });
 
 builder.Services.AddSingleton<Container>(sp =>
@@ -200,7 +220,23 @@ builder.Services.AddAuthentication(options =>
                 principal.AddIdentity(idIdentity);
             }
         };
+    }).AddScheme<AdminApiKeyOptions, AdminApiKeyAuthenticationHandler>(
+        AdminApiKeyOptions.SchemeN, options =>
+        {
+            builder.Configuration
+                .GetSection(AdminApiKeyOptions.SectionName)
+                .Bind(options);
+        });
+
+builder.Services.AddAuthorization(o =>
+    {
+        o.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder(
+                JwtBearerDefaults.AuthenticationScheme,
+                AdminApiKeyOptions.SchemeN)
+            .RequireAuthenticatedUser()
+            .Build();
     });
+
 
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
 
@@ -234,8 +270,6 @@ using (var scope = app.Services.CreateScope())
     }
     catch (Exception ex)
     {
-        // Suppress migration errors during build-time tooling (like OpenAPI generation) 
-        // where the database isn't reachable.
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
         logger.LogWarning(ex, "Failed to migrate database. This is expected during build-time tooling.");
     }

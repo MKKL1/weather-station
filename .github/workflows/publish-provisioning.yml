@@ -1,0 +1,39 @@
+name: Publish ProvisioningService Docker image
+
+on:
+  push:
+    tags: ["provisioning-v*"]
+    branches: [main]
+    paths:
+      - "provisioning-service/**"
+      - ".github/workflows/publish-provisioning.yml"
+      - ".github/actions/docker-publish/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+  security-events: write
+
+jobs:
+  publish:
+    name: Publish to GHCR & Docker Hub
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Publish Docker image
+        uses: ./.github/actions/docker-publish
+        with:
+          image-name: hw-provisioning-service
+          context: ./provisioning-service
+          dockerfile: ./provisioning-service/Dockerfile
+          tag-prefix: provisioning-v
+          platforms: linux/amd64,linux/arm64
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
+          trivy-config: trivy.yaml
+          trivy-category: trivy-provisioning

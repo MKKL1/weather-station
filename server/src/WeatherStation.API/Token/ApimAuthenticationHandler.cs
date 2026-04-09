@@ -8,24 +8,49 @@ namespace WeatherStation.API.Token;
 
 public class ApimAuthenticationHandler : DelegatingHandler
 {
-    private readonly TokenCredential _credential;
-    private readonly string[] _scopes;
+    private readonly DeviceAuthServiceOptions _settings;
+    private TokenCredential? _credential;
+    private string[]? _scopes;
 
     public ApimAuthenticationHandler(IOptions<DeviceAuthServiceOptions> options)
     {
-        var settings = options.Value;
-        _credential = new ClientSecretCredential(
-            settings.TenantId,
-            settings.ClientId,
-            settings.ClientSecret
-        );
-        _scopes = [settings.Scope];
+        _settings = options.Value;
+
+        if (string.IsNullOrWhiteSpace(_settings.SharedSecret))
+        {
+            if (_settings.TenantId is null || _settings.ClientId is null ||
+                _settings.ClientSecret is null || _settings.Scope is null)
+            {
+                throw new InvalidOperationException(
+                    "AuthService: Either SharedSecret or full Azure AD credentials " +
+                    "(TenantId, ClientId, ClientSecret, Scope) must be configured.");
+            }
+
+            _credential = new ClientSecretCredential(
+                _settings.TenantId,
+                _settings.ClientId,
+                _settings.ClientSecret
+            );
+            _scopes = [_settings.Scope];
+        }
     }
 
-    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    protected override async Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request, CancellationToken cancellationToken)
     {
-        var tokenResponse = await _credential.GetTokenAsync(new TokenRequestContext(_scopes), cancellationToken);
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokenResponse.Token);
+        if (!string.IsNullOrWhiteSpace(_settings.SharedSecret))
+        {
+            request.Headers.Authorization =
+                new AuthenticationHeaderValue("Bearer", _settings.SharedSecret);
+        }
+        else
+        {
+            var tokenResponse = await _credential!.GetTokenAsync(
+                new TokenRequestContext(_scopes!), cancellationToken);
+            request.Headers.Authorization =
+                new AuthenticationHeaderValue("Bearer", tokenResponse.Token);
+        }
+
         return await base.SendAsync(request, cancellationToken);
     }
 }
