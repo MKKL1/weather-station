@@ -93,8 +93,6 @@ def main(
     import os
 
     if os.getenv("NO_COLOR") or no_color or not sys.stderr.isatty():
-        import rich.console
-
         pass
 
     config = load_config(config_file)

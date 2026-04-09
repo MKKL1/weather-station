@@ -1,11 +1,11 @@
 import base64
+import dataclasses
 import json
 import os
 import sys
 from typing import Optional
 
 import typer
-from rich import print as rich_print
 from rich.prompt import Confirm, Prompt
 
 from hw_cli.core.api.client import WeatherIoTClient
@@ -182,8 +182,6 @@ def register_device(
                     )
 
                 if output_format == "json":
-                    import dataclasses
-
                     print(json.dumps({"claim_code": code}))
                 else:
                     print(code)
@@ -216,8 +214,6 @@ def list_devices(
         return
 
     if output == "json":
-        import dataclasses
-
         data = [dataclasses.asdict(d) for d in devices]
         for entry in data:
             entry.pop("provisioning_token", None)
@@ -257,8 +253,6 @@ def show_device(
         raise typer.Exit(1)
 
     if output == "json":
-        import dataclasses
-
         data = dataclasses.asdict(device)
         data.pop("provisioning_token", None)
         data.pop("hmac_secret", None)
@@ -292,7 +286,7 @@ def remove_device(
 
     mgr.remove_device(device.device_id)
     if not ctx.obj["quiet"]:
-        print_success(f"Device removed", file=sys.stderr)
+        print_success("Device removed", file=sys.stderr)
 
 
 @app.command("set-default")

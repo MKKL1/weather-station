@@ -2,7 +2,9 @@
 FROM python:3.11-alpine
 
 RUN apk add --no-cache openssl bash && \
+    apk add --no-cache --virtual .build-deps gcc musl-dev libffi-dev python3-dev && \
     pip install --no-cache-dir cryptography mnemonic PyJWT && \
+    apk del .build-deps && \
     addgroup -g 1000 appuser && \
     adduser -u 1000 -G appuser -s /bin/sh -D appuser
 

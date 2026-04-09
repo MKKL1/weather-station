@@ -1,6 +1,6 @@
 import os
 import sys
-from typing import List, Optional, Tuple
+from typing import List, Tuple
 
 from rich import print as rich_print
 
