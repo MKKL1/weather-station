@@ -8,7 +8,10 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-RUN pip install --no-cache-dir poetry==2.3.3
+RUN apt-get update && apt-get install -y --no-install-recommends gcc libffi-dev \
+    && pip install --no-cache-dir poetry==2.3.3 \
+    && apt-get purge -y --auto-remove gcc libffi-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml poetry.lock ./
 RUN poetry install --no-root --only main
