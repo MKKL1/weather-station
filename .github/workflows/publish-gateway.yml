@@ -1,12 +1,12 @@
-name: Publish CLI Docker image
+name: Publish Gateway Docker image
 
 on:
   push:
-    tags: ["cli-v*"]
+    tags: ["gateway-v*"]
     branches: [main]
     paths:
-      - "cli/**"
-      - ".github/workflows/publish-cli-docker.yml"
+      - "local/gateway/**"
+      - ".github/workflows/publish-gateway.yml"
       - ".github/actions/docker-publish/**"
   workflow_dispatch:
 
@@ -17,13 +17,8 @@ permissions:
   security-events: write
 
 jobs:
-  build-test:
-    name: Build & Test (CI gate)
-    uses: ./.github/workflows/build-cli.yml
-
   publish:
     name: Publish to GHCR & Docker Hub
-    needs: build-test
     runs-on: ubuntu-latest
 
     steps:
@@ -32,13 +27,13 @@ jobs:
       - name: Publish Docker image
         uses: ./.github/actions/docker-publish
         with:
-          image-name: hw-cli
-          context: ./cli
-          dockerfile: ./cli/Dockerfile
-          tag-prefix: cli-v
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          image-name: hw-gateway
+          context: ./local/gateway
+          dockerfile: ./local/gateway/Dockerfile
+          tag-prefix: gateway-v
+          platforms: linux/amd64,linux/arm64
           github-token: ${{ secrets.GITHUB_TOKEN }}
           dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
           dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
           trivy-config: trivy.yaml
-          trivy-category: trivy-cli
+          trivy-category: trivy-gateway

@@ -1,12 +1,12 @@
-name: Publish CLI Docker image
+name: Publish ProvisioningService Docker image
 
 on:
   push:
-    tags: ["cli-v*"]
+    tags: ["provisioning-v*"]
     branches: [main]
     paths:
-      - "cli/**"
-      - ".github/workflows/publish-cli-docker.yml"
+      - "provisioning-service/**"
+      - ".github/workflows/publish-provisioning.yml"
       - ".github/actions/docker-publish/**"
   workflow_dispatch:
 
@@ -17,13 +17,8 @@ permissions:
   security-events: write
 
 jobs:
-  build-test:
-    name: Build & Test (CI gate)
-    uses: ./.github/workflows/build-cli.yml
-
   publish:
     name: Publish to GHCR & Docker Hub
-    needs: build-test
     runs-on: ubuntu-latest
 
     steps:
@@ -32,13 +27,13 @@ jobs:
       - name: Publish Docker image
         uses: ./.github/actions/docker-publish
         with:
-          image-name: hw-cli
-          context: ./cli
-          dockerfile: ./cli/Dockerfile
-          tag-prefix: cli-v
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          image-name: hw-provisioning-service
+          context: ./provisioning-service
+          dockerfile: ./provisioning-service/Dockerfile
+          tag-prefix: provisioning-v
+          platforms: linux/amd64,linux/arm64
           github-token: ${{ secrets.GITHUB_TOKEN }}
           dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
           dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
           trivy-config: trivy.yaml
-          trivy-category: trivy-cli
+          trivy-category: trivy-provisioning

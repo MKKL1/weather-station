@@ -1,12 +1,12 @@
-name: Publish CLI Docker image
+name: Publish TelemetryWorker Docker image
 
 on:
   push:
-    tags: ["cli-v*"]
+    tags: ["func-v*"]
     branches: [main]
     paths:
-      - "cli/**"
-      - ".github/workflows/publish-cli-docker.yml"
+      - "telemetry-worker/**"
+      - ".github/workflows/publish-telemetry-worker.yml"
       - ".github/actions/docker-publish/**"
   workflow_dispatch:
 
@@ -18,8 +18,8 @@ permissions:
 
 jobs:
   build-test:
-    name: Build & Test (CI gate)
-    uses: ./.github/workflows/build-cli.yml
+    name: Build & test
+    uses: ./.github/workflows/build-function.yml
 
   publish:
     name: Publish to GHCR & Docker Hub
@@ -32,13 +32,13 @@ jobs:
       - name: Publish Docker image
         uses: ./.github/actions/docker-publish
         with:
-          image-name: hw-cli
-          context: ./cli
-          dockerfile: ./cli/Dockerfile
-          tag-prefix: cli-v
-          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          image-name: hw-telemetry-worker
+          context: .
+          dockerfile: ./telemetry-worker/Worker/Dockerfile
+          tag-prefix: func-v
+          platforms: linux/amd64,linux/arm64
           github-token: ${{ secrets.GITHUB_TOKEN }}
           dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
           dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
           trivy-config: trivy.yaml
-          trivy-category: trivy-cli
+          trivy-category: trivy-telemetry-worker

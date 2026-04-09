@@ -1,10 +1,10 @@
-name: Publish Docs
+name: Publish Docs to github pages
 
 on:
   push:
     branches: [main]
     paths:
-      - 'docs/**'
+      - "docs/**"
   workflow_dispatch:
 
 concurrency:
@@ -21,7 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v5
 
       - name: Install, build, and upload site output
         uses: withastro/action@v5

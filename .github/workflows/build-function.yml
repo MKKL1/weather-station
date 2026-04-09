@@ -33,10 +33,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Setup .NET 8
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@v5
         with:
           dotnet-version: '8.0.x'
           cache: true
@@ -59,7 +59,7 @@ jobs:
 
       - name: Upload artifact for deployment
         if: ${{ inputs.upload_artifact }}
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: function-app
           path: ${{ github.workspace }}/telemetry-worker/output

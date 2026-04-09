@@ -24,3 +24,4 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+  #TODO add for /local, maybe
