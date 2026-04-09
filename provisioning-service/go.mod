@@ -3,6 +3,7 @@ module provisioning-service
 go 1.26
 
 require (
+	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.21.0
 	github.com/Azure/azure-sdk-for-go/sdk/data/azcosmos v1.4.2
 	github.com/bytedance/sonic v1.15.0
 	github.com/go-chi/chi/v5 v5.2.5
@@ -12,7 +13,7 @@ require (
 	github.com/knadh/koanf/providers/confmap v1.0.0
 	github.com/knadh/koanf/providers/env v1.1.0
 	github.com/knadh/koanf/v2 v2.3.2
-	github.com/rs/zerolog v1.34.0
+	github.com/rs/zerolog v1.35.0
 	github.com/swaggo/swag v1.16.6
 	go.opentelemetry.io/otel v1.40.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.40.0
@@ -23,7 +24,6 @@ require (
 
 require (
 	github.com/Azure/azure-sdk-for-go v68.0.0+incompatible // indirect
-	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.21.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.11.2 // indirect
 	github.com/KyleBanks/depth v1.2.1 // indirect
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
