@@ -24,24 +24,18 @@ COPY hw_cli/ ./hw_cli/
 COPY README.md ./
 RUN poetry install --only-root
 
-FROM python:3.11-slim AS runtime
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PATH="/app/.venv/bin:$PATH" \
-    HW_CLI_DATA_DIR="/data"
+FROM gcr.io/distroless/python3-debian12:nonroot
 
-RUN groupadd -r hwcli && \
-    useradd -r -g hwcli -u 1000 hwcli && \
-    mkdir -p /data && \
-    chown hwcli:hwcli /data
+COPY --from=builder --chown=nonroot:nonroot /app/.venv/lib /app/.venv/lib
+COPY --from=builder --chown=nonroot:nonroot /app/hw_cli /app/hw_cli
 
 WORKDIR /app
 
-COPY --from=builder --chown=hwcli:hwcli /app/.venv  /app/.venv
-COPY --from=builder --chown=hwcli:hwcli /app/hw_cli /app/hw_cli
+ENV PYTHONPATH="/app/.venv/lib/python3.11/site-packages" \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    HW_CLI_DATA_DIR="/data"
 
-USER hwcli
-
-ENTRYPOINT ["hw"]
+ENTRYPOINT ["python3", "-m", "hw_cli.__main__"]
 CMD ["--help"]
