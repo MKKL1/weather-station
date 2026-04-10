@@ -36,7 +36,7 @@ jobs:
           context: .
           dockerfile: ./telemetry-worker/Worker/Dockerfile
           tag-prefix: func-v
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64 #,linux/arm64 if microsoft adds arm support in future
           github-token: ${{ secrets.GITHUB_TOKEN }}
           dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
           dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
