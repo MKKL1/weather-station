@@ -430,3 +430,8 @@ provisioning-service/provisioning-service
 
 .sonarqube/
 .vscode/
+
+
+keys/*
+devices.json
+.env
