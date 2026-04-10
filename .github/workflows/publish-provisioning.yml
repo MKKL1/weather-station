@@ -3,11 +3,6 @@ name: Publish ProvisioningService Docker image
 on:
   push:
     tags: ["provisioning-v*"]
-    branches: [main]
-    paths:
-      - "provisioning-service/**"
-      - ".github/workflows/publish-provisioning.yml"
-      - ".github/actions/docker-publish/**"
   workflow_dispatch:
 
 permissions:

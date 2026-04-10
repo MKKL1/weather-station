@@ -3,11 +3,6 @@ name: Publish TelemetryWorker Docker image
 on:
   push:
     tags: ["func-v*"]
-    branches: [main]
-    paths:
-      - "telemetry-worker/**"
-      - ".github/workflows/publish-telemetry-worker.yml"
-      - ".github/actions/docker-publish/**"
   workflow_dispatch:
 
 permissions:

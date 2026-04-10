@@ -3,12 +3,6 @@ name: Publish LocalDev images
 on:
   push:
     tags: ["local-v*"]
-    branches: [main]
-    paths:
-      - "local/cosmos-init/**"
-      - "local/setup/**"
-      - ".github/workflows/publish-local-images.yml"
-      - ".github/actions/docker-publish/**"
   workflow_dispatch:
 
 permissions:

@@ -3,11 +3,6 @@ name: Publish Gateway Docker image
 on:
   push:
     tags: ["gateway-v*"]
-    branches: [main]
-    paths:
-      - "local/gateway/**"
-      - ".github/workflows/publish-gateway.yml"
-      - ".github/actions/docker-publish/**"
   workflow_dispatch:
 
 permissions:
