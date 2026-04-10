@@ -1,7 +1,8 @@
 # syntax=docker/dockerfile:1.10
-FROM python:3.11-alpine
+FROM python:3.13-alpine
 
-RUN addgroup -g 1000 appuser && \
+RUN apk update && apk upgrade --no-cache && \
+    addgroup -g 1000 appuser && \
     adduser -u 1000 -G appuser -s /bin/sh -D appuser
 
 WORKDIR /app
