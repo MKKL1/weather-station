@@ -11,7 +11,7 @@ key = os.environ.get("COSMOS_KEY", "C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2n
 database_name = os.environ.get("COSMOS_DATABASE", "weather-station-db")
 
 print(f"Connecting to Cosmos DB {endpoint}")
-client = CosmosClient(endpoint, credential=key, connection_verify=False)
+client = CosmosClient(endpoint, credential=key, connection_verify=False, enable_endpoint_discovery=False)
 
 try:
     print(f"Ensuring database '{database_name}' exists...")

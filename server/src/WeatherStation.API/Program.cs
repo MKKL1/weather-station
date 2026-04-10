@@ -102,6 +102,7 @@ builder.Services.AddSingleton<CosmosClient>(sp =>
     var clientOptions = new CosmosClientOptions
     {
         AllowBulkExecution = false,
+        LimitToEndpoint = true,
         SerializerOptions = new CosmosSerializationOptions
         {
             PropertyNamingPolicy = CosmosPropertyNamingPolicy.CamelCase

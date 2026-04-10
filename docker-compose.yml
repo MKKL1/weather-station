@@ -12,7 +12,7 @@ volumes:
 
 services:
   setup:
-    image: ghcr.io/mkkl1/weather-station/hw-setup
+    image: ghcr.io/mkkl1/weather-station/hw-setup@sha256:c95efea014ffeb817fb6421c90b00e1e6e521701b6da8b9ce89348af0fd5accb
     networks: [internal]
     volumes:
       - keys-data:/keys:ro
@@ -30,21 +30,21 @@ services:
     environment:
       AZURE_COSMOS_EMULATOR_PARTITION_COUNT: 3
       AZURE_COSMOS_EMULATOR_ENABLE_DATA_PERSISTENCE: "true"
+      AZURE_COSMOS_EMULATOR_IP_ADDRESS_OVERRIDE: "cosmos-emulator"
     volumes:
       - cosmos-data:/tmp/cosmos/appdata
     healthcheck:
-      test:
-        ["CMD", "curl", "-fsk", "https://localhost:8081/_explorer/emulator.pem"]
+      test: ["CMD", "curl", "-fs", "http://localhost:8081/"]
       interval: 15s
       timeout: 10s
       retries: 10
       start_period: 60s
 
   cosmos-init:
-    image: ghcr.io/mkkl1/weather-station/hw-cosmos-init
+    image: ghcr.io/mkkl1/weather-station/hw-cosmos-init@sha256:c183a11103b0438be5b5ac902a572fc9c2e6f64aad6e57929d41f53e04c0a993
     networks: [internal]
     depends_on:
-      cosmos:
+      cosmos-emulator:
         condition: service_healthy
     environment:
       COSMOS_ENDPOINT: ${COSMOS_ENDPOINT}
@@ -68,7 +68,7 @@ services:
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.4
-    command: start-dev
+    command: start-dev --health-enabled=true
     networks: [internal]
     ports:
       - "8001:8080"
@@ -78,11 +78,11 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
     healthcheck:
-      test: ["CMD-SHELL", "curl --head -fsS http://localhost:9000/health/ready"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 40s
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 
   azurite:
     image: mcr.microsoft.com/azure-storage/azurite:3.35.0
@@ -97,10 +97,10 @@ services:
       start_period: 10s
 
   provisioning-function:
-    image: ghcr.io/mkkl1/weather-station/hw-provisioning-service
+    image: ghcr.io/mkkl1/weather-station/hw-provisioning-service@sha256:df7f6f51241e21c90a76c2176c2755f1b627c6c99ae1a35366fcdbbef05a87f0
     networks: [internal]
     depends_on:
-      cosmos:
+      cosmos-emulator:
         condition: service_healthy
       cosmos-init:
         condition: service_completed_successfully
@@ -120,7 +120,7 @@ services:
       ENVIRONMENT: development
 
   server:
-    image: ghcr.io/mkkl1/weather-station/hw-server
+    image: ghcr.io/mkkl1/weather-station/hw-server@sha256:64fc380a3c7eb25f66073d1c3b983201597fe2a7e7d5b21d0fe3bc5fc525e244
     networks: [internal]
     ports:
       - "8002:80"
@@ -147,10 +147,10 @@ services:
       AdminApiKey__ApiKey: ${ADMIN_API_KEY}
 
   telemetry-worker:
-    image: ghcr.io/mkkl1/weather-station/hw-telemetry-worker
+    image: ghcr.io/mkkl1/weather-station/hw-telemetry-worker@sha256:b8fe216344a2aaaa3da5b05e04e2d983e36291bf30a6bf58a9123985ceb0cb54
     networks: [internal]
     depends_on:
-      cosmos:
+      cosmos-emulator:
         condition: service_healthy
       cosmos-init:
         condition: service_completed_successfully
@@ -174,7 +174,7 @@ services:
       COSMOS_TLS_INSECURE: ${COSMOS_TLS_INSECURE}
 
   gateway:
-    image: ghcr.io/mkkl1/weather-station/hw-gateway
+    image: ghcr.io/mkkl1/weather-station/hw-gateway@sha256:192bea9d5a7095f152ac83ee31629dd8d75167f7a7e3200916d65918bbb80c3f
     networks: [internal]
     ports:
       - "8000:8000"
