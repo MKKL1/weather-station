@@ -12,12 +12,14 @@ volumes:
 
 services:
   setup:
-    image: ghcr.io/mkkl1/weather-station/hw-setup@sha256:c95efea014ffeb817fb6421c90b00e1e6e521701b6da8b9ce89348af0fd5accb
+    image: ghcr.io/mkkl1/weather-station/hw-setup@sha256:97ce917932ccef564d32f07991dbd2c998cbc749d6e77684efe363e1a9aba9b5
+    user: root
     networks: [internal]
     volumes:
-      - keys-data:/keys:ro
-      - ${SETUP_OUTPUT_DIR}:/output
+      - keys-data:/keys
+      - ${SETUP_OUTPUT_DIR:-.}:/output
     environment:
+      KEYS_DIR: /keys
       JWT_ISSUER: ${JWT_ISSUER_PROVISIONING}
       JWT_KID: ${JWT_KID_PROVISIONING}
       JWT_AUDIENCE: ${JWT_AUDIENCE_PROVISIONING}
@@ -26,6 +28,8 @@ services:
 
   cosmos-emulator:
     image: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-EN20260331
+    container_name: cosmos-emulator
+    hostname: cosmos-emulator
     networks: [internal]
     environment:
       AZURE_COSMOS_EMULATOR_PARTITION_COUNT: 3
@@ -41,7 +45,7 @@ services:
       start_period: 60s
 
   cosmos-init:
-    image: ghcr.io/mkkl1/weather-station/hw-cosmos-init@sha256:c183a11103b0438be5b5ac902a572fc9c2e6f64aad6e57929d41f53e04c0a993
+    image: ghcr.io/mkkl1/weather-station/hw-cosmos-init@sha256:fab992dba5d5c702aa607985e193891df02cf20dd7f705215a2842d973642977
     networks: [internal]
     depends_on:
       cosmos-emulator:
@@ -91,13 +95,20 @@ services:
       - azurite-data:/data
     command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0
     healthcheck:
-      test: ["CMD-SHELL", "nc -z localhost 10000"]
+      test:
+        - "CMD-SHELL"
+        - >
+          node -e "
+            const c = require('net').connect(10000, 'localhost', () => { c.end(); process.exit(0); });
+            c.on('error', () => process.exit(1));
+            setTimeout(() => process.exit(1), 3000);
+          "
       interval: 5s
       retries: 10
       start_period: 10s
 
   provisioning-function:
-    image: ghcr.io/mkkl1/weather-station/hw-provisioning-service@sha256:df7f6f51241e21c90a76c2176c2755f1b627c6c99ae1a35366fcdbbef05a87f0
+    image: ghcr.io/mkkl1/weather-station/hw-provisioning-service@sha256:a38e6de6cf4ce81937391472c865bdce0cf736a3a661f02ac8c3e9036b33a174
     networks: [internal]
     depends_on:
       cosmos-emulator:
@@ -120,7 +131,7 @@ services:
       ENVIRONMENT: development
 
   server:
-    image: ghcr.io/mkkl1/weather-station/hw-server@sha256:64fc380a3c7eb25f66073d1c3b983201597fe2a7e7d5b21d0fe3bc5fc525e244
+    image: ghcr.io/mkkl1/weather-station/hw-server@sha256:5aab2a230b9e6f926325cc3c67d18ab9807cc9728ca07a4b5f433e3f93f6f933
     networks: [internal]
     ports:
       - "8002:80"
@@ -147,7 +158,7 @@ services:
       AdminApiKey__ApiKey: ${ADMIN_API_KEY}
 
   telemetry-worker:
-    image: ghcr.io/mkkl1/weather-station/hw-telemetry-worker@sha256:b8fe216344a2aaaa3da5b05e04e2d983e36291bf30a6bf58a9123985ceb0cb54
+    image: ghcr.io/mkkl1/weather-station/hw-telemetry-worker@sha256:02158d122f9a2b8dfdb26b8b99c3e307ffa0f9bf554eaba73295a416dbd1f945
     networks: [internal]
     depends_on:
       cosmos-emulator:
@@ -174,8 +185,11 @@ services:
       COSMOS_TLS_INSECURE: ${COSMOS_TLS_INSECURE}
 
   gateway:
-    image: ghcr.io/mkkl1/weather-station/hw-gateway@sha256:192bea9d5a7095f152ac83ee31629dd8d75167f7a7e3200916d65918bbb80c3f
+    image: ghcr.io/mkkl1/weather-station/hw-gateway@sha256:121a89e6c39a359f43ba5add5b161c3379c92d609a66692e882c6c0f6685d9cd
     networks: [internal]
+    depends_on:
+      setup:
+        condition: service_completed_successfully
     ports:
       - "8000:8000"
     volumes:

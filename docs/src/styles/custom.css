@@ -115,9 +115,11 @@ starlight-custom-theme-select {
     vertical-align: middle;
     background-color: currentColor;
     opacity: 0.6;
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 3h6v6'/%3E%3Cpath d='M10 14 21 3'/%3E%3Cpath d='M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6'/%3E%3C/svg%3E") no-repeat center;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 3h6v6'/%3E%3Cpath d='M10 14 21 3'/%3E%3Cpath d='M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6'/%3E%3C/svg%3E")
+        no-repeat center;
     mask-size: contain;
-    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 3h6v6'/%3E%3Cpath d='M10 14 21 3'/%3E%3Cpath d='M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6'/%3E%3C/svg%3E") no-repeat center;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M15 3h6v6'/%3E%3Cpath d='M10 14 21 3'/%3E%3Cpath d='M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6'/%3E%3C/svg%3E")
+        no-repeat center;
     -webkit-mask-size: contain;
     transition: opacity 0.2s;
 }
@@ -125,7 +127,6 @@ starlight-custom-theme-select {
 .external-sidebar-link:hover span::after {
     opacity: 1;
 }
-
 
 .hero {
     position: relative;
@@ -151,19 +152,19 @@ body {
     transform: translateX(-50%);
     width: 100vw;
     height: 160%;
-    background-image: url('/assets/flyd-xRXXVwNgAXE-unsplash.webp');
+    background-image: url("/assets/flyd-xRXXVwNgAXE-unsplash.webp");
     background-size: cover;
     background-position: center top;
     z-index: -1;
     pointer-events: none;
     -webkit-mask-image: linear-gradient(to bottom, black 10%, transparent 100%);
     mask-image: linear-gradient(to bottom, black 10%, transparent 100%);
-    opacity: 0.45;
+    opacity: 0.1;
     mix-blend-mode: screen;
 }
 
 [data-theme="light"] .hero::before {
-    opacity: 0.95;
+    opacity: 0.3;
     mix-blend-mode: multiply;
 }
 
@@ -172,8 +173,16 @@ html[data-has-hero] .main-frame {
 }
 
 html[data-has-hero] header.header {
-    background-color: color-mix(in srgb, var(--sl-color-bg-nav) 60%, transparent) !important;
-    border-bottom-color: color-mix(in srgb, var(--sl-color-hairline) 50%, transparent) !important;
+    background-color: color-mix(
+        in srgb,
+        var(--sl-color-bg-nav) 60%,
+        transparent
+    ) !important;
+    border-bottom-color: color-mix(
+        in srgb,
+        var(--sl-color-hairline) 50%,
+        transparent
+    ) !important;
     -webkit-backdrop-filter: blur(16px) !important;
     backdrop-filter: blur(16px) !important;
 }
@@ -209,7 +218,8 @@ html[data-has-hero] header.header .header {
 }
 
 .feature-card:hover {
-    box-shadow: 0 4px 12px color-mix(in srgb, var(--sl-color-bg) 50%, transparent);
+    box-shadow: 0 4px 12px
+        color-mix(in srgb, var(--sl-color-bg) 50%, transparent);
 }
 
 .feature-card__icon {
@@ -365,7 +375,8 @@ html[data-has-hero] header.header .header {
     text-align: center;
     padding-top: 3rem;
     padding-bottom: 4rem;
-    border-top: 1px solid color-mix(in srgb, var(--sl-color-hairline) 40%, transparent);
+    border-top: 1px solid
+        color-mix(in srgb, var(--sl-color-hairline) 40%, transparent);
 }
 
 .landing-tech h3 {
@@ -437,7 +448,11 @@ html[data-has-hero] header.header .header {
 .sl-markdown-content a:not(:where(.not-content *)) {
     color: var(--sl-color-text) !important;
     text-decoration: underline;
-    text-decoration-color: color-mix(in srgb, var(--sl-color-text) 50%, transparent) !important;
+    text-decoration-color: color-mix(
+        in srgb,
+        var(--sl-color-text) 50%,
+        transparent
+    ) !important;
     text-underline-offset: 3px;
 }
 
