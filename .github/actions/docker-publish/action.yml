@@ -66,8 +66,8 @@ runs:
       id: refs
       shell: bash
       run: |
-        OWNER_LC=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-        echo "ghcr=ghcr.io/${OWNER_LC}/${{ inputs.image-name }}" >> "$GITHUB_OUTPUT"
+        REPO_LC=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+        echo "ghcr=ghcr.io/${REPO_LC}/${{ inputs.image-name }}" >> "$GITHUB_OUTPUT"
         echo "dh=${{ inputs.dockerhub-username }}/${{ inputs.image-name }}" >> "$GITHUB_OUTPUT"
 
     - name: Extract metadata

@@ -11,6 +11,7 @@ on:
     paths:
       - 'server/**'
       - '.github/workflows/build-server.yml'
+  workflow_call:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
