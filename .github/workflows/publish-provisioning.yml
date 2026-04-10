@@ -31,7 +31,7 @@ jobs:
           context: ./provisioning-service
           dockerfile: ./provisioning-service/Dockerfile
           tag-prefix: provisioning-v
-          platforms: linux/amd64,linux/arm64
+          platforms: linux/amd64 #,linux/arm64 if microsoft adds arm support in future
           github-token: ${{ secrets.GITHUB_TOKEN }}
           dockerhub-username: ${{ secrets.DOCKERHUB_USERNAME }}
           dockerhub-token: ${{ secrets.DOCKERHUB_TOKEN }}
