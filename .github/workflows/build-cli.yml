@@ -4,13 +4,13 @@ on:
   push:
     branches: [main]
     paths:
-      - 'cli/**'
-      - '.github/workflows/build-cli.yml'
+      - "cli/**"
+      - ".github/workflows/build-cli.yml"
   pull_request:
     branches: [main]
     paths:
-      - 'cli/**'
-      - '.github/workflows/build-cli.yml'
+      - "cli/**"
+      - ".github/workflows/build-cli.yml"
   workflow_dispatch:
   workflow_call:
 
@@ -36,25 +36,25 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
-        python-version: ['3.12']
-    
+        python-version: ["3.13"]
+
     steps:
       - uses: actions/checkout@v6
-      
+
       - name: Install Poetry
         run: pipx install poetry
-      
+
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
-          cache: 'poetry'
+          cache: "poetry"
           cache-dependency-path: cli/poetry.lock
-      
+
       - name: Install dependencies
         working-directory: ./cli
         run: poetry install --no-interaction
-      
+
       - name: Run tests
         working-directory: ./cli
         run: poetry run pytest
@@ -67,28 +67,28 @@ jobs:
 
       - name: Install Poetry
         run: pipx install poetry
-      
+
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
-          cache: 'poetry'
+          python-version: "3.13"
+          cache: "poetry"
           cache-dependency-path: cli/poetry.lock
-      
+
       - name: Install build tools
         working-directory: ./cli
         run: |
           pip install poetry build twine
           poetry install --no-interaction
-      
+
       - name: Build distributions
         working-directory: ./cli
         run: poetry build
-      
+
       - name: Check build artifacts
         working-directory: ./cli
         run: python -m twine check dist/*
-      
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
@@ -99,19 +99,19 @@ jobs:
   test-install:
     needs: build
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
-      
+          python-version: "3.13"
+
       - name: Download build artifacts
         uses: actions/download-artifact@v8
         with:
           name: cli-dist
           path: ./dist/
-      
+
       - name: Test wheel installation
         run: |
           pip install ./dist/*.whl

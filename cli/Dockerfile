@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.10
-FROM python:3.11-slim AS builder
+FROM python:3.13-slim AS builder
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -25,14 +25,14 @@ COPY README.md ./
 RUN poetry install --only-root
 
 
-FROM gcr.io/distroless/python3-debian12:nonroot
+FROM gcr.io/distroless/python3-debian13:nonroot
 
 COPY --from=builder --chown=nonroot:nonroot /app/.venv/lib /app/.venv/lib
 COPY --from=builder --chown=nonroot:nonroot /app/hw_cli /app/hw_cli
 
 WORKDIR /app
 
-ENV PYTHONPATH="/app/.venv/lib/python3.11/site-packages" \
+ENV PYTHONPATH="/app/.venv/lib/python3.13/site-packages" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     HW_CLI_DATA_DIR="/data"
