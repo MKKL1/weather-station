@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1.10
-FROM python:3.11-alpine
+FROM alpine:3.23
 
-RUN apk add --no-cache openssl bash && \
-    apk add --no-cache --virtual .build-deps gcc musl-dev libffi-dev python3-dev && \
-    pip install --no-cache-dir cryptography mnemonic PyJWT && \
-    apk del .build-deps && \
+RUN apk update && apk upgrade --no-cache && \
+    apk add --no-cache python3 py3-pip bash openssl && \
+    python3 -m venv /opt/venv && \
+    /opt/venv/bin/pip install --no-cache-dir mnemonic==0.21 PyJWT==2.12.1 && \
     addgroup -g 1000 appuser && \
     adduser -u 1000 -G appuser -s /bin/sh -D appuser
 
