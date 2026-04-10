@@ -44,7 +44,7 @@ generate_keypair() {
     fi
 
     openssl genrsa -out "$private_key_path" 2048 >/dev/null 2>&1
-    chmod 600 "$private_key_path"
+    chmod 644 "$private_key_path"
 
     openssl rsa -in "$private_key_path" -pubout -out "$public_key_path" >/dev/null 2>&1
     chmod 644 "$public_key_path"
@@ -57,7 +57,7 @@ generate_keypair "$PROVISIONING_PRIVATE_KEY" "$PROVISIONING_PUBLIC_KEY" "provisi
 
 if [ ! -f "$DEVICES_FILE" ] || [ "$provisioning_keys_changed" = "1" ]; then
     echo "Generating ${DEVICE_COUNT} device credentials..."
-    python3 /scripts/generate_devices.py \
+    /opt/venv/bin/python3 /scripts/generate_devices.py \
         --key "$PROVISIONING_PRIVATE_KEY" \
         --out "$DEVICES_FILE" \
         --count "$DEVICE_COUNT"

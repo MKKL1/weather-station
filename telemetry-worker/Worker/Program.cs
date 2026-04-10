@@ -43,7 +43,7 @@ builder.Services.AddSingleton<CosmosClient>(sp =>
         "true",
         StringComparison.OrdinalIgnoreCase);
 
-    var options = new CosmosClientOptions { AllowBulkExecution = true };
+    var options = new CosmosClientOptions { AllowBulkExecution = true, LimitToEndpoint = true };
 
     if (tlsInsecure)
     {

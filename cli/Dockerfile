@@ -22,13 +22,14 @@ RUN poetry install --no-root --only main
 
 COPY hw_cli/ ./hw_cli/
 COPY README.md ./
-RUN poetry install --only-root
+RUN poetry install --only-root && mkdir -p /data_dir
 
 
 FROM gcr.io/distroless/python3-debian13:nonroot
 
 COPY --from=builder --chown=nonroot:nonroot /app/.venv/lib /app/.venv/lib
 COPY --from=builder --chown=nonroot:nonroot /app/hw_cli /app/hw_cli
+COPY --from=builder --chown=nonroot:nonroot /data_dir /data
 
 WORKDIR /app
 

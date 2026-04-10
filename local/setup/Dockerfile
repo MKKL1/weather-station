@@ -2,8 +2,8 @@
 FROM alpine:3.23
 
 RUN apk update && apk upgrade --no-cache && \
-    apk add --no-cache python3 py3-pip bash openssl && \
-    python3 -m venv /opt/venv && \
+    apk add --no-cache python3 py3-pip bash openssl py3-cryptography && \
+    python3 -m venv --system-site-packages /opt/venv && \
     /opt/venv/bin/pip install --no-cache-dir mnemonic==0.21 PyJWT==2.12.1 && \
     addgroup -g 1000 appuser && \
     adduser -u 1000 -G appuser -s /bin/sh -D appuser
@@ -11,7 +11,7 @@ RUN apk update && apk upgrade --no-cache && \
 WORKDIR /scripts
 
 COPY --chown=appuser:appuser entrypoint.sh generate_devices.py ./
-RUN chmod +x entrypoint.sh
+RUN sed -i 's/\r$//' entrypoint.sh && chmod +x entrypoint.sh
 
 USER appuser
 

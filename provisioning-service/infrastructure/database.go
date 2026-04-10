@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
@@ -51,18 +52,29 @@ func NewCosmosDB(endpoint, key, database, container string, tlsInsecure bool) (*
 		return nil, fmt.Errorf("failed to create cosmos DB credential: %w", err)
 	}
 
-	var opts *azcosmos.ClientOptions
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("invalid cosmos endpoint: %w", err)
+	}
+
+	var baseTransport http.RoundTripper = http.DefaultTransport
 	if tlsInsecure {
-		transport := &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			},
+		baseTransport = &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
-		opts = &azcosmos.ClientOptions{
-			ClientOptions: policy.ClientOptions{
-				Transport: transport,
-			},
-		}
+	}
+
+	transport := &http.Client{
+		Transport: &emulatorTransport{
+			roundTripper: baseTransport,
+			emulatorHost: u.Host,
+		},
+	}
+
+	opts := &azcosmos.ClientOptions{
+		ClientOptions: policy.ClientOptions{
+			Transport: transport,
+		},
 	}
 
 	client, err := azcosmos.NewClientWithKey(endpoint, cred, opts)
@@ -148,4 +160,19 @@ func isNotFoundError(err error) bool {
 	return strings.Contains(errMsg, "404") ||
 		strings.Contains(errMsg, "NotFound") ||
 		strings.Contains(errMsg, "not found")
+}
+
+// emulatorTransport wraps an http.RoundTripper to intercept and rewrite requests
+// meant for 127.0.0.1. The CosmosDB Emulator resolves partition addresses to
+// localhost (127.0.0.1) by default, which breaks clients inside Docker Compose.
+type emulatorTransport struct {
+	roundTripper http.RoundTripper
+	emulatorHost string
+}
+
+func (t *emulatorTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	if strings.HasPrefix(req.URL.Host, "127.0.0.1:") || req.URL.Host == "127.0.0.1" {
+		req.URL.Host = t.emulatorHost
+	}
+	return t.roundTripper.RoundTrip(req)
 }

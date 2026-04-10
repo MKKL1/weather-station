@@ -3,11 +3,6 @@ name: Publish CLI Docker image
 on:
   push:
     tags: ["cli-v*"]
-    branches: [main]
-    paths:
-      - "cli/**"
-      - ".github/workflows/publish-cli-docker.yml"
-      - ".github/actions/docker-publish/**"
   workflow_dispatch:
 
 permissions:

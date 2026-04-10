@@ -9,7 +9,7 @@ public class DeviceAuthServiceOptions
     [Required]
     [Url]
     public required string BaseUrl { get; set; }
-    
+
     public string? Instance { get; set; } = "https://login.microsoftonline.com/";
     public string? TenantId { get; set; }
     public string? ClientId { get; set; }

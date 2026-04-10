@@ -53,8 +53,8 @@ public class DeviceAuthGatewayHttpClient(
                 innerException: ex);
         }
 
-        if (!response.IsSuccessStatusCode && 
-            response.StatusCode != HttpStatusCode.Conflict && 
+        if (!response.IsSuccessStatusCode &&
+            response.StatusCode != HttpStatusCode.Conflict &&
             response.StatusCode != HttpStatusCode.BadRequest &&
             response.StatusCode != HttpStatusCode.NotFound)
         {

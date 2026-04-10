@@ -12,7 +12,7 @@ public static class DeviceAuthenticationService
     {
         var normalizedWords = words.Normalize(NormalizationForm.FormKD);
         var normalizedSalt = "mnemonic".Normalize(NormalizationForm.FormKD);
-        
+
         var seed = Rfc2898DeriveBytes.Pbkdf2(
             Encoding.UTF8.GetBytes(normalizedWords),
             Encoding.UTF8.GetBytes(normalizedSalt),

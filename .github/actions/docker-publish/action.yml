@@ -66,9 +66,19 @@ runs:
       id: refs
       shell: bash
       run: |
-        OWNER_LC=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-        echo "ghcr=ghcr.io/${OWNER_LC}/${{ inputs.image-name }}" >> "$GITHUB_OUTPUT"
+        REPO_LC=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+        echo "ghcr=ghcr.io/${REPO_LC}/${{ inputs.image-name }}" >> "$GITHUB_OUTPUT"
         echo "dh=${{ inputs.dockerhub-username }}/${{ inputs.image-name }}" >> "$GITHUB_OUTPUT"
+
+    - name: Strip tag prefix
+      id: clean-tag
+      if: github.ref_type == 'tag'
+      shell: bash
+      run: |
+        TAG_NAME="${{ github.ref_name }}"
+        PREFIX="${{ inputs.tag-prefix }}"
+        CLEAN_TAG="${TAG_NAME#$PREFIX}"
+        echo "version=$CLEAN_TAG" >> "$GITHUB_OUTPUT"
 
     - name: Extract metadata
       id: meta
@@ -78,8 +88,8 @@ runs:
           ${{ steps.refs.outputs.ghcr }}
           ${{ steps.refs.outputs.dh }}
         tags: |
-          type=semver,pattern={{version}},prefix=${{ inputs.tag-prefix }},enable=${{ github.ref_type == 'tag' }}
-          type=semver,pattern={{major}}.{{minor}},prefix=${{ inputs.tag-prefix }},enable=${{ github.ref_type == 'tag' }}
+          type=semver,pattern={{version}},value=${{ steps.clean-tag.outputs.version }},enable=${{ github.ref_type == 'tag' }}
+          type=semver,pattern={{major}}.{{minor}},value=${{ steps.clean-tag.outputs.version }},enable=${{ github.ref_type == 'tag' }}
           type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
           type=sha,prefix=main-,enable=${{ github.ref_type != 'tag' }}
         labels: |

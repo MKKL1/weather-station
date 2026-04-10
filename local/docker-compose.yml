@@ -1,7 +1,7 @@
 # Compared to root/docker-compose.yml, this docker compose file builds each service locally
 # Ideal for development
 
-name: weather-station-local
+name: weather-station-local-build
 
 networks:
   internal:
@@ -30,7 +30,7 @@ services:
       DEVICE_COUNT: ${DEVICE_COUNT}
 
   cosmos:
-    image: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest
+    image: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-EN20260331
     container_name: cosmos-emulator
     hostname: cosmos-emulator
     networks: [internal]
@@ -39,11 +39,11 @@ services:
     environment:
       AZURE_COSMOS_EMULATOR_PARTITION_COUNT: 3
       AZURE_COSMOS_EMULATOR_ENABLE_DATA_PERSISTENCE: "true"
+      AZURE_COSMOS_EMULATOR_IP_ADDRESS_OVERRIDE: "cosmos-emulator"
     volumes:
       - cosmos-data:/tmp/cosmos/appdata
     healthcheck:
-      test:
-        ["CMD", "curl", "-fsk", "https://localhost:8081/_explorer/emulator.pem"]
+      test: ["CMD", "curl", "-fs", "http://localhost:8081/"]
       interval: 15s
       timeout: 10s
       retries: 10
@@ -81,7 +81,7 @@ services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.4
     container_name: keycloak
-    command: start-dev
+    command: start-dev --health-enabled=true
     networks: [internal]
     ports:
       - "8083:8080"
@@ -91,15 +91,11 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "curl --head -fsS http://localhost:9000/health/ready | echo $?",
-        ]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 40s
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 
   azurite:
     image: mcr.microsoft.com/azure-storage/azurite
@@ -213,6 +209,13 @@ services:
     networks: [internal]
     ports:
       - "8000:8000"
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+      telemetry-worker:
+        condition: service_started
+      provisioning-function:
+        condition: service_started
     volumes:
       - ./keys:/keys:ro
     environment:
