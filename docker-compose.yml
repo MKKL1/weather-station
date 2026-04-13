@@ -1,7 +1,9 @@
 name: weather-station-local
 
 networks:
-  internal:
+  api:
+  backend:
+  frontend:
 
 volumes:
   cosmos-data:
@@ -14,7 +16,7 @@ services:
   setup:
     image: ghcr.io/mkkl1/weather-station/hw-setup@sha256:97ce917932ccef564d32f07991dbd2c998cbc749d6e77684efe363e1a9aba9b5
     user: root
-    networks: [internal]
+    networks: [backend]
     volumes:
       - keys-data:/keys
       - ${SETUP_OUTPUT_DIR:-.}:/output
@@ -25,12 +27,17 @@ services:
       JWT_AUDIENCE: ${JWT_AUDIENCE_PROVISIONING}
       CLAIM_BASE_URL: ${CLAIM_BASE_URL}
       DEVICE_COUNT: ${DEVICE_COUNT}
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
 
   cosmos-emulator:
     image: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-EN20260331
     container_name: cosmos-emulator
     hostname: cosmos-emulator
-    networks: [internal]
+    networks: [backend]
     environment:
       AZURE_COSMOS_EMULATOR_PARTITION_COUNT: 3
       AZURE_COSMOS_EMULATOR_ENABLE_DATA_PERSISTENCE: "true"
@@ -43,10 +50,15 @@ services:
       timeout: 10s
       retries: 10
       start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 3G
 
   cosmos-init:
     image: ghcr.io/mkkl1/weather-station/hw-cosmos-init@sha256:fab992dba5d5c702aa607985e193891df02cf20dd7f705215a2842d973642977
-    networks: [internal]
+    networks: [backend]
     depends_on:
       cosmos-emulator:
         condition: service_healthy
@@ -54,10 +66,15 @@ services:
       COSMOS_ENDPOINT: ${COSMOS_ENDPOINT}
       COSMOS_KEY: ${COSMOS_KEY}
       COSMOS_DATABASE: ${COSMOS_DATABASE}
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
 
   postgres:
     image: postgres:18-alpine
-    networks: [internal]
+    networks: [api]
     volumes:
       - postgres-data:/var/lib/postgresql/data
     environment:
@@ -69,11 +86,16 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 256M
 
   keycloak:
     image: quay.io/keycloak/keycloak:26.4
     command: start-dev --health-enabled=true
-    networks: [internal]
+    networks: [api]
     ports:
       - "8001:8080"
     volumes:
@@ -87,10 +109,15 @@ services:
       timeout: 5s
       retries: 12
       start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
 
   azurite:
     image: mcr.microsoft.com/azure-storage/azurite:3.35.0
-    networks: [internal]
+    networks: [backend]
     volumes:
       - azurite-data:/data
     command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0
@@ -106,10 +133,15 @@ services:
       interval: 5s
       retries: 10
       start_period: 10s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
 
   provisioning-function:
     image: ghcr.io/mkkl1/weather-station/hw-provisioning-service@sha256:a38e6de6cf4ce81937391472c865bdce0cf736a3a661f02ac8c3e9036b33a174
-    networks: [internal]
+    networks: [frontend, backend]
     depends_on:
       cosmos-emulator:
         condition: service_healthy
@@ -129,10 +161,15 @@ services:
       ACCESS_TOKEN_PRIVATE_KEY_PATH: "/keys/private.pem"
       SERVER_PORT: "8080"
       ENVIRONMENT: development
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
 
   server:
     image: ghcr.io/mkkl1/weather-station/hw-server@sha256:5aab2a230b9e6f926325cc3c67d18ab9807cc9728ca07a4b5f433e3f93f6f933
-    networks: [internal]
+    networks: [api, backend]
     ports:
       - "8002:80"
     depends_on:
@@ -156,10 +193,15 @@ services:
       AuthService__BaseUrl: "http://provisioning-function:8080/api/v1/devices/"
       AuthService__SharedSecret: ${WORKER_SHARED_SECRET}
       AdminApiKey__ApiKey: ${ADMIN_API_KEY}
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
 
   telemetry-worker:
     image: ghcr.io/mkkl1/weather-station/hw-telemetry-worker@sha256:02158d122f9a2b8dfdb26b8b99c3e307ffa0f9bf554eaba73295a416dbd1f945
-    networks: [internal]
+    networks: [frontend, backend]
     depends_on:
       cosmos-emulator:
         condition: service_healthy
@@ -169,13 +211,7 @@ services:
         condition: service_healthy
     environment:
       FUNCTIONS_WORKER_RUNTIME: dotnet-isolated
-      AzureWebJobsStorage: >-
-        DefaultEndpointsProtocol=http;
-        AccountName=${AZURITE_ACCOUNT};
-        AccountKey=${AZURITE_KEY};
-        BlobEndpoint=http://azurite:10000/${AZURITE_ACCOUNT};
-        QueueEndpoint=http://azurite:10001/${AZURITE_ACCOUNT};
-        TableEndpoint=http://azurite:10002/${AZURITE_ACCOUNT};
+      AzureWebJobsStorage: "DefaultEndpointsProtocol=http;AccountName=${AZURITE_ACCOUNT};AccountKey=${AZURITE_KEY};BlobEndpoint=http://azurite:10000/${AZURITE_ACCOUNT};QueueEndpoint=http://azurite:10001/${AZURITE_ACCOUNT};TableEndpoint=http://azurite:10002/${AZURITE_ACCOUNT}"
       COSMOS_CONNECTION: >-
         AccountEndpoint=${COSMOS_ENDPOINT};AccountKey=${COSMOS_KEY}
       COSMOS_DATABASE: ${COSMOS_DATABASE}
@@ -183,10 +219,15 @@ services:
       COSMOS_VIEWS_CONTAINER: ${COSMOS_CONTAINER_VIEWS}
       COSMOS_TELEMETRY_CONTAINER: ${COSMOS_CONTAINER_TELEMETRY}
       COSMOS_TLS_INSECURE: ${COSMOS_TLS_INSECURE}
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
 
   gateway:
     image: ghcr.io/mkkl1/weather-station/hw-gateway@sha256:121a89e6c39a359f43ba5add5b161c3379c92d609a66692e882c6c0f6685d9cd
-    networks: [internal]
+    networks: [frontend]
     depends_on:
       setup:
         condition: service_completed_successfully
@@ -202,3 +243,8 @@ services:
       WORKER_SHARED_SECRET: ${WORKER_SHARED_SECRET}
       MAIN_FN_URL: "http://telemetry-worker:80"
       PROVISIONING_FN_URL: "http://provisioning-function:8080"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
