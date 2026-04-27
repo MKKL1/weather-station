@@ -26,16 +26,15 @@ public class WeatherIngestionService
 
     public async Task<IngestionResult> Ingest(ValidatedTelemetryDto dto, string deviceId)
     {
+        //TODO this try-catch with logging is not that great, would rather let global exception handler do it
         try
         {
-            // 1. Save Raw (Audit) - Updated method name
             await _repository.SaveRaw(dto, deviceId);
-            
-            // 2. Process Domain Logic
+
             var reading = _mapper.ToDomain(dto, deviceId);
+            //Chained services, not sure if good pattern
             var aggregationResult = await _aggregationService.ProcessReading(reading);
-            
-            // 3. Save State (Hot Path) - Updated method name
+
             await _repository.SaveState(aggregationResult);
 
             _logger.LogInformation("Ingested reading for {DeviceId} at {Timestamp}",

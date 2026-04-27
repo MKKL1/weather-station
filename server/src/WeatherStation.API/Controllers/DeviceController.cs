@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using WeatherStation.API.Extensions;
 using WeatherStation.API.Validation;
 using WeatherStation.Core.Dto;
 using WeatherStation.Core.Services;

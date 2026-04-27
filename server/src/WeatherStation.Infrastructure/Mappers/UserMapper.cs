@@ -1,7 +1,7 @@
 using WeatherStation.Core.Entities;
 using WeatherStation.Infrastructure.Tables;
 
-namespace WeatherStation.Infrastructure;
+namespace WeatherStation.Infrastructure.Mappers;
 
 public static class UserMapper
 {

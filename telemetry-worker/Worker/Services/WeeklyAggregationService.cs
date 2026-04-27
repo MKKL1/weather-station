@@ -11,6 +11,12 @@ public class WeeklyAggregationService(
     ILogger<WeeklyAggregationService> logger,
     IWeatherRepository repository)
 {
+    /**
+     * Find weekly documents corresponding to days in finalizedDays and update weekly documents.
+     *
+     * Example: finalizedDays holds 5 days (Friday, Saturday, Sunday, Monday, Tuesday); 3 (Fri,Sat,Sun) in week#1, 2 (Mon, Tue) in week#2.
+     * week#1 and week#2 are fetched, updated locally and then persisted.
+     */
     public async Task SyncDaysToWeeksAsync(IEnumerable<DailyWeather> finalizedDays)
     {
         var daysList = finalizedDays.ToList();
@@ -23,7 +29,7 @@ public class WeeklyAggregationService(
             })
             .ToList();
 
-        var tasks = groups.Select(group => ProcessSingleWeekGroupAsync(group));
+        var tasks = groups.Select(ProcessSingleWeekGroupAsync);
         
         await Task.WhenAll(tasks);
     }
@@ -71,7 +77,7 @@ public class WeeklyAggregationService(
             }
         }
 
-        throw new Exception($"Failed to update week for {deviceId} after {MaxRetries} attempts due to concurrency.");
+        throw new Exception($"Failed to update week for {deviceId} after {MaxRetries} attempts.");
     }
 
     private static (int Year, int Week) GetIsoWeek(DateTimeOffset date)

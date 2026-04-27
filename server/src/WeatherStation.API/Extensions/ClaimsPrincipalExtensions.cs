@@ -1,6 +1,6 @@
 using System.Security.Claims;
 
-namespace WeatherStation.API;
+namespace WeatherStation.API.Extensions;
 
 public static class ClaimsPrincipalExtensions
 {

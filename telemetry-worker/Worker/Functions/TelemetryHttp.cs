@@ -16,6 +16,7 @@ public class TelemetryHttp(
     IValidator<TelemetryRequest> validator,
     TelemetryMapper mapper)
 {
+    //TODO this needs to be updated, don't pass deviceID thru header, use path variable instead
     private const string DeviceIdHeader = "X-Device-ID";
 
     [Function(nameof(TelemetryHttp))]

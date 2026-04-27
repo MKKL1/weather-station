@@ -11,7 +11,7 @@ public class TelemetryRequestValidator : AbstractValidator<TelemetryRequest>
     private const int PrecipitationBinsTimeAlignmentMinutes = 30;
     private const int MaxDataPoints = 100;
     private readonly TimeProvider _timeProvider;
-    
+
     public TelemetryRequestValidator(TimeProvider timeProvider)
     {
         _timeProvider = timeProvider;
@@ -25,10 +25,10 @@ public class TelemetryRequestValidator : AbstractValidator<TelemetryRequest>
             .NotNull().WithMessage("Payload is required")
                 .WithErrorCode("MISSING_PAYLOAD")
             .SetValidator(new PayloadValidator()!);
-        
+
         RuleFor(x => x.TimestampEpoch)
             .Custom(ValidateTimestampLogic);
-        
+
         RuleFor(x => x)
             .Custom(ValidatePrecipitationBinsAlignment);
     }
@@ -39,14 +39,12 @@ public class TelemetryRequestValidator : AbstractValidator<TelemetryRequest>
 
         var now = _timeProvider.GetUtcNow();
         var eventTime = DateTimeOffset.FromUnixTimeSeconds(timestampEpoch.Value);
-        
-        // Floor to minutes
+
         eventTime = new DateTimeOffset(
-            eventTime.Year, eventTime.Month, eventTime.Day, 
-            eventTime.Hour, eventTime.Minute, 0, 
+            eventTime.Year, eventTime.Month, eventTime.Day,
+            eventTime.Hour, eventTime.Minute, 0,
             TimeSpan.Zero);
-        
-        // Future Check
+
         if (eventTime > now.AddMinutes(5))
         {
             context.AddFailure(new ValidationFailure("TimestampEpoch", "Event timestamp is in the future.")
@@ -55,16 +53,15 @@ public class TelemetryRequestValidator : AbstractValidator<TelemetryRequest>
             });
             return;
         }
-        
+
         var cutoff = now.AddMinutes(-MaxDataAgeMinutes);
         cutoff = new DateTimeOffset(
-            cutoff.Year, cutoff.Month, cutoff.Day, 
-            cutoff.Hour, cutoff.Minute, 0, 
+            cutoff.Year, cutoff.Month, cutoff.Day,
+            cutoff.Hour, cutoff.Minute, 0,
             TimeSpan.Zero);
-        
-        // Too Old Check
+
         if (eventTime >= cutoff) return;
-        
+
         var cutoffString = cutoff.ToString("yyyy-MM-dd HH:mm");
         context.AddFailure(new ValidationFailure("TimestampEpoch", $"Event is too old. Must be after {cutoffString} UTC.")
         {
@@ -74,8 +71,8 @@ public class TelemetryRequestValidator : AbstractValidator<TelemetryRequest>
 
     private void ValidatePrecipitationBinsAlignment(TelemetryRequest req, ValidationContext<TelemetryRequest> context)
     {
-        if (req.TimestampEpoch == null || 
-            req.Payload?.Precipitation?.Data == null || 
+        if (req.TimestampEpoch == null ||
+            req.Payload?.Precipitation?.Data == null ||
             req.Payload.Precipitation.SlotSeconds == null ||
             req.Payload.Precipitation.StartTimeEpoch == null ||
             req.Payload.Precipitation.SlotCount == null)
@@ -84,10 +81,10 @@ public class TelemetryRequestValidator : AbstractValidator<TelemetryRequest>
         }
 
         var precipitation = req.Payload.Precipitation;
-        
+
         if (precipitation.Data.Count > MaxDataPoints)
         {
-            context.AddFailure(new ValidationFailure("Payload.Precipitation.Data", 
+            context.AddFailure(new ValidationFailure("Payload.Precipitation.Data",
                     $"Too many data points. Max allowed: {MaxDataPoints}")
                 { ErrorCode = "TOO_MANY_POINTS" });
             return;
@@ -97,7 +94,7 @@ public class TelemetryRequestValidator : AbstractValidator<TelemetryRequest>
 
         if (totalDurationSeconds > MaxPrecipitationBinsDurationMinutes * 60)
         {
-            context.AddFailure(new ValidationFailure("Payload.Precipitation", 
+            context.AddFailure(new ValidationFailure("Payload.Precipitation",
                     $"Precipitation bins duration ({totalDurationSeconds}s) exceeds limit of {MaxPrecipitationBinsDurationMinutes} minutes")
                 { ErrorCode = "HISTOGRAM_DURATION_EXCEEDED" });
             return;
@@ -117,26 +114,25 @@ public class TelemetryRequestValidator : AbstractValidator<TelemetryRequest>
 
             if (maxIndex >= precipitation.SlotCount.Value)
             {
-                context.AddFailure(new ValidationFailure("Payload.Precipitation.Data", 
+                context.AddFailure(new ValidationFailure("Payload.Precipitation.Data",
                         $"Data contains index {maxIndex} which exceeds declared SlotCount {precipitation.SlotCount.Value}")
                     { ErrorCode = "INDEX_OUT_OF_BOUNDS" });
                 return;
             }
         }
 
-        // 4. Timeline Alignment
         var binsStart = precipitation.StartTimeEpoch.Value > 0
             ? DateTimeOffset.FromUnixTimeSeconds(precipitation.StartTimeEpoch.Value)
             : DateTimeOffset.UnixEpoch;
 
         var binsEnd = binsStart.AddSeconds(totalDurationSeconds);
         var eventTime = DateTimeOffset.FromUnixTimeSeconds(req.TimestampEpoch.Value);
-    
+
         var diff = Math.Abs((eventTime - binsEnd).TotalMinutes);
 
         if (diff > PrecipitationBinsTimeAlignmentMinutes)
         {
-            context.AddFailure(new ValidationFailure("Payload.Precipitation", 
+            context.AddFailure(new ValidationFailure("Payload.Precipitation",
                     $"Precipitation bins timeline mismatch (off by {diff:F0} minutes)")
                 { ErrorCode = "HISTOGRAM_ALIGNMENT_MISMATCH" });
         }
@@ -176,7 +172,7 @@ public class PrecipitationBinsValidator : AbstractValidator<TelemetryRequest.Pre
                 .WithErrorCode("MISSING_HIST_START")
             .GreaterThan(0).WithMessage("Precipitation bins start time must be positive")
                 .WithErrorCode("INVALID_HIST_START");
-        
+
         RuleFor(x => x.SlotCount)
             .NotNull().WithMessage("Slot count is required")
             .WithErrorCode("MISSING_SLOT_COUNT")

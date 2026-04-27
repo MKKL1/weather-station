@@ -1,6 +1,7 @@
 using WeatherStation.Core;
+using WeatherStation.Core.Exceptions;
 
-namespace WeatherStation.API;
+namespace WeatherStation.API.Middleware;
 
 public class DomainExceptionMiddleware(RequestDelegate next, ILogger<DomainExceptionMiddleware> logger)
 {

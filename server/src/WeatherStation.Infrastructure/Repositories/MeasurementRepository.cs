@@ -50,6 +50,7 @@ public class MeasurementRepository(Container viewContainer) : IMeasurementReposi
         };
     }
 
+    //TODO make them private?
     public async Task<IEnumerable<AggregatedMeasurement>> GetDailyRange(
         string deviceId,
         DateTimeOffset requestStart,

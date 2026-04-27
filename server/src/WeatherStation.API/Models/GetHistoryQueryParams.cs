@@ -4,7 +4,7 @@ using WeatherStation.API.Validation;
 using WeatherStation.Core;
 using WeatherStation.Core.Entities;
 
-namespace WeatherStation.API;
+namespace WeatherStation.API.Models;
 
 [StartBeforeEnd(nameof(StartTime), nameof(EndTime))]
 public class GetHistoryQueryParams

@@ -3,22 +3,32 @@ using Worker.Domain.ValueObjects;
 
 namespace Worker.Domain.Models;
 
+/// <summary>
+/// Represents all weather readings of given day.
+/// 
+/// </summary>
 public class DailyWeather
 {
     private const int BucketSizeSeconds = 300; 
     public string DeviceId { get; }
     public DateTimeOffset DayTimestamp { get; }
+    //TODO could change all setters to "init" so domain object cannot be in invalid state
     public PrecipitationAccumulator? Precipitation { get; set; }
     public MetricAggregate? Temperature { get; set; }
     public MetricAggregate? Humidity { get; set; }
     public MetricAggregate? Pressure { get; set; }
     
+    //TKey - hour
+    //TValue - stores cumulative aggregate (sum and count of readings)
     public Dictionary<int, MetricAggregate>? HourlyTemperature { get; set; }
     public Dictionary<int, MetricAggregate>? HourlyHumidity { get; set; }
     public Dictionary<int, MetricAggregate>? HourlyPressure { get; set; }
     
     public List<DateTimeOffset> IncludedTimestamps { get; set; } = [];
 
+    /// <summary>
+    /// Finalized DailyWeather document shouldn't be changed
+    /// </summary>
     public bool IsFinalized { get; internal set; } = false;
     public string? Version { get; set; }
 
@@ -73,6 +83,7 @@ public class DailyWeather
     {
         if (IsFinalized)
         {
+            //TODO or make it idempotent
             throw new InvalidOperationException($"DailyWeather for {DeviceId} on {DayTimestamp:yyyy-MM-dd} is already finalized");
         }
 

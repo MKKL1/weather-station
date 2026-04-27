@@ -5,6 +5,9 @@ using WeatherStation.Infrastructure.Tables;
 
 namespace WeatherStation.Infrastructure.Repositories;
 
+//IDeviceRepository is implemented with Entity Framework
+//This may be overengineering as EF has enough of abstraction over database operations
+
 public class DeviceRepository(WeatherStationDbContext context) : IDeviceRepository
 {
     public async Task<bool> Exists(string deviceId, CancellationToken ct)

@@ -15,6 +15,7 @@ using Container = Microsoft.Azure.Cosmos.Container;
 using Microsoft.Extensions.Options;
 using WeatherStation.API;
 using WeatherStation.API.Authentication;
+using WeatherStation.API.Middleware;
 using WeatherStation.API.Options;
 using WeatherStation.API.Token;
 using WeatherStation.Core.Dto;
@@ -24,7 +25,6 @@ DotNetEnv.Env.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Support custom environment variable for Cosmos connection string
 var cosmosConnection = Environment.GetEnvironmentVariable("COSMOS_CONNECTION");
 if (!string.IsNullOrWhiteSpace(cosmosConnection))
 {
@@ -147,11 +147,9 @@ builder.Services.AddHttpClient<IDeviceAuthGateway, DeviceAuthGatewayHttpClient>(
 
 builder.Services.AddScoped<IMeasurementRepository, MeasurementRepository>();
 builder.Services.AddScoped<MeasurementService>();
-builder.Services.AddScoped<DeviceAccessValidator>(sp => new DeviceAccessValidator(sp.GetRequiredService<IDeviceRepository>()));
-builder.Services.AddScoped<DeviceService>(sp => new DeviceService(sp.GetRequiredService<IDeviceRepository>(), sp.GetRequiredService<DeviceAccessValidator>()));
-builder.Services.AddScoped<DeviceClaimService>(sp => new DeviceClaimService(
-    sp.GetRequiredService<IDeviceAuthGateway>(),
-    sp.GetRequiredService<IDeviceRepository>()));
+builder.Services.AddScoped<DeviceAccessValidator>();
+builder.Services.AddScoped<DeviceService>();
+builder.Services.AddScoped<DeviceClaimService>();
 
 builder.Services.AddAuthentication(options =>
     {
@@ -186,6 +184,7 @@ builder.Services.AddAuthentication(options =>
         {
             OnTokenValidated = async ctx =>
             {
+                //JIT user provisioning based on JWT
                 var principal = ctx.Principal!;
 
                 var email = principal.FindFirst(ClaimTypes.Email)?.Value;
@@ -221,7 +220,7 @@ builder.Services.AddAuthentication(options =>
                 principal.AddIdentity(idIdentity);
             }
         };
-    }).AddScheme<AdminApiKeyOptions, AdminApiKeyAuthenticationHandler>(
+    }).AddScheme<AdminApiKeyOptions, AdminApiKeyAuthenticationHandler>( //Adds api key authentication
         AdminApiKeyOptions.SchemeN, options =>
         {
             builder.Configuration
@@ -229,14 +228,13 @@ builder.Services.AddAuthentication(options =>
                 .Bind(options);
         });
 
-builder.Services.AddAuthorization(o =>
-    {
-        o.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder(
+//Default policy to allow access if either jwt or api key is valid
+builder.Services.AddAuthorizationBuilder()
+    .SetDefaultPolicy(new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder(
                 JwtBearerDefaults.AuthenticationScheme,
                 AdminApiKeyOptions.SchemeN)
             .RequireAuthenticatedUser()
-            .Build();
-    });
+            .Build());
 
 
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();

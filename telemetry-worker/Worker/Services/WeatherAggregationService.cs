@@ -6,12 +6,17 @@ namespace Worker.Services;
 
 public class WeatherAggregationService(IWeatherRepository repository)
 {
+    /**
+     * Finds all readings that need update, reads them, aggregates results and saves.
+     * Creates them if they didn't exist before.
+     * Works on Daily readings.
+     */
     public async Task<WeatherStateUpdate> ProcessReading(WeatherReading reading)
     {
         var start = reading.Timestamp;
         var end = reading.Timestamp;
 
-        // If it's a precipitation reading (bins), it might span across midnight, affecting two days.
+        // If it has precipitation reading, it might span across midnight, affecting two days.
         if (reading.PrecipitationVo != null)
         {
             start = reading.PrecipitationVo.Value.StartTime;
@@ -19,10 +24,7 @@ public class WeatherAggregationService(IWeatherRepository repository)
         }
         
         var affectedDates = GetUniqueDays(start, end);
-        
-        // Updated to use the new Repository Method
         var foundAggregates = await repository.GetManyDaily(reading.DeviceId, affectedDates);
-        
         var aggregateMap = foundAggregates.ToDictionary(d => d.DayTimestamp);
         var finalAggregates = new List<DailyWeather>();
 

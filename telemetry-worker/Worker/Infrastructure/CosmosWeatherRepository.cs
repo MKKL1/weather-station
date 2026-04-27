@@ -103,8 +103,7 @@ public class CosmosWeatherRepository(
             }
             catch (CosmosException ex) when (ex.StatusCode == HttpStatusCode.PreconditionFailed)
             {
-                // Concurrency conflict: The day was updated by Ingestion while we were finalizing.
-                // Action: Ignore. Leave it Unfinalized. It will be picked up next run.
+                // Concurrency issue, leave it unfinalized, and it will be picked up next time.
             }
         });
 

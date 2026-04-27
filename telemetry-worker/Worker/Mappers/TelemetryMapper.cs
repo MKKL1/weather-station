@@ -25,7 +25,7 @@ public class TelemetryMapper
                 sparseMmData,
                 payload.Precipitation.SlotSeconds,
                 DateTimeOffset.FromUnixTimeSeconds(payload.Precipitation.StartTimeEpoch).ToUniversalTime(),
-                payload.Precipitation.SlotCount // Use explicit count
+                payload.Precipitation.SlotCount
             );
         }
 

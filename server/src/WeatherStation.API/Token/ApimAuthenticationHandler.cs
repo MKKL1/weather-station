@@ -6,6 +6,8 @@ using WeatherStation.API.Options;
 
 namespace WeatherStation.API.Token;
 
+//TODO could use strategy pattern
+
 public class ApimAuthenticationHandler : DelegatingHandler
 {
     private readonly DeviceAuthServiceOptions _settings;

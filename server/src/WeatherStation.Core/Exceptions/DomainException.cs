@@ -1,4 +1,4 @@
-namespace WeatherStation.Core;
+namespace WeatherStation.Core.Exceptions;
 
 public abstract class DomainException : Exception
 {

@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
 using WeatherStation.Core;
 using WeatherStation.Core.Entities;
+using WeatherStation.Infrastructure.Mappers;
+
 namespace WeatherStation.Infrastructure.Repositories;
 
 public class UserRepository(WeatherStationDbContext context) : IUserRepository

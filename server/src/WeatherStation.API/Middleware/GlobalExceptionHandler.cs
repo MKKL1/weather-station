@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Diagnostics;
 using WeatherStation.Core;
 using WeatherStation.Core.Exceptions;
 
-namespace WeatherStation.API;
+namespace WeatherStation.API.Middleware;
 
 public class GlobalExceptionHandler : IExceptionHandler
 {
