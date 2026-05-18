@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: cosmos
+  name: cosmos
+  namespace: weather-app-dev
+spec:
+  serviceName: cosmos-sv
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cosmos
+  template:
+    metadata:
+      labels:
+        app: cosmos
+    spec:
+      containers:
+        - image: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-EN20260331
+          name: cosmos
+          env:
+            - name: AZURE_COSMOS_EMULATOR_PARTITION_COUNT
+              value: "3"
+            - name: AZURE_COSMOS_EMULATOR_ENABLE_DATA_PERSISTENCE
+              value: "true"
+            - name: AZURE_COSMOS_EMULATOR_IP_ADDRESS_OVERRIDE
+              value: "cosmos-sv"
+          volumeMounts:
+            - mountPath: /tmp/cosmos/appdata
+              name: cosmos-v
+          ports:
+            - containerPort: 8081
+  volumeClaimTemplates:
+    - metadata:
+        name: cosmos-v
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: cosmos-sv
+  name: cosmos-sv
+  namespace: weather-app-dev
+spec:
+  ports:
+    - name: gateway
+      port: 8081
+      protocol: TCP
+      targetPort: 8081
+  selector:
+    app: cosmos
+  type: ClusterIP
+status:
+  loadBalancer: {}

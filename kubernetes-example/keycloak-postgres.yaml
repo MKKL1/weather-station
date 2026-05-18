@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: postgres-kc
+  name: postgres-kc
+  namespace: weather-app-dev
+spec:
+  serviceName: postgres-kc-sv
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-kc
+  template:
+    metadata:
+      labels:
+        app: postgres-kc
+    spec:
+      containers:
+        - image: postgres:18-alpine
+          name: postgres-kc
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                configMapKeyRef:
+                  name: ws-config
+                  key: POSTGRES_KC_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ws-secrets
+                  key: POSTGRES_KC_PASSWORD
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: ws-config
+                  key: POSTGRES_KC_DB
+          volumeMounts:
+            - mountPath: /var/lib/postgresql
+              name: postgres-kc-v
+          ports:
+            - containerPort: 5432
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-kc-v
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-kc-sv
+  namespace: weather-app-dev
+spec:
+  clusterIP: None
+  selector:
+    app: postgres-kc
+  ports:
+    - port: 5432
+      targetPort: 5432

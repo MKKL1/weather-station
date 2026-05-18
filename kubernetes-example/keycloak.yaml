@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: keycloak
+  name: keycloak
+  namespace: weather-app-dev
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: keycloak
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: keycloak
+    spec:
+      containers:
+        - image: quay.io/keycloak/keycloak:26.4
+          args:
+            - start
+            - --health-enabled=true
+            - --hostname-strict=false
+            - --http-enabled=true
+          name: keycloak
+          ports:
+            - containerPort: 8080
+          env:
+            - name: KC_DB
+              value: "postgres"
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: ws-config
+                  key: POSTGRES_KC_DB
+            - name: KC_DB_URL
+              value: "jdbc:postgresql://postgres-kc-sv:5432/$(POSTGRES_DB)"
+            - name: KC_DB_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: ws-config
+                  key: POSTGRES_KC_USER
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ws-secrets
+                  key: POSTGRES_KC_PASSWORD
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: ws-config
+                  key: KEYCLOAK_ADMIN
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  name: ws-config
+                  key: KEYCLOAK_ADMIN_PASSWORD
+          resources: {}
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak-sv
+  namespace: weather-app-dev
+spec:
+  clusterIP: None
+  selector:
+    app: keycloak
+  ports:
+    - port: 80
+      targetPort: 8080
