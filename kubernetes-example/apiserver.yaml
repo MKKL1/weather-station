@@ -6,7 +6,7 @@ metadata:
   name: api-server
   namespace: weather-app-dev
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: api-server
@@ -79,7 +79,7 @@ spec:
                   name: ws-config
                   key: COSMOS_TLS_INSECURE
             - name: AuthService__BaseUrl
-              value: "http://provisioning-function:8080/api/v1/devices/"
+              value: "http://provisioning-sv:80/api/v1/devices/"
             - name: AuthService__SharedSecret
               valueFrom:
                 secretKeyRef:

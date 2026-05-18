@@ -17,7 +17,7 @@ spec:
             - sh
             - -c
             - |
-              until nc -z -v -w3 cosmos-sv 80; do
+              until nc -z -v -w3 cosmos-sv 8081; do
                 echo "Waiting for Cosmos DB Emulator to start up..."
                 sleep 3
               done
@@ -27,7 +27,7 @@ spec:
           name: cosmos-init
           env:
             - name: COSMOS_ENDPOINT
-              value: http://cosmos-sv:80/
+              value: http://cosmos-sv:8081/
             - name: COSMOS_KEY
               valueFrom:
                 configMapKeyRef:

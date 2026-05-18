@@ -6,7 +6,7 @@ metadata:
   name: telemetry-worker
   namespace: weather-app-dev
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
       app: telemetry-worker
@@ -23,11 +23,11 @@ spec:
             - sh
             - -c
             - |
-              until nc -z -v -w3 azurite-sv 10000; do
-                echo "Waiting for Azurite Storage Emulator to spin up..."
+              until nc -z -w 3 azurite-sv 10000; do
+                printf "Waiting for Azurite Storage Emulator to spin up...\n"
                 sleep 2
               done
-              echo "Azurite is UP!"
+              printf "Azurite is UP!\n"
       containers:
         - image: ghcr.io/mkkl1/weather-station/hw-telemetry-worker@sha256:02158d122f9a2b8dfdb26b8b99c3e307ffa0f9bf554eaba73295a416dbd1f945
           name: hw-telemetry-worker
@@ -91,6 +91,7 @@ metadata:
   labels:
     app: telemetry-worker-sv
   name: telemetry-worker-sv
+  namespace: weather-app-dev
 spec:
   ports:
     - name: 80-80

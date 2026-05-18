@@ -6,7 +6,7 @@ metadata:
   name: keycloak
   namespace: weather-app-dev
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: keycloak
