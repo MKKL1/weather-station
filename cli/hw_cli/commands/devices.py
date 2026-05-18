@@ -3,7 +3,10 @@ import dataclasses
 import json
 import os
 import sys
+from pathlib import Path
 from typing import Optional
+
+from hw_cli.core.provisioning import DeviceProvisioningService, ProvisioningConfig
 
 import typer
 from rich.prompt import Confirm, Prompt
@@ -304,3 +307,127 @@ def set_default(
     mgr.set_default_device(device.device_id)
     if not ctx.obj["quiet"]:
         print_success(f"Default set to {device.name}", file=sys.stderr)
+
+
+@app.command("generate")
+def generate_devices(
+    ctx: typer.Context,
+    key_path: Path = typer.Option(
+        ...,
+        "--key",
+        "-k",
+        help="Path to the PEM private key file",
+        exists=True,
+        file_okay=True,
+        dir_okay=False,
+        readable=True,
+    ),
+    out_path: Optional[Path] = typer.Option(
+        None,
+        "--out",
+        "-o",
+        help="Path to the output JSON file. If omitted, prints to stdout.",
+        file_okay=True,
+        dir_okay=False,
+        writable=True,
+    ),
+    count: int = typer.Option(
+        3,
+        "--count",
+        "-c",
+        help="Number of devices to generate",
+        min=1,
+    ),
+    product_code: str = typer.Option(
+        "H",
+        "--product-code",
+        help="Product code prefix",
+    ),
+    version: str = typer.Option(
+        "1",
+        "--version",
+        help="Version identifier",
+    ),
+    machine_id: int = typer.Option(
+        1,
+        "--machine-id",
+        help="Machine ID (0-31)",
+        min=0,
+        max=31,
+    ),
+    epoch: int = typer.Option(
+        1735689600,
+        "--epoch",
+        help="Project start epoch timestamp",
+    ),
+    jwt_issuer: str = typer.Option(
+        "weather-station/provisioning",
+        "--jwt-issuer",
+        help="JWT Issuer claim",
+    ),
+    jwt_kid: str = typer.Option(
+        "provisioning-access-token",
+        "--jwt-kid",
+        help="JWT Key ID header",
+    ),
+    jwt_audience: str = typer.Option(
+        "provisioning-api",
+        "--jwt-audience",
+        help="JWT Audience claim",
+    ),
+    claim_base_url: str = typer.Option(
+        "https://setup.weather-app.local/claim",
+        "--claim-url",
+        help="Base URL for claiming the device",
+    ),
+):
+    """
+    Generate device configurations, claim mnemonics, and provisioning JWTs.
+
+    Examples:
+
+    1. Generate 3 default devices and print raw JSON to stdout (great for piping):
+       
+       $ hw devices generate --key keys/private.pem
+
+    2. Generate 10 devices and write them directly to a JSON file:
+       
+       $ hw devices generate --key keys/private.pem --count 10 --out devices.json
+
+    3. Override JWT details and output to stdout:
+       
+       $ hw devices generate --key keys/private.pem --count 1 --jwt-issuer "custom-issuer"
+    """
+    try:
+        config = ProvisioningConfig(
+            product_code=product_code,
+            version=version,
+            machine_id=machine_id,
+            project_start_epoch=epoch,
+            jwt_issuer=jwt_issuer,
+            jwt_kid=jwt_kid,
+            jwt_audience=jwt_audience,
+            claim_base_url=claim_base_url,
+        )
+
+        with open(key_path, "rb") as f:
+            key_pem = f.read()
+
+        service = DeviceProvisioningService(config)
+        devices = service.generate_multiple(key_pem, count)
+
+        output_json = json.dumps(devices, indent=2)
+
+        if out_path:
+            with open(out_path, "w", encoding="utf-8") as f:
+                f.write(output_json)
+            if not ctx.obj.get("quiet"):
+                print_success(f"Wrote {len(devices)} devices to {out_path}", file=sys.stderr)
+        else:
+            print(output_json)
+            if not ctx.obj.get("quiet"):
+                print_success(f"Generated {len(devices)} devices", file=sys.stderr)
+
+    except Exception as e:
+        print_error(f"Failed to generate devices: {e}")
+        raise typer.Exit(1)

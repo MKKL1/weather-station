@@ -14,7 +14,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libc6-dev \
     python3-dev \
     && pip install --no-cache-dir poetry==2.3.3 \
-    && apt-get purge -y --auto-remove gcc libffi-dev libc6-dev python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY pyproject.toml poetry.lock ./
