@@ -65,7 +65,6 @@ metadata:
   name: keycloak-sv
   namespace: weather-app-dev
 spec:
-  clusterIP: None
   selector:
     app: keycloak
   ports:

@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: gateway
+  name: gateway-dp
+  namespace: weather-app-dev
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: gateway
+  template:
+    metadata:
+      labels:
+        app: gateway
+    spec:
+      containers:
+        - image: ghcr.io/mkkl1/weather-station/hw-gateway@sha256:121a89e6c39a359f43ba5add5b161c3379c92d609a66692e882c6c0f6685d9cd
+          name: hw-gateway
+          ports:
+            - containerPort: 8000
+              name: api-port
+          resources:
+            limits:
+              cpu: "500m"
+              memory: "128Mi"
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+          env:
+            - name: DEVICE_PUB_KEY_PATH
+              value: "/keys/public.pem"
+            - name: PROVISIONING_PUB_KEY_PATH
+              value: "/keys/provisioning-public.pem"
+
+            - name: MAIN_FN_URL
+              value: "http://telemetry-worker-sv:80"
+            - name: PROVISIONING_FN_URL
+              value: "http://provisioning-sv:80"
+
+            - name: DEVICE_ISSUER
+              valueFrom:
+                configMapKeyRef:
+                  name: ws-config
+                  key: JWT_ISSUER_DEVICE
+            - name: PROVISIONING_ISSUER
+              valueFrom:
+                configMapKeyRef:
+                  name: ws-config
+                  key: JWT_ISSUER_PROVISIONING
+            - name: WORKER_SHARED_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: ws-secrets
+                  key: WORKER_SHARED_SECRET
+          volumeMounts:
+            - name: keys-volume
+              mountPath: /keys
+              readOnly: true
+      volumes:
+        - name: keys-volume
+          secret:
+            secretName: ws-keys
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: gateway
+  name: gateway-sv
+  namespace: weather-app-dev
+spec:
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 8000
+  selector:
+    app: gateway
+  type: ClusterIP

@@ -22,7 +22,7 @@ data:
   KEYCLOAK_REALM: weather-server
   POSTGRES_DB: weather_station
   POSTGRES_USER: ws_user
-  SETUP_OUTPUT_DIR: '"."'
+  SETUP_OUTPUT_DIR: .
   POSTGRES_KC_DB: keycloak_db
   POSTGRES_KC_USER: keycloak_admin
 kind: ConfigMap

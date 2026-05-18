@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: azurite
+  name: azurite
+  namespace: weather-app-dev
+spec:
+  serviceName: azurite-sv
+  replicas: 1
+  selector:
+    matchLabels:
+      app: azurite
+  updateStrategy: {}
+  template:
+    metadata:
+      labels:
+        app: azurite
+    spec:
+      containers:
+        - image: mcr.microsoft.com/azure-storage/azurite:3.35.0
+          name: azurite
+          args:
+            [
+              "azurite",
+              "--blobHost",
+              "0.0.0.0",
+              "--queueHost",
+              "0.0.0.0",
+              "--tableHost",
+              "0.0.0.0",
+              "--location",
+              "/data",
+            ]
+          volumeMounts:
+            - mountPath: /data
+              name: azurite-v
+          ports:
+            - containerPort: 10000
+              name: blob
+            - containerPort: 10001
+              name: queue
+            - containerPort: 10002
+              name: table
+          startupProbe:
+            exec:
+              command:
+                - node
+                - -e
+                - "const c = require('net').connect(10000, 'localhost', () => { c.end(); process.exit(0); }); c.on('error', () => process.exit(1)); setTimeout(() => process.exit(1), 3000);"
+            initialDelaySeconds: 2
+            periodSeconds: 3
+            failureThreshold: 10
+          livenessProbe:
+            exec:
+              command:
+                - node
+                - -e
+                - "const c = require('net').connect(10000, 'localhost', () => { c.end(); process.exit(0); }); c.on('error', () => process.exit(1)); setTimeout(() => process.exit(1), 3000);"
+            periodSeconds: 5
+            failureThreshold: 3
+          resources: {}
+  volumeClaimTemplates:
+    - metadata:
+        name: azurite-v
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: azurite-sv
+  name: azurite-sv
+spec:
+  ports:
+    - name: 10000-10000
+      port: 10000
+      protocol: TCP
+      targetPort: 10000
+    - name: 10001-10001
+      port: 10001
+      protocol: TCP
+      targetPort: 10001
+    - name: 10002-10002
+      port: 10002
+      protocol: TCP
+      targetPort: 10002
+  selector:
+    app: azurite
+  type: ClusterIP
+status:
+  loadBalancer: {}
