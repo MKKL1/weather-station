@@ -1,4 +1,3 @@
-# --- Core Infrastructure ---
 output "resource_group_name" {
   description = "Resource Group name"
   value       = azurerm_resource_group.project_scope.name

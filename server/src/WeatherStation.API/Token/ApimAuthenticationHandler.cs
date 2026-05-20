@@ -10,11 +10,11 @@ namespace WeatherStation.API.Token;
 
 public class ApimAuthenticationHandler : DelegatingHandler
 {
-    private readonly DeviceAuthServiceOptions _settings;
+    private readonly DeviceAuthApiOptions _settings;
     private TokenCredential? _credential;
     private string[]? _scopes;
 
-    public ApimAuthenticationHandler(IOptions<DeviceAuthServiceOptions> options)
+    public ApimAuthenticationHandler(IOptions<DeviceAuthApiOptions> options)
     {
         _settings = options.Value;
 

@@ -2,9 +2,9 @@ using System.ComponentModel.DataAnnotations;
 
 namespace WeatherStation.API.Options;
 
-public class KeycloakOptions
+public class OidcOptions
 {
-    public const string SectionName = "Keycloak";
+    public static string SectionName => nameof(OidcOptions).Replace("Options", "");
 
     [Required]
     [Url]
