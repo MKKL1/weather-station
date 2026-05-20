@@ -56,7 +56,13 @@ spec:
                 configMapKeyRef:
                   name: ws-config
                   key: KEYCLOAK_ADMIN_PASSWORD
-          resources: {}
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "100m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
 status: {}
 ---
 apiVersion: v1
@@ -70,3 +76,28 @@ spec:
   ports:
     - port: 80
       targetPort: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: keycloak-policy
+  namespace: weather-app-dev
+spec:
+  podSelector:
+    matchLabels:
+      app: keycloak
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres-kc
+      ports:
+        - protocol: TCP
+          port: 5432

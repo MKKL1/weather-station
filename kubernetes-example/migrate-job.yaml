@@ -1,10 +1,13 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: weather-db-migration
+  name: postgres-db-migration
   namespace: weather-app-dev
 spec:
   template:
+    metadata:
+      labels:
+        app: postgres-db-migration
     spec:
       restartPolicy: OnFailure
       containers:
@@ -31,3 +34,30 @@ spec:
                   key: POSTGRES_PASSWORD
             - name: Postgres__ConnectionString
               value: "Host=postgres-sv;Port=5432;Database=$(POSTGRES_DB);Username=$(POSTGRES_USER);Password=$(POSTGRES_PASSWORD);"
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "300m"
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-db-migration-policy
+  namespace: weather-app-dev
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres-db-migration
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres
+      ports:
+        - protocol: TCP
+          port: 5432

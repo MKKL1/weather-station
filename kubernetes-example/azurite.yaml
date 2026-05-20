@@ -59,7 +59,13 @@ spec:
                 - "const c = require('net').connect(10000, 'localhost', () => { c.end(); process.exit(0); }); c.on('error', () => process.exit(1)); setTimeout(() => process.exit(1), 3000);"
             periodSeconds: 5
             failureThreshold: 3
-          resources: {}
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
   volumeClaimTemplates:
     - metadata:
         name: azurite-v
@@ -97,3 +103,27 @@ spec:
   type: ClusterIP
 status:
   loadBalancer: {}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: azurite-ingress
+  namespace: weather-app-dev
+spec:
+  podSelector:
+    matchLabels:
+      app: azurite
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: telemetry-worker
+      ports:
+        - protocol: TCP
+          port: 10000
+        - protocol: TCP
+          port: 10001
+        - protocol: TCP
+          port: 10002

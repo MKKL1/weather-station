@@ -82,7 +82,13 @@ spec:
                   key: COSMOS_TLS_INSECURE
           ports:
             - containerPort: 80
-          resources: {}
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
 status: {}
 ---
 apiVersion: v1
@@ -103,3 +109,43 @@ spec:
   type: ClusterIP
 status:
   loadBalancer: {}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: telemetry-worker-policy
+  namespace: weather-app-dev
+spec:
+  podSelector:
+    matchLabels:
+      app: telemetry-worker
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: gateway
+      ports:
+        - protocol: TCP
+          port: 80
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: azurite
+      ports:
+        - protocol: TCP
+          port: 10000
+        - protocol: TCP
+          port: 10001
+        - protocol: TCP
+          port: 10002
+    - to:
+        - podSelector:
+            matchLabels:
+              app: cosmos
+      ports:
+        - protocol: TCP
+          port: 8081

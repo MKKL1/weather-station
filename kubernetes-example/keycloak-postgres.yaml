@@ -40,6 +40,13 @@ spec:
               name: postgres-kc-v
           ports:
             - containerPort: 5432
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
   volumeClaimTemplates:
     - metadata:
         name: postgres-kc-v
@@ -63,3 +70,23 @@ spec:
   ports:
     - port: 5432
       targetPort: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-kc-ingress
+  namespace: weather-app-dev
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres-kc
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: keycloak
+      ports:
+        - protocol: TCP
+          port: 5432

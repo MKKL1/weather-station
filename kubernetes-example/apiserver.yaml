@@ -105,7 +105,13 @@ spec:
                 secretKeyRef:
                   name: ws-secrets
                   key: ADMIN_API_KEY
-          resources: {}
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
 status: {}
 ---
 apiVersion: v1
@@ -126,3 +132,49 @@ spec:
   type: ClusterIP
 status:
   loadBalancer: {}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-server-policy
+  namespace: weather-app-dev
+spec:
+  podSelector:
+    matchLabels:
+      app: api-server
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 80
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres
+      ports:
+        - protocol: TCP
+          port: 5432
+    - to:
+        - podSelector:
+            matchLabels:
+              app: cosmos
+      ports:
+        - protocol: TCP
+          port: 8081
+    - to:
+        - podSelector:
+            matchLabels:
+              app: keycloak
+      ports:
+        - protocol: TCP
+          port: 8080
+    - to:
+        - podSelector:
+            matchLabels:
+              app: provisioning
+      ports:
+        - protocol: TCP
+          port: 8080

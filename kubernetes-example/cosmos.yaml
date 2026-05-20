@@ -31,6 +31,13 @@ spec:
               name: cosmos-v
           ports:
             - containerPort: 8081
+          resources:
+            requests:
+              memory: "1.5Gi"
+              cpu: "500m"
+            limits:
+              memory: "3Gi"
+              cpu: "1"
   volumeClaimTemplates:
     - metadata:
         name: cosmos-v
@@ -60,3 +67,30 @@ spec:
   type: ClusterIP
 status:
   loadBalancer: {}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cosmos-ingress
+  namespace: weather-app-dev
+spec:
+  podSelector:
+    matchLabels:
+      app: cosmos
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: api-server
+        - podSelector:
+            matchLabels:
+              app: cosmos-init
+        - podSelector:
+            matchLabels:
+              app: telemetry-worker
+        - podSelector:
+            matchLabels:
+              app: provisioning
+      ports:
+        - port: 8081
+          protocol: TCP

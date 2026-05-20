@@ -40,6 +40,13 @@ spec:
               name: postgres-v
           ports:
             - containerPort: 5432
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
   volumeClaimTemplates:
     - metadata:
         name: postgres-v
@@ -63,3 +70,24 @@ spec:
   ports:
     - port: 5432
       targetPort: 5432
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-allow-api-server
+  namespace: weather-app-dev
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: api-server
+        - podSelector:
+            matchLabels:
+              app: postgres-db-migration
+      ports:
+        - port: 5432
+          protocol: TCP
