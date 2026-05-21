@@ -1,0 +1,28 @@
+[project]
+name = "heavyweather-e2e"
+version = "0.1.0"
+description = "End-to-End tests for HeavyWeather"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "heavyweather-cli",
+    "httpx>=0.28.1",
+    "pydantic-settings>=2.14.1",
+    "pyjwt>=2.12.1",
+    "pytest>=9.0.3",
+    "pytest-env>=1.6.0",
+    "pytest-ordering>=0.6",
+    "pytest-timeout>=2.4.0",
+    "pytest-xdist>=3.8.0",
+]
+
+[tool.uv.sources]
+heavyweather-cli = { path = "../cli", editable = true }
+
+[tool.pytest_env]
+API_SERVER_URL = "http://localhost:8002"
+GATEWAY_URL = "http://localhost:8000"
+ADMIN_API_KEY = "super-secret-admin-key"
+HTTP_PROXY = "http://localhost:8080"
+HTTPS_PROXY = "http://localhost:8080"
+NO_PROXY = ""

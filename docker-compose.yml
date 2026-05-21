@@ -74,6 +74,8 @@ services:
 
   postgres:
     image: postgres:18-alpine
+    ports:
+      - "5432:5432"
     networks: [api]
     volumes:
       - postgres-data:/var/lib/postgresql/data
@@ -179,19 +181,23 @@ services:
         condition: service_healthy
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      ConnectionStrings__PortainerConnection: >-
-        Host=postgres:5432;
+      Postgres__ConnectionString: >-
+        Host=postgres;
+        Port=5432;
         Database=${POSTGRES_DB};
         Username=${POSTGRES_USER};
         Password=${POSTGRES_PASSWORD}
-      Keycloak__Authority: "http://keycloak:8080/realms/${KEYCLOAK_REALM}"
+      ConnectionStrings__PortainerConnection: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+      Oidc__Authority: "http://keycloak:8080/realms/${KEYCLOAK_REALM}"
+      Oidc__Audience: "weather-api"
+      Oidc__RequireHttpsMetadata: "false"
       CosmosDb__ConnectionString: >-
         AccountEndpoint=${COSMOS_ENDPOINT};AccountKey=${COSMOS_KEY}
       CosmosDb__DatabaseName: ${COSMOS_DATABASE}
       CosmosDb__ViewsContainerName: ${COSMOS_CONTAINER_VIEWS}
       COSMOS_TLS_INSECURE: ${COSMOS_TLS_INSECURE}
-      AuthService__BaseUrl: "http://provisioning-function:8080/api/v1/devices/"
-      AuthService__SharedSecret: ${WORKER_SHARED_SECRET}
+      DeviceAuthApi__BaseUrl: "http://provisioning-function:8080/api/v1/devices/"
+      DeviceAuthApi__SharedSecret: ${WORKER_SHARED_SECRET}
       AdminApiKey__ApiKey: ${ADMIN_API_KEY}
     deploy:
       resources:

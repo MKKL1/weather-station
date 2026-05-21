@@ -8,4 +8,6 @@ public class PostgresOptions
 
     [Required]
     public string ConnectionString { get; set; } = string.Empty;
+
+    public bool AutoMigrate { get; set; } = true;
 }
