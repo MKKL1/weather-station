@@ -1,10 +1,10 @@
 using System.ComponentModel.DataAnnotations;
 
-namespace WeatherStation.Infrastructure.Cosmos;
+namespace WeatherStation.API.Options;
 
 public class CosmosDbOptions
 {
-    public const string SectionName = "CosmosDb";
+    public static string SectionName => nameof(CosmosDbOptions).Replace("Options", "");
 
     [Required]
     public string ConnectionString { get; set; } = string.Empty;

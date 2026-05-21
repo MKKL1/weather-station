@@ -2,9 +2,9 @@ using System.ComponentModel.DataAnnotations;
 
 namespace WeatherStation.API.Options;
 
-public class DeviceAuthServiceOptions
+public class DeviceAuthApiOptions
 {
-    public const string SectionName = "AuthService";
+    public static string SectionName => nameof(DeviceAuthApiOptions).Replace("Options", "");
 
     [Required]
     [Url]

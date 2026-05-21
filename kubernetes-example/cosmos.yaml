@@ -1,0 +1,133 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: cosmos
+  name: cosmos
+  namespace: weather-app-dev
+spec:
+  serviceName: cosmos-sv
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cosmos
+  template:
+    metadata:
+      labels:
+        app: cosmos
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - image: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-EN20260331
+          imagePullPolicy: Always
+          name: cosmos
+          securityContext:
+            allowPrivilegeEscalation: false
+          readinessProbe:
+            tcpSocket:
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8081
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          env:
+            - name: AZURE_COSMOS_EMULATOR_PARTITION_COUNT
+              value: "3"
+            - name: AZURE_COSMOS_EMULATOR_ENABLE_DATA_PERSISTENCE
+              value: "true"
+            - name: AZURE_COSMOS_EMULATOR_IP_ADDRESS_OVERRIDE
+              value: "cosmos-sv"
+          volumeMounts:
+            - mountPath: /data
+              name: cosmos-v
+            - mountPath: /tmp
+              name: tmp-volume
+            - mountPath: /logs
+              name: logs-volume
+          ports:
+            - containerPort: 8081
+          resources:
+            requests:
+              memory: "1.5Gi"
+              cpu: "500m"
+              ephemeral-storage: "100Mi"
+            limits:
+              memory: "3Gi"
+              cpu: "1"
+              ephemeral-storage: "250Mi"
+      volumes:
+        - name: tmp-volume
+          emptyDir: {}
+        - name: logs-volume
+          emptyDir: {}
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: homelab.local/tier
+                    operator: In
+                    values:
+                      - storage
+  volumeClaimTemplates:
+    - metadata:
+        name: cosmos-v
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 1Gi
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: cosmos-sv
+  name: cosmos-sv
+  namespace: weather-app-dev
+spec:
+  clusterIP: None
+  ports:
+    - name: gateway
+      port: 8081
+      protocol: TCP
+      targetPort: 8081
+  selector:
+    app: cosmos
+  type: ClusterIP
+status:
+  loadBalancer: {}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cosmos-ingress
+  namespace: weather-app-dev
+spec:
+  podSelector:
+    matchLabels:
+      app: cosmos
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: api-server
+        - podSelector:
+            matchLabels:
+              app: cosmos-init
+        - podSelector:
+            matchLabels:
+              app: telemetry-worker
+        - podSelector:
+            matchLabels:
+              app: provisioning
+      ports:
+        - port: 8081
+          protocol: TCP

@@ -8,12 +8,10 @@ using Microsoft.OpenApi.Models;
 using WeatherStation.Core.Services;
 using WeatherStation.Infrastructure;
 using WeatherStation.Infrastructure.Repositories;
-using WeatherStation.Infrastructure.Cosmos;
 using Microsoft.Azure.Cosmos;
 using WeatherStation.Core;
 using Container = Microsoft.Azure.Cosmos.Container;
 using Microsoft.Extensions.Options;
-using WeatherStation.API;
 using WeatherStation.API.Authentication;
 using WeatherStation.API.Middleware;
 using WeatherStation.API.Options;
@@ -24,17 +22,6 @@ using WeatherStation.Infrastructure.External;
 DotNetEnv.Env.Load();
 
 var builder = WebApplication.CreateBuilder(args);
-
-var cosmosConnection = Environment.GetEnvironmentVariable("COSMOS_CONNECTION");
-if (!string.IsNullOrWhiteSpace(cosmosConnection))
-{
-    builder.Configuration["CosmosDb:ConnectionString"] = cosmosConnection;
-}
-
-builder.Services.AddDbContext<WeatherStationDbContext>(options =>
-{
-    options.UseNpgsql(builder.Configuration.GetConnectionString("PortainerConnection"));
-});
 
 
 builder.Services.AddControllers()
@@ -80,19 +67,28 @@ builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IDeviceRepository, DeviceRepository>();
 
+builder.Services.AddDbContext<WeatherStationDbContext>((serviceProvider, options) =>
+{
+    var postgresConfig = serviceProvider.GetRequiredService<IOptions<PostgresOptions>>().Value;
+    options.UseNpgsql(postgresConfig.ConnectionString);
+});
+
+builder.Services.AddOptions<PostgresOptions>()
+    .Bind(builder.Configuration.GetSection(PostgresOptions.SectionName))
+    .ValidateDataAnnotations();
 
 builder.Services.AddOptions<CosmosDbOptions>()
     .Bind(builder.Configuration.GetSection(CosmosDbOptions.SectionName))
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
-builder.Services.AddOptions<KeycloakOptions>()
-    .Bind(builder.Configuration.GetSection(KeycloakOptions.SectionName))
+builder.Services.AddOptions<OidcOptions>()
+    .Bind(builder.Configuration.GetSection(OidcOptions.SectionName))
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
-builder.Services.AddOptions<DeviceAuthServiceOptions>()
-    .Bind(builder.Configuration.GetSection(DeviceAuthServiceOptions.SectionName))
+builder.Services.AddOptions<DeviceAuthApiOptions>()
+    .Bind(builder.Configuration.GetSection(DeviceAuthApiOptions.SectionName))
     .ValidateDataAnnotations()
     .ValidateOnStart();
 
@@ -139,7 +135,7 @@ builder.Services.AddSingleton<Container>(sp =>
 builder.Services.AddTransient<ApimAuthenticationHandler>();
 builder.Services.AddHttpClient<IDeviceAuthGateway, DeviceAuthGatewayHttpClient>((sp, client) =>
     {
-        var options = sp.GetRequiredService<IOptions<DeviceAuthServiceOptions>>().Value;
+        var options = sp.GetRequiredService<IOptions<DeviceAuthApiOptions>>().Value;
         client.BaseAddress = new Uri(options.BaseUrl);
     })
     .AddHttpMessageHandler<ApimAuthenticationHandler>()
@@ -158,9 +154,12 @@ builder.Services.AddAuthentication(options =>
     })
     .AddJwtBearer(options =>
     {
-        var keycloakOptions = builder.Configuration.GetSection(KeycloakOptions.SectionName).Get<KeycloakOptions>();
+        var keycloakOptions = builder.Configuration.GetSection(OidcOptions.SectionName).Get<OidcOptions>();
 
-        if (keycloakOptions == null) throw new InvalidOperationException("Keycloak configuration is missing");
+        if (keycloakOptions == null)
+        {
+            throw new InvalidOperationException(nameof(OidcOptions) + " configuration is missing");
+        }
 
         options.Authority = keycloakOptions.Authority;
         options.Audience = keycloakOptions.Audience;
@@ -260,18 +259,16 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapOpenApi();
 
-using (var scope = app.Services.CreateScope())
+if (args.Contains("--migrate"))
 {
-    try
-    {
-        var db = scope.ServiceProvider.GetRequiredService<WeatherStationDbContext>();
-        await db.Database.MigrateAsync();
-    }
-    catch (Exception ex)
-    {
-        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-        logger.LogWarning(ex, "Failed to migrate database. This is expected during build-time tooling.");
-    }
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<WeatherStationDbContext>();
+
+    Console.WriteLine("Executing Entity Framework Migrations...");
+    await db.Database.MigrateAsync();
+    Console.WriteLine("Migrations completed successfully.");
+
+    return;
 }
 
 await app.RunAsync();

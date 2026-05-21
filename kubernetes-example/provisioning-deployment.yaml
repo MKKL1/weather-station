@@ -1,0 +1,169 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: provisioning
+  name: provisioning-dp
+  namespace: weather-app-dev
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: provisioning
+  template:
+    metadata:
+      labels:
+        app: provisioning
+    spec:
+      containers:
+        - image: ghcr.io/mkkl1/weather-station/hw-provisioning-service@sha256:a38e6de6cf4ce81937391472c865bdce0cf736a3a661f02ac8c3e9036b33a174
+          imagePullPolicy: Always
+          name: hw-provisioning-service
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 10000
+            runAsGroup: 10000
+            capabilities:
+              drop:
+                - ALL
+          ports:
+            - containerPort: 8080
+              name: http
+          resources:
+            limits:
+              cpu: "500m"
+              memory: "128Mi"
+              ephemeral-storage: "100Mi"
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+              ephemeral-storage: "50Mi"
+          env:
+            - name: ENVIRONMENT
+              value: "development"
+            - name: SERVER_PORT
+              value: "8080"
+            - name: ACCESS_TOKEN_PRIVATE_KEY_PATH
+              value: "/keys/private.pem"
+            - name: COSMOS_ENDPOINT
+              value: "http://cosmos-sv:8081"
+            - name: COSMOS_KEY
+              valueFrom:
+                configMapKeyRef:
+                  name: ws-config
+                  key: COSMOS_KEY
+            - name: COSMOS_DATABASE
+              valueFrom:
+                configMapKeyRef:
+                  name: ws-config
+                  key: COSMOS_DATABASE
+            - name: COSMOS_CONTAINER
+              valueFrom:
+                configMapKeyRef:
+                  name: ws-config
+                  key: COSMOS_CONTAINER_REGISTRY
+            - name: COSMOS_TLS_INSECURE
+              valueFrom:
+                configMapKeyRef:
+                  name: ws-config
+                  key: COSMOS_TLS_INSECURE
+            - name: JWT_ISSUER
+              valueFrom:
+                configMapKeyRef:
+                  name: ws-config
+                  key: JWT_ISSUER_DEVICE
+          volumeMounts:
+            - name: keys-volume
+              mountPath: /keys
+              readOnly: true
+            - name: tmp-volume
+              mountPath: /tmp
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: homelab.local/tier
+                    operator: In
+                    values:
+                      - compute
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - provisioning
+                topologyKey: kubernetes.io/hostname
+      volumes:
+        - name: keys-volume
+          secret:
+            secretName: ws-keys
+        - name: tmp-volume
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: provisioning
+  name: provisioning-sv
+  namespace: weather-app-dev
+spec:
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: 8080
+  selector:
+    app: provisioning
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: provisioning-policy
+  namespace: weather-app-dev
+spec:
+  podSelector:
+    matchLabels:
+      app: provisioning
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: api-server
+        - podSelector:
+            matchLabels:
+              app: gateway
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: cosmos
+      ports:
+        - protocol: TCP
+          port: 8081
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: provisioning-pdb
+  namespace: weather-app-dev
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: provisioning

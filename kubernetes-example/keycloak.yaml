@@ -1,0 +1,173 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: keycloak
+  name: keycloak
+  namespace: weather-app-dev
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: keycloak
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: keycloak
+    spec:
+      containers:
+        - image: quay.io/keycloak/keycloak:26.4
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            capabilities:
+              drop:
+                - ALL
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 9000
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            failureThreshold: 10
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 9000
+            initialDelaySeconds: 120
+            periodSeconds: 20
+            failureThreshold: 6
+          args:
+            - start
+            - --health-enabled=true
+            - --hostname-strict=false
+            - --http-enabled=true
+          name: keycloak
+          ports:
+            - containerPort: 8080
+          env:
+            - name: KC_DB
+              value: "postgres"
+            - name: POSTGRES_DB
+              valueFrom:
+                configMapKeyRef:
+                  name: ws-config
+                  key: POSTGRES_KC_DB
+            - name: KC_DB_URL
+              value: "jdbc:postgresql://postgres-kc-sv:5432/$(POSTGRES_DB)"
+            - name: KC_DB_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: ws-config
+                  key: POSTGRES_KC_USER
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: ws-secrets
+                  key: POSTGRES_KC_PASSWORD
+            - name: KC_BOOTSTRAP_ADMIN_USERNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: ws-config
+                  key: KEYCLOAK_ADMIN
+            - name: KC_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                configMapKeyRef:
+                  name: ws-config
+                  key: KEYCLOAK_ADMIN_PASSWORD
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "100m"
+              ephemeral-storage: "100Mi"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
+              ephemeral-storage: "250Mi"
+          volumeMounts:
+            - name: keycloak-data
+              mountPath: /opt/keycloak/data
+            - name: tmp-volume
+              mountPath: /tmp
+      volumes:
+        - name: keycloak-data
+          emptyDir: {}
+        - name: tmp-volume
+          emptyDir: {}
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: homelab.local/tier
+                    operator: In
+                    values:
+                      - compute
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - keycloak
+                topologyKey: kubernetes.io/hostname
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak-sv
+  namespace: weather-app-dev
+spec:
+  selector:
+    app: keycloak
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: keycloak-policy
+  namespace: weather-app-dev
+spec:
+  podSelector:
+    matchLabels:
+      app: keycloak
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 9000
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgres-kc
+      ports:
+        - protocol: TCP
+          port: 5432
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: keycloak-pdb
+  namespace: weather-app-dev
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: keycloak

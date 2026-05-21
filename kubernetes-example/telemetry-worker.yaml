@@ -1,0 +1,223 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: telemetry-worker
+  name: telemetry-worker
+  namespace: weather-app-dev
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: telemetry-worker
+  strategy: {}
+  template:
+    metadata:
+      labels:
+        app: telemetry-worker
+    spec:
+      initContainers:
+        - name: wait-for-azurite
+          image: busybox:1.36
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 10000
+            runAsGroup: 10000
+            capabilities:
+              drop:
+                - ALL
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z -w 3 azurite-sv 10000; do
+                printf "Waiting for Azurite Storage Emulator to spin up...\n"
+                sleep 2
+              done
+              printf "Azurite is UP!\n"
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+              ephemeral-storage: "10Mi"
+            limits:
+              memory: "64Mi"
+              cpu: "50m"
+              ephemeral-storage: "20Mi"
+          volumeMounts:
+            - name: tmp-volume
+              mountPath: /tmp
+      containers:
+        - image: ghcr.io/mkkl1/weather-station/hw-telemetry-worker@sha256:02158d122f9a2b8dfdb26b8b99c3e307ffa0f9bf554eaba73295a416dbd1f945
+          imagePullPolicy: Always
+          name: hw-telemetry-worker
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 10000
+            runAsGroup: 10000
+            capabilities:
+              drop:
+                - ALL
+          env:
+            - name: AZURITE_ACCOUNT
+              valueFrom:
+                configMapKeyRef:
+                  name: ws-config
+                  key: AZURITE_ACCOUNT
+            - name: AZURITE_KEY
+              valueFrom:
+                configMapKeyRef:
+                  name: ws-config
+                  key: AZURITE_KEY
+            - name: COSMOS_ENDPOINT
+              value: http://cosmos-sv:8081
+            - name: COSMOS_KEY
+              valueFrom:
+                configMapKeyRef:
+                  name: ws-config
+                  key: COSMOS_KEY
+            - name: FUNCTIONS_WORKER_RUNTIME
+              value: "dotnet-isolated"
+            - name: AzureWebJobsStorage
+              value: "DefaultEndpointsProtocol=http;AccountName=$(AZURITE_ACCOUNT);AccountKey=$(AZURITE_KEY);BlobEndpoint=http://azurite-sv:10000/$(AZURITE_ACCOUNT);QueueEndpoint=http://azurite-sv:10001/$(AZURITE_ACCOUNT);TableEndpoint=http://azurite-sv:10002/$(AZURITE_ACCOUNT)"
+            - name: COSMOS_CONNECTION
+              value: "AccountEndpoint=$(COSMOS_ENDPOINT);AccountKey=$(COSMOS_KEY)"
+            - name: COSMOS_DATABASE
+              valueFrom:
+                configMapKeyRef:
+                  name: ws-config
+                  key: COSMOS_DATABASE
+            - name: COSMOS_CONTAINER
+              valueFrom:
+                configMapKeyRef:
+                  name: ws-config
+                  key: COSMOS_CONTAINER_REGISTRY
+            - name: COSMOS_VIEWS_CONTAINER
+              valueFrom:
+                configMapKeyRef:
+                  name: ws-config
+                  key: COSMOS_CONTAINER_VIEWS
+            - name: COSMOS_TELEMETRY_CONTAINER
+              valueFrom:
+                configMapKeyRef:
+                  name: ws-config
+                  key: COSMOS_CONTAINER_TELEMETRY
+            - name: COSMOS_TLS_INSECURE
+              valueFrom:
+                configMapKeyRef:
+                  name: ws-config
+                  key: COSMOS_TLS_INSECURE
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+              ephemeral-storage: "50Mi"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+              ephemeral-storage: "100Mi"
+          volumeMounts:
+            - name: tmp-volume
+              mountPath: /tmp
+      volumes:
+        - name: tmp-volume
+          emptyDir: {}
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: homelab.local/tier
+                    operator: In
+                    values:
+                      - compute
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - telemetry-worker
+                topologyKey: kubernetes.io/hostname
+status: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: telemetry-worker-sv
+  name: telemetry-worker-sv
+  namespace: weather-app-dev
+spec:
+  ports:
+    - name: 80-80
+      port: 80
+      protocol: TCP
+      targetPort: 80
+  selector:
+    app: telemetry-worker
+  type: ClusterIP
+status:
+  loadBalancer: {}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: telemetry-worker-policy
+  namespace: weather-app-dev
+spec:
+  podSelector:
+    matchLabels:
+      app: telemetry-worker
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: gateway
+      ports:
+        - protocol: TCP
+          port: 80
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: azurite
+      ports:
+        - protocol: TCP
+          port: 10000
+        - protocol: TCP
+          port: 10001
+        - protocol: TCP
+          port: 10002
+    - to:
+        - podSelector:
+            matchLabels:
+              app: cosmos
+      ports:
+        - protocol: TCP
+          port: 8081
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: telemetry-worker-pdb
+  namespace: weather-app-dev
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: telemetry-worker
