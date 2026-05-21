@@ -8,10 +8,10 @@ public class CosmosDbOptions
 
     [Required]
     public string ConnectionString { get; set; } = string.Empty;
-    
+
     [Required]
     public string DatabaseName { get; set; } = string.Empty;
-    
+
     [Required]
     public string ViewsContainerName { get; set; } = string.Empty;
 }

@@ -160,7 +160,7 @@ builder.Services.AddAuthentication(options =>
         {
             throw new InvalidOperationException(nameof(OidcOptions) + " configuration is missing");
         }
-        
+
         options.Authority = keycloakOptions.Authority;
         options.Audience = keycloakOptions.Audience;
         options.RequireHttpsMetadata = keycloakOptions.RequireHttpsMetadata;
@@ -263,11 +263,11 @@ if (args.Contains("--migrate"))
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<WeatherStationDbContext>();
-    
+
     Console.WriteLine("Executing Entity Framework Migrations...");
     await db.Database.MigrateAsync();
     Console.WriteLine("Migrations completed successfully.");
-    
+
     return;
 }
 
