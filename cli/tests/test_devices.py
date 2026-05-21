@@ -72,7 +72,7 @@ def test_cli_generate_to_stdout(runner, tmp_path, test_private_key_pem):
     )
     
     assert result.exit_code == 0
-    assert "Generated 2 devices" in result.stdout
+    assert "Generated 2 devices" in result.output
     
     json_str = result.stdout[:result.stdout.rfind("]") + 1]
     devices = json.loads(json_str)
@@ -91,7 +91,7 @@ def test_cli_generate_to_file(runner, tmp_path, test_private_key_pem):
     )
     
     assert result.exit_code == 0
-    assert "Wrote 1 devices to" in result.stdout
+    assert "Wrote 1 devices to" in result.output
     
     assert out_file.exists()
     devices = json.loads(out_file.read_text(encoding="utf-8"))

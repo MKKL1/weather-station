@@ -59,7 +59,11 @@ def get_version() -> str:
 def version_callback(value: bool):
     if value:
         app_version = get_version()
-        rich_print(f"[green]Heavy Weather CLI v{app_version}[/green]", file=sys.stderr)
+        import os
+        if os.getenv("NO_COLOR") or not sys.stderr.isatty():
+            print(f"Heavy Weather CLI v{app_version}", file=sys.stderr)
+        else:
+            rich_print(f"[green]Heavy Weather CLI v{app_version}[/green]", file=sys.stderr)
         raise typer.Exit()
 
 
