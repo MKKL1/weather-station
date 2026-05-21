@@ -11,7 +11,7 @@ public static class MeasurementProjector
         {
             Temperature = measurement.Temperature,
             Humidity = measurement.Humidity,
-            Pressure = measurement.Humidity,
+            Pressure = measurement.Pressure,
             Precipitation = measurement.Precipitation == null
                 ? null
                 : PrecipitationToResponse(measurement.Precipitation),

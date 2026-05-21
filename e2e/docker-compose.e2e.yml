@@ -1,0 +1,230 @@
+name: weather-station-e2e-build
+
+networks:
+  api:
+  backend:
+  frontend:
+
+volumes:
+  cosmos-data:
+  postgres-data:
+  keycloak-data:
+  azurite-data:
+
+services:
+  network-inspector:
+    image: mitmproxy/mitmproxy:11.0.0
+    container_name: network-inspector
+    networks:
+      - frontend
+      - api
+    ports:
+      - "8080:8080"  # Proxy port
+      - "8085:8081"  # Web UI port
+    environment:
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./ci-artifacts:/traffic
+    command: >
+      mitmweb 
+      -w /traffic/traffic.mitm 
+      --set stream_websocket=true 
+      --mode regular 
+      --map-remote "|http://localhost:8000|http://gateway:8000" 
+      --map-remote "|http://127.0.0.1:8000|http://gateway:8000" 
+      --map-remote "|http://localhost:8002|http://server:80"
+      --map-remote "|http://127.0.0.1:8002|http://server:80"
+      --web-host 0.0.0.0
+      --web-port 8081
+      --no-web-open-browser
+      --set block_global=false
+
+  setup:
+    build:
+      context: ../local/setup
+    user: root
+    networks: [backend]
+    volumes:
+      - ./keys:/keys
+      - .:/output
+    environment:
+      KEYS_DIR: /keys
+      JWT_ISSUER: ${JWT_ISSUER_PROVISIONING}
+      JWT_KID: ${JWT_KID_PROVISIONING}
+      JWT_AUDIENCE: ${JWT_AUDIENCE_PROVISIONING}
+      CLAIM_BASE_URL: ${CLAIM_BASE_URL}
+      DEVICE_COUNT: ${DEVICE_COUNT}
+
+  cosmos-init:
+    build:
+      context: ../local/cosmos-init
+    networks: [backend]
+    depends_on:
+      cosmos-emulator:
+        condition: service_healthy
+    environment:
+      COSMOS_ENDPOINT: ${COSMOS_ENDPOINT}
+      COSMOS_KEY: ${COSMOS_KEY}
+      COSMOS_DATABASE: ${COSMOS_DATABASE}
+
+  provisioning-function:
+    build:
+      context: ../provisioning-service
+    networks: [frontend, backend]
+    depends_on:
+      cosmos-emulator:
+        condition: service_healthy
+      cosmos-init:
+        condition: service_completed_successfully
+      setup:
+        condition: service_completed_successfully
+    volumes:
+      - ./keys:/keys:ro
+    environment:
+      COSMOS_ENDPOINT: ${COSMOS_ENDPOINT}
+      COSMOS_KEY: ${COSMOS_KEY}
+      COSMOS_DATABASE: ${COSMOS_DATABASE}
+      COSMOS_CONTAINER: ${COSMOS_CONTAINER_REGISTRY}
+      COSMOS_TLS_INSECURE: ${COSMOS_TLS_INSECURE}
+      JWT_ISSUER: ${JWT_ISSUER_DEVICE}
+      ACCESS_TOKEN_PRIVATE_KEY_PATH: "/keys/private.pem"
+      SERVER_PORT: "8080"
+      ENVIRONMENT: development
+
+  server:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    networks: [api, backend]
+    ports:
+      - "8002:80"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Postgres__ConnectionString: "Host=postgres;Port=5432;Database=${POSTGRES_DB};Username=${POSTGRES_USER};Password=${POSTGRES_PASSWORD}"
+      Oidc__Authority: "http://keycloak:8080/realms/${KEYCLOAK_REALM}"
+      Oidc__Audience: "weather-api"
+      Oidc__RequireHttpsMetadata: "false"
+      CosmosDb__ConnectionString: "AccountEndpoint=${COSMOS_ENDPOINT};AccountKey=${COSMOS_KEY}"
+      CosmosDb__DatabaseName: ${COSMOS_DATABASE}
+      CosmosDb__ViewsContainerName: ${COSMOS_CONTAINER_VIEWS}
+      COSMOS_TLS_INSECURE: ${COSMOS_TLS_INSECURE}
+      DeviceAuthApi__BaseUrl: "http://provisioning-function:8080/api/v1/devices/"
+      DeviceAuthApi__SharedSecret: ${WORKER_SHARED_SECRET}
+      AdminApiKey__ApiKey: ${ADMIN_API_KEY}
+
+  telemetry-worker:
+    build:
+      context: ..
+      dockerfile: telemetry-worker/Worker/Dockerfile
+    networks: [frontend, backend]
+    depends_on:
+      cosmos-emulator:
+        condition: service_healthy
+      cosmos-init:
+        condition: service_completed_successfully
+      azurite:
+        condition: service_healthy
+    environment:
+      FUNCTIONS_WORKER_RUNTIME: dotnet-isolated
+      AzureWebJobsStorage: "DefaultEndpointsProtocol=http;AccountName=${AZURITE_ACCOUNT};AccountKey=${AZURITE_KEY};BlobEndpoint=http://azurite:10000/${AZURITE_ACCOUNT};QueueEndpoint=http://azurite:10001/${AZURITE_ACCOUNT};TableEndpoint=http://azurite:10002/${AZURITE_ACCOUNT}"
+      COSMOS_CONNECTION: "AccountEndpoint=${COSMOS_ENDPOINT};AccountKey=${COSMOS_KEY}"
+      COSMOS_DATABASE: ${COSMOS_DATABASE}
+      COSMOS_CONTAINER: ${COSMOS_CONTAINER_REGISTRY}
+      COSMOS_VIEWS_CONTAINER: ${COSMOS_CONTAINER_VIEWS}
+      COSMOS_TELEMETRY_CONTAINER: ${COSMOS_CONTAINER_TELEMETRY}
+      COSMOS_TLS_INSECURE: ${COSMOS_TLS_INSECURE}
+
+  gateway:
+    build:
+      context: ../local/gateway
+    networks: [frontend]
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./keys:/keys:ro
+    environment:
+      DEVICE_PUB_KEY_PATH: /keys/public.pem
+      PROVISIONING_PUB_KEY_PATH: /keys/provisioning-public.pem
+      DEVICE_ISSUER: ${JWT_ISSUER_DEVICE}
+      PROVISIONING_ISSUER: ${JWT_ISSUER_PROVISIONING}
+      WORKER_SHARED_SECRET: ${WORKER_SHARED_SECRET}
+      MAIN_FN_URL: "http://telemetry-worker:80"
+      PROVISIONING_FN_URL: "http://provisioning-function:8080"
+
+  cosmos-emulator:
+    image: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-EN20260331
+    container_name: cosmos-emulator
+    hostname: cosmos-emulator
+    networks: [backend]
+    environment:
+      AZURE_COSMOS_EMULATOR_PARTITION_COUNT: 3
+      AZURE_COSMOS_EMULATOR_ENABLE_DATA_PERSISTENCE: "true"
+      AZURE_COSMOS_EMULATOR_IP_ADDRESS_OVERRIDE: "cosmos-emulator"
+    volumes:
+      - cosmos-data:/tmp/cosmos/appdata
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8081/"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  postgres:
+    image: postgres:18-alpine
+    networks: [api]
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4
+    command: start-dev --health-enabled=true
+    networks: [api]
+    ports:
+      - "8001:8080"
+    volumes:
+      - keycloak-data:/opt/keycloak/data
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite:3.35.0
+    networks: [backend]
+    volumes:
+      - azurite-data:/data
+    command: azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0
+    healthcheck:
+      test:
+        - "CMD-SHELL"
+        - >
+          node -e "
+            const c = require('net').connect(10000, 'localhost', () => { c.end(); process.exit(0); });
+            c.on('error', () => process.exit(1));
+            setTimeout(() => process.exit(1), 3000);
+          "
+      interval: 5s
+      retries: 10
+      start_period: 10s

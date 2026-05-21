@@ -18,4 +18,4 @@ def test_version(runner):
     """Test the version flag."""
     result = runner.invoke(app, ["--version"])
     assert result.exit_code == 0
-    assert "Heavy Weather CLI v" in result.stdout
+    assert "Heavy Weather CLI v" in result.output

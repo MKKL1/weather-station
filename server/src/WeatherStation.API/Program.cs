@@ -23,7 +23,7 @@ DotNetEnv.Env.Load();
 
 var builder = WebApplication.CreateBuilder(args);
 
-
+builder.Services.AddHealthChecks();
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -165,6 +165,15 @@ builder.Services.AddAuthentication(options =>
         options.Audience = keycloakOptions.Audience;
         options.RequireHttpsMetadata = keycloakOptions.RequireHttpsMetadata;
 
+        // Bypass OIDC metadata discovery in dev
+        if (builder.Environment.IsDevelopment())
+        {
+            options.Configuration = new Microsoft.IdentityModel.Protocols.OpenIdConnect.OpenIdConnectConfiguration
+            {
+                Issuer = options.Authority
+            };
+        }
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
@@ -258,8 +267,10 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.MapOpenApi();
+app.MapHealthChecks("/api/health");
 
-if (args.Contains("--migrate"))
+var postgresOptions = app.Services.GetRequiredService<IOptions<PostgresOptions>>().Value;
+if (postgresOptions.AutoMigrate || args.Contains("--migrate"))
 {
     using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<WeatherStationDbContext>();
@@ -268,7 +279,10 @@ if (args.Contains("--migrate"))
     await db.Database.MigrateAsync();
     Console.WriteLine("Migrations completed successfully.");
 
-    return;
+    if (args.Contains("--migrate"))
+    {
+        return;
+    }
 }
 
 await app.RunAsync();

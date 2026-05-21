@@ -1,0 +1,23 @@
+# Python
+**/__pycache__/
+**/.venv/
+**/.pytest_cache/
+**/.poetry/
+
+# .NET / C# build outputs
+**/bin/
+**/obj/
+**/.vs/
+**/.user/
+
+# Git & IDE configs
+.git/
+.github/
+.idea/
+.vscode/
+
+# Local configuration and keys
+local/keys/
+keys/
+.env
+.env.local

@@ -1,27 +1,23 @@
 # syntax=docker/dockerfile:1.10
 FROM python:3.13-slim AS builder
 
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    POETRY_VIRTUALENVS_IN_PROJECT=true \
-    POETRY_NO_INTERACTION=1
+    UV_LINK_MODE=copy \
+    UV_COMPILE_BYTECODE=1
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    libffi-dev \
-    libc6-dev \
-    python3-dev \
-    && pip install --no-cache-dir poetry==2.3.3 \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY pyproject.toml poetry.lock ./
-RUN poetry install --no-root --only main
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --frozen --no-install-project --no-dev
 
 COPY hw_cli/ ./hw_cli/
 COPY README.md ./
-RUN poetry install --only-root && mkdir -p /data_dir
+RUN mkdir -p /data_dir
 
 
 FROM gcr.io/distroless/python3-debian13:nonroot
