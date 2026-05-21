@@ -6,7 +6,7 @@ metadata:
   name: api-server
   namespace: weather-app-dev
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: api-server
@@ -17,9 +17,18 @@ spec:
         app: api-server
     spec:
       containers:
-        - image: ghcr.io/mkkl1/weather-station/hw-server:latest
-          imagePullPolicy: Never
+        - image: ghcr.io/mkkl1/weather-station/hw-server@sha256:5aab2a230b9e6f926325cc3c67d18ab9807cc9728ca07a4b5f433e3f93f6f933
+          imagePullPolicy: Always
           name: api-server
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 10000
+            runAsGroup: 10000
+            capabilities:
+              drop:
+                - ALL
           ports:
             - containerPort: 80
               name: http
@@ -27,7 +36,7 @@ spec:
             - name: ASPNETCORE_URLS
               value: "http://0.0.0.0:80"
             - name: ASPNETCORE_ENVIRONMENT
-              value: Development
+              value: Production
 
             # Postgres
             - name: POSTGRES_DB
@@ -109,9 +118,38 @@ spec:
             requests:
               memory: "256Mi"
               cpu: "100m"
+              ephemeral-storage: "50Mi"
             limits:
               memory: "512Mi"
               cpu: "500m"
+              ephemeral-storage: "100Mi"
+          volumeMounts:
+            - name: tmp-volume
+              mountPath: /tmp
+      volumes:
+        - name: tmp-volume
+          emptyDir: {}
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: homelab.local/tier
+                    operator: In
+                    values:
+                      - compute
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - api-server
+                topologyKey: kubernetes.io/hostname
 status: {}
 ---
 apiVersion: v1
@@ -178,3 +216,14 @@ spec:
       ports:
         - protocol: TCP
           port: 8080
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: api-server-pdb
+  namespace: weather-app-dev
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: api-server

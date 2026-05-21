@@ -6,7 +6,7 @@ metadata:
   name: provisioning-dp
   namespace: weather-app-dev
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: provisioning
@@ -17,7 +17,17 @@ spec:
     spec:
       containers:
         - image: ghcr.io/mkkl1/weather-station/hw-provisioning-service@sha256:a38e6de6cf4ce81937391472c865bdce0cf736a3a661f02ac8c3e9036b33a174
+          imagePullPolicy: Always
           name: hw-provisioning-service
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 10000
+            runAsGroup: 10000
+            capabilities:
+              drop:
+                - ALL
           ports:
             - containerPort: 8080
               name: http
@@ -25,9 +35,11 @@ spec:
             limits:
               cpu: "500m"
               memory: "128Mi"
+              ephemeral-storage: "100Mi"
             requests:
               cpu: "100m"
               memory: "64Mi"
+              ephemeral-storage: "50Mi"
           env:
             - name: ENVIRONMENT
               value: "development"
@@ -66,10 +78,35 @@ spec:
             - name: keys-volume
               mountPath: /keys
               readOnly: true
+            - name: tmp-volume
+              mountPath: /tmp
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: homelab.local/tier
+                    operator: In
+                    values:
+                      - compute
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - provisioning
+                topologyKey: kubernetes.io/hostname
       volumes:
         - name: keys-volume
           secret:
             secretName: ws-keys
+        - name: tmp-volume
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -119,3 +156,14 @@ spec:
       ports:
         - protocol: TCP
           port: 8081
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: provisioning-pdb
+  namespace: weather-app-dev
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: provisioning

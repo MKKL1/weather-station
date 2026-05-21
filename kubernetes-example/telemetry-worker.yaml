@@ -6,7 +6,7 @@ metadata:
   name: telemetry-worker
   namespace: weather-app-dev
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: telemetry-worker
@@ -19,6 +19,16 @@ spec:
       initContainers:
         - name: wait-for-azurite
           image: busybox:1.36
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 10000
+            runAsGroup: 10000
+            capabilities:
+              drop:
+                - ALL
           command:
             - sh
             - -c
@@ -28,9 +38,31 @@ spec:
                 sleep 2
               done
               printf "Azurite is UP!\n"
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+              ephemeral-storage: "10Mi"
+            limits:
+              memory: "64Mi"
+              cpu: "50m"
+              ephemeral-storage: "20Mi"
+          volumeMounts:
+            - name: tmp-volume
+              mountPath: /tmp
       containers:
         - image: ghcr.io/mkkl1/weather-station/hw-telemetry-worker@sha256:02158d122f9a2b8dfdb26b8b99c3e307ffa0f9bf554eaba73295a416dbd1f945
+          imagePullPolicy: Always
           name: hw-telemetry-worker
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 10000
+            runAsGroup: 10000
+            capabilities:
+              drop:
+                - ALL
           env:
             - name: AZURITE_ACCOUNT
               valueFrom:
@@ -86,9 +118,38 @@ spec:
             requests:
               memory: "256Mi"
               cpu: "100m"
+              ephemeral-storage: "50Mi"
             limits:
               memory: "512Mi"
               cpu: "500m"
+              ephemeral-storage: "100Mi"
+          volumeMounts:
+            - name: tmp-volume
+              mountPath: /tmp
+      volumes:
+        - name: tmp-volume
+          emptyDir: {}
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: homelab.local/tier
+                    operator: In
+                    values:
+                      - compute
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - telemetry-worker
+                topologyKey: kubernetes.io/hostname
 status: {}
 ---
 apiVersion: v1
@@ -149,3 +210,14 @@ spec:
       ports:
         - protocol: TCP
           port: 8081
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: telemetry-worker-pdb
+  namespace: weather-app-dev
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: telemetry-worker

@@ -17,9 +17,27 @@ spec:
       labels:
         app: azurite
     spec:
+      securityContext:
+        fsGroup: 10000
       containers:
         - image: mcr.microsoft.com/azure-storage/azurite:3.35.0
+          imagePullPolicy: Always
           name: azurite
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 10000
+            runAsGroup: 10000
+            capabilities:
+              drop:
+                - ALL
+          readinessProbe:
+            tcpSocket:
+              port: 10000
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            failureThreshold: 3
           args:
             [
               "azurite",
@@ -35,6 +53,8 @@ spec:
           volumeMounts:
             - mountPath: /data
               name: azurite-v
+            - mountPath: /tmp
+              name: tmp-volume
           ports:
             - containerPort: 10000
               name: blob
@@ -63,9 +83,23 @@ spec:
             requests:
               memory: "128Mi"
               cpu: "100m"
+              ephemeral-storage: "50Mi"
             limits:
               memory: "256Mi"
               cpu: "500m"
+              ephemeral-storage: "100Mi"
+      volumes:
+        - name: tmp-volume
+          emptyDir: {}
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: homelab.local/tier
+                    operator: In
+                    values:
+                      - storage
   volumeClaimTemplates:
     - metadata:
         name: azurite-v
@@ -85,6 +119,7 @@ metadata:
   name: azurite-sv
   namespace: weather-app-dev
 spec:
+  clusterIP: None
   ports:
     - name: 10000-10000
       port: 10000
