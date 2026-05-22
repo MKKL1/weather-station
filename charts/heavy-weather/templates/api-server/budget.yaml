@@ -1,0 +1,15 @@
+{{- if and .Values.apiServer.enabled .Values.apiServer.minAvailable }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "heavy-weather.fullname" . }}-api-server-pdb
+  labels:
+    {{- include "heavy-weather.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api-server
+spec:
+  minAvailable: {{ .Values.apiServer.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "heavy-weather.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: api-server
+{{- end }}

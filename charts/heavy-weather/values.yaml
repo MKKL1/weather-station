@@ -1,0 +1,100 @@
+global:
+  networkPolicy:
+    defaultDeny: true
+  environment: production
+  image:
+    pullPolicy: IfNotPresent
+    pullSecrets: []
+  secrets:
+    name: ws-secrets
+    keys:
+      postgresPassword: POSTGRES_PASSWORD
+      cosmosKey: COSMOS_KEY
+      workerSharedSecret: WORKER_SHARED_SECRET
+      adminApiKey: ADMIN_API_KEY
+  keysSecret:
+    name: ws-keys
+  services:
+    postgres: heavy-weather-postgres
+    keycloak: heavy-weather-keycloak
+    provisioning: heavy-weather-provisioning
+    cosmos: heavy-weather-cosmos
+  database:
+    postgres:
+      dbName: weather_db
+      user: db_admin
+  cosmosDb:
+    endpoint: "http://cosmos-sv:8081"
+    database: weather_cosmos_db
+    tlsInsecure: false
+    
+keycloak:
+  realm: weather-station
+
+provisioning:
+  enabled: true
+  networkPolicy:
+    enabled: true
+    additionalIngress: []
+    additionalEgress: []
+
+apiServer:
+  enabled: true
+  replicaCount: 2
+  minAvailable: 1
+  image:
+    repository: ghcr.io/mkkl1/weather-station/hw-server
+    tag: "0.5"
+  containerPort: 80
+  service:
+    type: ClusterIP
+    port: 80
+  oidc:
+    aud: account
+    requireHttpsMetadata: false
+  securityContext:
+    runAsUser: 10000
+    runAsGroup: 10000
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+      ephemeral-storage: "50Mi"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+      ephemeral-storage: "100Mi"
+  podAnnotations: {}
+  affinity:
+    # nodeAffinity:
+    #   preferredDuringSchedulingIgnoredDuringExecution:
+    #     - weight: 100
+    #       preference:
+    #         matchExpressions:
+    #           - key: homelab.local/tier
+    #             operator: In
+    #             values:
+    #               - compute
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/component
+                  operator: In
+                  values:
+                    - api-server
+            topologyKey: kubernetes.io/hostname
+  networkPolicy:
+    enabled: true
+    allowExternal: true
+    additionalIngress: []
+    additionalEgress: []
+
+postgres:
+  enabled: true
+  networkPolicy:
+    enabled: true
+    additionalIngress: []
+    additionalEgress: []
