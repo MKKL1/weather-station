@@ -1,0 +1,74 @@
+{{- if .Values.provisioning.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "heavy-weather.fullname" . }}-provisioning
+  labels:
+    {{- include "heavy-weather.labels" . | nindent 4 }}
+    app.kubernetes.io/component: provisioning
+spec:
+  replicas: {{ .Values.provisioning.replicaCount | default 2 }}
+  selector:
+    matchLabels:
+      {{- include "heavy-weather.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: provisioning
+  template:
+    metadata:
+      labels:
+        {{- include "heavy-weather.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: provisioning
+    spec:
+      {{- with .Values.global.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: provisioning
+          image: "{{ .Values.provisioning.image.repository }}:{{ .Values.provisioning.image.tag }}"
+          imagePullPolicy: {{ .Values.provisioning.image.pullPolicy | default .Values.global.image.pullPolicy | default "IfNotPresent" }}
+          securityContext:
+            {{- include "heavy-weather.containerSecurityContext" .Values.provisioning | nindent 12 }}
+          ports:
+            - containerPort: {{ .Values.provisioning.containerPort | default 8080 }}
+              name: http
+          resources:
+            {{- toYaml .Values.provisioning.resources | nindent 12 }}
+          env:
+            - name: ENVIRONMENT
+              value: {{ .Values.global.environment | quote }}
+            - name: SERVER_PORT
+              value: {{ .Values.provisioning.containerPort | default 8080 | quote }}
+            - name: ACCESS_TOKEN_PRIVATE_KEY_PATH
+              value: "/keys/private.pem"
+            - name: COSMOS_ENDPOINT
+              value: {{ .Values.global.cosmosDb.endpoint | quote }}
+            - name: COSMOS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.secrets.name }}
+                  key: {{ .Values.global.secrets.keys.cosmosKey }}
+            - name: COSMOS_DATABASE
+              value: {{ .Values.global.cosmosDb.database | quote }}
+            - name: COSMOS_CONTAINER
+              value: "device-registry"
+            - name: COSMOS_TLS_INSECURE
+              value: {{ .Values.global.cosmosDb.tlsInsecure | quote }}
+            - name: JWT_ISSUER
+              value: "weather-station/device"
+          volumeMounts:
+            - name: keys-volume
+              mountPath: /keys
+              readOnly: true
+            - name: tmp-volume
+              mountPath: /tmp
+      volumes:
+        - name: keys-volume
+          secret:
+            secretName: {{ .Values.global.keysSecret.name }}
+        - name: tmp-volume
+          emptyDir: {}
+      {{- with .Values.provisioning.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

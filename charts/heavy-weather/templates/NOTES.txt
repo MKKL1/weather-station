@@ -1,0 +1,12 @@
+heavy-weather has been deployed to {{ .Release.Namespace }}.
+
+Release: {{ .Release.Name }}
+Environment: {{ .Values.global.environment }}
+
+Services running:
+{{- if .Values.provisioning.enabled }}
+  - Provisioning: {{ include "heavy-weather.fullname" . }}-provisioning
+{{- end }}
+{{- if .Values.apiServer.enabled }}
+  - API Server: {{ include "heavy-weather.fullname" . }}-api-server
+{{- end }}

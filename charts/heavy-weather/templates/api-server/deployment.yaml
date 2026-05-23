@@ -1,0 +1,112 @@
+{{- if .Values.apiServer.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "heavy-weather.fullname" . }}-api-server
+  labels:
+    {{- include "heavy-weather.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api-server
+spec:
+  replicas: {{ .Values.apiServer.replicaCount | default 1 }}
+  selector:
+    matchLabels:
+      {{- include "heavy-weather.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: api-server
+  template:
+    metadata:
+      labels:
+        {{- include "heavy-weather.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: api-server
+      {{- with .Values.apiServer.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.global.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: api-server
+          image: "{{ .Values.apiServer.image.repository }}:{{ .Values.apiServer.image.tag }}"
+          imagePullPolicy: {{ .Values.apiServer.image.pullPolicy | default .Values.global.image.pullPolicy | default "IfNotPresent" }}
+          
+          securityContext:
+            {{- include "heavy-weather.containerSecurityContext" .Values.apiServer | nindent 12 }}
+            
+          ports:
+            - containerPort: {{ .Values.apiServer.containerPort | default 80 }}
+              name: http
+          env:
+            - name: ASPNETCORE_URLS
+              value: "http://0.0.0.0:{{ .Values.apiServer.containerPort | default 80 }}"
+            - name: ASPNETCORE_ENVIRONMENT
+              value: {{ .Values.global.environment | quote }}
+
+            # Postgres
+            - name: POSTGRES_DB
+              value: {{ .Values.global.database.postgres.dbName | quote }}
+            - name: POSTGRES_USER
+              value: {{ .Values.global.database.postgres.user | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.secrets.name }}
+                  key: {{ .Values.global.secrets.keys.postgresPassword }}
+            - name: Postgres__ConnectionString
+              value: "Host={{ .Values.global.services.postgres }};Port=5432;Database=$(POSTGRES_DB);Username=$(POSTGRES_USER);Password=$(POSTGRES_PASSWORD);"
+
+            # CosmosDB
+            - name: COSMOS_ENDPOINT
+              value: {{ .Values.global.cosmosDb.endpoint | quote }}
+            - name: COSMOS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.secrets.name }}
+                  key: {{ .Values.global.secrets.keys.cosmosKey }}
+            - name: CosmosDb__ConnectionString
+              value: "AccountEndpoint=$(COSMOS_ENDPOINT);AccountKey=$(COSMOS_KEY)"
+            - name: CosmosDb__DatabaseName
+              value: {{ .Values.global.cosmosDb.database | quote }}
+            - name: CosmosDb__ViewsContainerName
+              value: {{ .Values.global.cosmosDb.viewsContainerName | default "telemetry_views" | quote }}
+            - name: COSMOS_TLS_INSECURE
+              value: {{ .Values.global.cosmosDb.tlsInsecure | quote }}
+
+            # OIDC
+            - name: KEYCLOAK_REALM
+              value: {{ .Values.keycloak.realm | quote }}
+            - name: Oidc__Authority
+              value: "http://{{ .Values.global.services.keycloak }}:8080/realms/$(KEYCLOAK_REALM)"
+            - name: Oidc__Audience
+              value: {{ .Values.apiServer.oidc.aud | quote }}
+            - name: Oidc__RequireHttpsMetadata
+              value: {{ .Values.apiServer.oidc.requireHttpsMetadata | quote }}
+
+            # Provisioning service
+            - name: DeviceAuthApi__BaseUrl
+              value: "http://{{ .Values.global.services.provisioning }}:80/api/v1/devices/"
+            - name: DeviceAuthApi__SharedSecret
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.secrets.name }}
+                  key: {{ .Values.global.secrets.keys.workerSharedSecret }}
+
+            # Admin key
+            - name: AdminApiKey__ApiKey
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.secrets.name }}
+                  key: {{ .Values.global.secrets.keys.adminApiKey }}
+          resources:
+            {{- toYaml .Values.apiServer.resources | nindent 12 }}
+          volumeMounts:
+            {{- include "heavy-weather.tmpVolume" . | nindent 12 }}
+      volumes:
+        - name: tmp-volume
+          emptyDir: {}
+      {{- with .Values.apiServer.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

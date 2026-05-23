@@ -1,0 +1,50 @@
+{{- if and .Values.apiServer.enabled .Values.apiServer.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "heavy-weather.fullname" . }}-api-server
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "heavy-weather.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api-server
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "heavy-weather.componentSelectorLabels" (dict "ctx" . "component" "api-server") | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  
+  ingress:
+    - {{- if not .Values.apiServer.networkPolicy.allowExternal }}
+      from:
+        - podSelector:
+            matchLabels:
+              {{- include "heavy-weather.componentSelectorLabels" (dict "ctx" . "component" "gateway") | nindent 14 }}
+        - podSelector:
+            matchLabels:
+              {{ include "heavy-weather.fullname" . }}-client: "true"
+      {{- end }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.apiServer.containerPort | default 80 }}
+
+    {{- if .Values.apiServer.networkPolicy.additionalIngress }}
+    {{- toYaml .Values.apiServer.networkPolicy.additionalIngress | nindent 4 }}
+    {{- end }}
+
+  egress:
+    {{- include "heavy-weather.dnsEgress" . | nindent 4 }}
+
+    {{- include "heavy-weather.egressToComponent" (dict "ctx" . "component" "postgres" "port" 5432) | nindent 4 }}
+
+    {{- include "heavy-weather.egressToComponent" (dict "ctx" . "component" "cosmos" "port" 8081) | nindent 4 }}
+
+    {{- include "heavy-weather.egressToComponent" (dict "ctx" . "component" "keycloak" "port" 8080) | nindent 4 }}
+
+    {{- include "heavy-weather.egressToComponent" (dict "ctx" . "component" "provisioning" "port" 8080) | nindent 4 }}
+
+    {{- if .Values.apiServer.networkPolicy.additionalEgress }}
+    {{- toYaml .Values.apiServer.networkPolicy.additionalEgress | nindent 4 }}
+    {{- end }}
+{{- end }}

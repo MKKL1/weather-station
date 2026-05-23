@@ -1,0 +1,83 @@
+{{- if .Values.postgres.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "heavy-weather.fullname" . }}-postgres
+  labels:
+    {{- include "heavy-weather.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  serviceName: {{ .Values.global.services.postgres | default "postgres-sv" }}
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "heavy-weather.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: postgres
+  template:
+    metadata:
+      labels:
+        {{- include "heavy-weather.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: postgres
+    spec:
+      securityContext:
+        fsGroup: {{ .Values.postgres.securityContext.runAsUser | default 999 }}
+      containers:
+        - name: postgres
+          image: "{{ .Values.postgres.image.repository }}:{{ .Values.postgres.image.tag }}"
+          imagePullPolicy: {{ .Values.postgres.image.pullPolicy | default .Values.global.image.pullPolicy | default "IfNotPresent" }}
+          securityContext:
+            {{- include "heavy-weather.containerSecurityContext" .Values.postgres | nindent 12 }}
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - postgres
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 5432
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          env:
+            - name: POSTGRES_DB
+              value: {{ .Values.global.database.postgres.dbName | quote }}
+            - name: POSTGRES_USER
+              value: {{ .Values.global.database.postgres.user | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.secrets.name }}
+                  key: {{ .Values.global.secrets.keys.postgresPassword }}
+          volumeMounts:
+            - mountPath: /var/lib/postgresql
+              name: postgres-v
+              subPath: postgres-data
+            - mountPath: /tmp
+              name: tmp-volume
+            - mountPath: /var/run/postgresql
+              name: pg-run
+          ports:
+            - containerPort: 5432
+          resources:
+            {{- toYaml .Values.postgres.resources | nindent 12 }}
+      volumes:
+        - name: tmp-volume
+          emptyDir: {}
+        - name: pg-run
+          emptyDir: {}
+      {{- with .Values.postgres.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-v
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.postgres.storage | default "1Gi" }}
+{{- end }}

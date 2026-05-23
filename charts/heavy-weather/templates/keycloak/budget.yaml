@@ -1,0 +1,15 @@
+{{- if and .Values.keycloak.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "heavy-weather.fullname" . }}-keycloak
+  labels:
+    {{- include "heavy-weather.labels" . | nindent 4 }}
+    app.kubernetes.io/component: keycloak
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      {{- include "heavy-weather.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: keycloak
+{{- end }}

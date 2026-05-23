@@ -17,7 +17,7 @@ spec:
         app: api-server
     spec:
       containers:
-        - image: ghcr.io/mkkl1/weather-station/hw-server@sha256:5aab2a230b9e6f926325cc3c67d18ab9807cc9728ca07a4b5f433e3f93f6f933
+        - image: ghcr.io/mkkl1/weather-station/hw-server:0.4
           imagePullPolicy: Always
           name: api-server
           securityContext:

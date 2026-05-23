@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "heavy-weather.fullname" . }}-api-server
+  labels:
+    {{- include "heavy-weather.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api-server
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: {{ .Values.apiServer.service.port | default 80 }}
+      protocol: TCP
+      targetPort: {{ .Values.apiServer.containerPort | default 80 }}
+  selector:
+    {{- include "heavy-weather.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: api-server

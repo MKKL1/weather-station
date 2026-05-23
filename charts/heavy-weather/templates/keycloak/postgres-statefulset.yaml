@@ -1,0 +1,83 @@
+{{- if .Values.keycloakPostgres.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "heavy-weather.fullname" . }}-keycloak-postgres
+  labels:
+    {{- include "heavy-weather.labels" . | nindent 4 }}
+    app.kubernetes.io/component: keycloak-postgres
+spec:
+  serviceName: postgres-kc-sv
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "heavy-weather.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: keycloak-postgres
+  template:
+    metadata:
+      labels:
+        {{- include "heavy-weather.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: keycloak-postgres
+    spec:
+      securityContext:
+        fsGroup: {{ .Values.keycloakPostgres.securityContext.runAsUser | default 999 }}
+      containers:
+        - name: postgres-kc
+          image: "{{ .Values.keycloakPostgres.image.repository }}:{{ .Values.keycloakPostgres.image.tag }}"
+          imagePullPolicy: {{ .Values.keycloakPostgres.image.pullPolicy | default .Values.global.image.pullPolicy | default "IfNotPresent" }}
+          securityContext:
+            {{- include "heavy-weather.containerSecurityContext" .Values.keycloakPostgres | nindent 12 }}
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - postgres
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 5432
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          env:
+            - name: POSTGRES_USER
+              value: "keycloak_admin"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.secrets.name }}
+                  key: POSTGRES_KC_PASSWORD
+            - name: POSTGRES_DB
+              value: "keycloak_db"
+          volumeMounts:
+            - mountPath: /var/lib/postgresql
+              name: postgres-kc-v
+              subPath: postgres-data
+            - mountPath: /tmp
+              name: tmp-volume
+            - mountPath: /var/run/postgresql
+              name: pg-run
+          ports:
+            - containerPort: 5432
+          resources:
+            {{- toYaml .Values.keycloakPostgres.resources | nindent 12 }}
+      volumes:
+        - name: tmp-volume
+          emptyDir: {}
+        - name: pg-run
+          emptyDir: {}
+      {{- with .Values.keycloakPostgres.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-kc-v
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.keycloakPostgres.storage | default "1Gi" }}
+{{- end }}

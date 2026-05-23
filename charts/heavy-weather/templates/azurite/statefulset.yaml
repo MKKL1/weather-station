@@ -1,0 +1,96 @@
+{{- if .Values.azurite.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "heavy-weather.fullname" . }}-azurite
+  labels:
+    {{- include "heavy-weather.labels" . | nindent 4 }}
+    app.kubernetes.io/component: azurite
+spec:
+  serviceName: azurite-sv
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "heavy-weather.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: azurite
+  template:
+    metadata:
+      labels:
+        {{- include "heavy-weather.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: azurite
+    spec:
+      securityContext:
+        fsGroup: 10000
+
+      containers:
+        - name: azurite
+          image: "{{ .Values.azurite.image.repository }}:{{ .Values.azurite.image.tag }}"
+          imagePullPolicy: {{ .Values.azurite.image.pullPolicy | default .Values.global.image.pullPolicy | default "IfNotPresent" }}
+          securityContext:
+            {{- include "heavy-weather.containerSecurityContext" .Values.azurite | nindent 12 }}
+          readinessProbe:
+            tcpSocket:
+              port: 10000
+            initialDelaySeconds: 2
+            periodSeconds: 5
+            failureThreshold: 3
+          args:
+            [
+              "azurite",
+              "--blobHost",
+              "0.0.0.0",
+              "--queueHost",
+              "0.0.0.0",
+              "--tableHost",
+              "0.0.0.0",
+              "--location",
+              "/data",
+            ]
+          volumeMounts:
+            - mountPath: /data
+              name: azurite-v
+            - mountPath: /tmp
+              name: tmp-volume
+          ports:
+            - containerPort: 10000
+              name: blob
+            - containerPort: 10001
+              name: queue
+            - containerPort: 10002
+              name: table
+          startupProbe:
+            exec:
+              command:
+                - node
+                - -e
+                - "const c = require('net').connect(10000, 'localhost', () => { c.end(); process.exit(0); }); c.on('error', () => process.exit(1)); setTimeout(() => process.exit(1), 3000);"
+            initialDelaySeconds: 2
+            periodSeconds: 3
+            failureThreshold: 10
+          livenessProbe:
+            exec:
+              command:
+                - node
+                - -e
+                - "const c = require('net').connect(10000, 'localhost', () => { c.end(); process.exit(0); }); c.on('error', () => process.exit(1)); setTimeout(() => process.exit(1), 3000);"
+            periodSeconds: 5
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.azurite.resources | nindent 12 }}
+      volumes:
+        - name: tmp-volume
+          emptyDir: {}
+      {{- with .Values.azurite.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  volumeClaimTemplates:
+    - metadata:
+        name: azurite-v
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.azurite.storage | default "1Gi" }}
+{{- end }}

@@ -1,0 +1,19 @@
+{{- if .Values.provisioning.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.global.services.provisioning | default "provisioning-sv" }}
+  labels:
+    {{- include "heavy-weather.labels" . | nindent 4 }}
+    app.kubernetes.io/component: provisioning
+spec:
+  ports:
+    - name: http
+      port: 80
+      protocol: TCP
+      targetPort: {{ .Values.provisioning.containerPort | default 8080 }}
+  selector:
+    {{- include "heavy-weather.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: provisioning
+  type: ClusterIP
+{{- end }}
