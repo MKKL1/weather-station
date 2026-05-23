@@ -26,13 +26,106 @@ global:
   cosmosDb:
     endpoint: "http://cosmos-sv:8081"
     database: weather_cosmos_db
-    tlsInsecure: false
-    
+    viewsContainerName: "views"
+    tlsInsecure: true
+
 keycloak:
-  realm: weather-station
+  enabled: true
+  realm: weather-server
+  image:
+    repository: quay.io/keycloak/keycloak
+    tag: 26.1
+    pullPolicy: Always
+  securityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "100m"
+      ephemeral-storage: "100Mi"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+      ephemeral-storage: "250Mi"
+  networkPolicy:
+    enabled: true
+    additionalIngress: []
+    additionalEgress: []
+
+keycloakPostgres:
+  enabled: true
+  image:
+    repository: postgres
+    tag: 18-alpine
+    pullPolicy: Always
+  securityContext:
+    runAsUser: 999
+    runAsGroup: 999
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+      ephemeral-storage: "50Mi"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+      ephemeral-storage: "100Mi"
+  storage: 1Gi
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: homelab.local/tier
+                operator: In
+                values:
+                  - storage
+  networkPolicy:
+    enabled: true
+    additionalIngress: []
+    additionalEgress: []
 
 provisioning:
   enabled: true
+  replicaCount: 2
+  image:
+    repository: ghcr.io/mkkl1/weather-station/hw-provisioning-service
+    tag: latest
+    pullPolicy: Always
+  securityContext:
+    runAsUser: 10000
+    runAsGroup: 10000
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "100m"
+      ephemeral-storage: "50Mi"
+    limits:
+      memory: "128Mi"
+      cpu: "500m"
+      ephemeral-storage: "100Mi"
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
+              - key: homelab.local/tier
+                operator: In
+                values:
+                  - compute
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/component
+                  operator: In
+                  values:
+                    - provisioning
+            topologyKey: kubernetes.io/hostname
   networkPolicy:
     enabled: true
     additionalIngress: []
@@ -44,7 +137,8 @@ apiServer:
   minAvailable: 1
   image:
     repository: ghcr.io/mkkl1/weather-station/hw-server
-    tag: "0.5"
+    tag: "0.4"
+    pullPolicy: Always
   containerPort: 80
   service:
     type: ClusterIP
@@ -66,15 +160,6 @@ apiServer:
       ephemeral-storage: "100Mi"
   podAnnotations: {}
   affinity:
-    # nodeAffinity:
-    #   preferredDuringSchedulingIgnoredDuringExecution:
-    #     - weight: 100
-    #       preference:
-    #         matchExpressions:
-    #           - key: homelab.local/tier
-    #             operator: In
-    #             values:
-    #               - compute
     podAntiAffinity:
       preferredDuringSchedulingIgnoredDuringExecution:
         - weight: 100
@@ -94,7 +179,161 @@ apiServer:
 
 postgres:
   enabled: true
+  image:
+    repository: postgres
+    tag: 18-alpine
+    pullPolicy: Always
+  securityContext:
+    runAsUser: 999
+    runAsGroup: 999
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+      ephemeral-storage: "50Mi"
+    limits:
+      memory: "256Mi"
+      cpu: "500m"
+      ephemeral-storage: "100Mi"
+  storage: 1Gi
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: homelab.local/tier
+                operator: In
+                values:
+                  - storage
   networkPolicy:
     enabled: true
     additionalIngress: []
     additionalEgress: []
+
+gateway:
+  enabled: true
+  replicaCount: 2
+  minAvailable: 1
+  image:
+    repository: ghcr.io/mkkl1/weather-station/hw-gateway
+    tag: latest
+    pullPolicy: Always
+  securityContext:
+    runAsUser: 10000
+    runAsGroup: 10000
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "64Mi"
+      ephemeral-storage: "50Mi"
+    limits:
+      cpu: "500m"
+      memory: "128Mi"
+      ephemeral-storage: "100Mi"
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/component
+                  operator: In
+                  values:
+                    - gateway
+            topologyKey: kubernetes.io/hostname
+  networkPolicy:
+    enabled: true
+    additionalIngress: []
+    additionalEgress: []
+
+telemetryWorker:
+  enabled: true
+  replicaCount: 2
+  minAvailable: 1
+  image:
+    repository: ghcr.io/mkkl1/weather-station/hw-telemetry-worker
+    tag: latest
+    pullPolicy: Always
+  securityContext:
+    runAsUser: 10000
+    runAsGroup: 10000
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+      ephemeral-storage: "50Mi"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+      ephemeral-storage: "100Mi"
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/component
+                  operator: In
+                  values:
+                    - telemetry-worker
+            topologyKey: kubernetes.io/hostname
+  networkPolicy:
+    enabled: true
+    additionalIngress: []
+    additionalEgress: []
+
+cosmosDbEmulator:
+  enabled: true
+  image:
+    repository: mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator
+    tag: vnext-EN20260331
+    pullPolicy: Always
+  resources:
+    requests:
+      memory: "1.5Gi"
+      cpu: "500m"
+      ephemeral-storage: "100Mi"
+    limits:
+      memory: "3Gi"
+      cpu: "1"
+      ephemeral-storage: "250Mi"
+  storage: 1Gi
+  networkPolicy:
+    enabled: true
+    additionalIngress: []
+    additionalEgress: []
+
+azurite:
+  enabled: true
+  image:
+    repository: mcr.microsoft.com/azure-storage/azurite
+    tag: 3.33.0
+    pullPolicy: Always
+  securityContext:
+    runAsUser: 10000
+    runAsGroup: 10000
+  resources:
+    requests:
+      memory: "64Mi"
+      cpu: "100m"
+      ephemeral-storage: "50Mi"
+    limits:
+      memory: "128Mi"
+      cpu: "250m"
+      ephemeral-storage: "100Mi"
+  storage: 1Gi
+  networkPolicy:
+    enabled: true
+    additionalIngress: []
+    additionalEgress: []
+
+ingress:
+  enabled: true
+  api:
+    host: weather-station.local
+  iot:
+    host: iot.weather-station.local
+
+createSecrets: true

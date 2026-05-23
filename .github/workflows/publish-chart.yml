@@ -1,0 +1,51 @@
+name: Publish Helm Chart
+
+on:
+  push:
+    tags: ["chart-v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  check:
+    name: Run Checks
+    uses: ./.github/workflows/check-chart.yml
+
+  publish:
+    name: Publish Helm Chart to GHCR
+    needs: check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v5
+        with:
+          version: 'v3.14.0'
+
+      - name: Strip tag prefix
+        id: clean-tag
+        shell: bash
+        run: |
+          TAG_NAME="${{ github.ref_name }}"
+          PREFIX="chart-v"
+          CLEAN_TAG="${TAG_NAME#$PREFIX}"
+          echo "version=$CLEAN_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GitHub Container Registry
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | helm registry login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Package Helm Chart
+        run: |
+          helm package charts/heavy-weather --version ${{ steps.clean-tag.outputs.version }} --destination .
+
+      - name: Push Helm Chart to GHCR
+        run: |
+          REPO_LC=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          helm push heavy-weather-${{ steps.clean-tag.outputs.version }}.tgz oci://ghcr.io/${REPO_LC}

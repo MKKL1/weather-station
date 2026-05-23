@@ -1,0 +1,20 @@
+{{- if .Values.cosmosDbEmulator.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: cosmos-sv
+  labels:
+    {{- include "heavy-weather.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cosmos
+spec:
+  clusterIP: None
+  ports:
+    - name: gateway
+      port: 8081
+      protocol: TCP
+      targetPort: 8081
+  selector:
+    {{- include "heavy-weather.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: cosmos
+  type: ClusterIP
+{{- end }}

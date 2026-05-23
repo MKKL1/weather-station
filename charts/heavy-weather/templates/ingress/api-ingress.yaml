@@ -1,0 +1,21 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "heavy-weather.fullname" . }}-api-ingress
+  labels:
+    {{- include "heavy-weather.labels" . | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.api.ingressClassName | default "nginx"}}
+  rules:
+    - host: {{ .Values.ingress.api.host | default "api.weather.local" }}
+      http:
+        paths:
+          - path: /api/v1/
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "heavy-weather.fullname" . }}-api-server
+                port:
+                  number: {{ .Values.apiServer.service.port | default 80 }}
+{{- end }}

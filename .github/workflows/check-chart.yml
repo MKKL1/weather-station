@@ -1,0 +1,38 @@
+name: Check Helm Chart
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'charts/heavy-weather/**'
+      - '.github/workflows/check-chart.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'charts/heavy-weather/**'
+      - '.github/workflows/check-chart.yml'
+  workflow_dispatch:
+  workflow_call:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint & Template Chart
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v6
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v5
+        with:
+          version: 'v3.14.0'
+
+      - name: Lint Chart
+        run: helm lint charts/heavy-weather
+
+      - name: Dry-run / Template Chart
+        run: helm template heavy-weather charts/heavy-weather

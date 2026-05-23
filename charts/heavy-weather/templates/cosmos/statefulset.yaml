@@ -1,0 +1,77 @@
+{{- if .Values.cosmosDbEmulator.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "heavy-weather.fullname" . }}-cosmos
+  labels:
+    {{- include "heavy-weather.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cosmos
+spec:
+  serviceName: cosmos-sv
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "heavy-weather.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: cosmos
+  template:
+    metadata:
+      labels:
+        {{- include "heavy-weather.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: cosmos
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: cosmos
+          image: "{{ .Values.cosmosDbEmulator.image.repository }}:{{ .Values.cosmosDbEmulator.image.tag }}"
+          imagePullPolicy: {{ .Values.cosmosDbEmulator.image.pullPolicy | default .Values.global.image.pullPolicy | default "IfNotPresent" }}
+          securityContext:
+            allowPrivilegeEscalation: false
+          readinessProbe:
+            tcpSocket:
+              port: 8081
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8081
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          env:
+            - name: AZURE_COSMOS_EMULATOR_PARTITION_COUNT
+              value: "3"
+            - name: AZURE_COSMOS_EMULATOR_ENABLE_DATA_PERSISTENCE
+              value: "true"
+            - name: AZURE_COSMOS_EMULATOR_IP_ADDRESS_OVERRIDE
+              value: "cosmos-sv"
+          volumeMounts:
+            - mountPath: /data
+              name: cosmos-v
+            - mountPath: /tmp
+              name: tmp-volume
+            - mountPath: /logs
+              name: logs-volume
+          ports:
+            - containerPort: 8081
+          resources:
+            {{- toYaml .Values.cosmosDbEmulator.resources | nindent 12 }}
+      volumes:
+        - name: tmp-volume
+          emptyDir: {}
+        - name: logs-volume
+          emptyDir: {}
+      {{- with .Values.cosmosDbEmulator.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  volumeClaimTemplates:
+    - metadata:
+        name: cosmos-v
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.cosmosDbEmulator.storage | default "1Gi" }}
+{{- end }}

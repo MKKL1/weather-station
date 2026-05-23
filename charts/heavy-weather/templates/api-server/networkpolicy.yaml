@@ -16,17 +16,15 @@ spec:
     - Egress
   
   ingress:
-    - from:
-        {{- if .Values.apiServer.networkPolicy.allowExternal }}
-        - {}
-        {{- else }}
+    - {{- if not .Values.apiServer.networkPolicy.allowExternal }}
+      from:
         - podSelector:
             matchLabels:
               {{- include "heavy-weather.componentSelectorLabels" (dict "ctx" . "component" "gateway") | nindent 14 }}
         - podSelector:
             matchLabels:
               {{ include "heavy-weather.fullname" . }}-client: "true"
-        {{- end }}
+      {{- end }}
       ports:
         - protocol: TCP
           port: {{ .Values.apiServer.containerPort | default 80 }}

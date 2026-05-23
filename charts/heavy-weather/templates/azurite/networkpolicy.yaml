@@ -1,0 +1,41 @@
+{{- if and .Values.azurite.enabled .Values.azurite.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "heavy-weather.fullname" . }}-azurite
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "heavy-weather.labels" . | nindent 4 }}
+    app.kubernetes.io/component: azurite
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "heavy-weather.componentSelectorLabels" (dict "ctx" . "component" "azurite") | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "heavy-weather.componentSelectorLabels" (dict "ctx" . "component" "telemetry-worker") | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: 10000
+        - protocol: TCP
+          port: 10001
+        - protocol: TCP
+          port: 10002
+
+    {{- if .Values.azurite.networkPolicy.additionalIngress }}
+    {{- toYaml .Values.azurite.networkPolicy.additionalIngress | nindent 4 }}
+    {{- end }}
+
+  egress:
+    {{- include "heavy-weather.dnsEgress" . | nindent 4 }}
+
+    {{- if .Values.azurite.networkPolicy.additionalEgress }}
+    {{- toYaml .Values.azurite.networkPolicy.additionalEgress | nindent 4 }}
+    {{- end }}
+{{- end }}

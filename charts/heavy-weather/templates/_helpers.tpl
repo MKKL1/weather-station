@@ -52,8 +52,8 @@ Standard hardened container security context.
 allowPrivilegeEscalation: false
 readOnlyRootFilesystem: true
 runAsNonRoot: true
-runAsUser: {{ .securityContext.runAsUser | default 10000 }}
-runAsGroup: {{ .securityContext.runAsGroup | default 10000 }}
+runAsUser: {{ if .securityContext }}{{ .securityContext.runAsUser | default 10000 }}{{ else }}10000{{ end }}
+runAsGroup: {{ if .securityContext }}{{ .securityContext.runAsGroup | default 10000 }}{{ else }}10000{{ end }}
 capabilities:
   drop:
     - ALL
@@ -61,11 +61,11 @@ capabilities:
 
 
 {{/*
-Standard tmp volume
+Standard tmp volume mount
 */}}
 {{- define "heavy-weather.tmpVolume" -}}
 - name: tmp-volume
-  emptyDir: {}
+  mountPath: /tmp
 {{- end }}
 
 

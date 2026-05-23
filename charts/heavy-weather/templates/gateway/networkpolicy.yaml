@@ -1,0 +1,36 @@
+{{- if and .Values.gateway.enabled .Values.gateway.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "heavy-weather.fullname" . }}-gateway
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "heavy-weather.labels" . | nindent 4 }}
+    app.kubernetes.io/component: gateway
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "heavy-weather.componentSelectorLabels" (dict "ctx" . "component" "gateway") | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 8000
+    
+    {{- if .Values.gateway.networkPolicy.additionalIngress }}
+    {{- toYaml .Values.gateway.networkPolicy.additionalIngress | nindent 4 }}
+    {{- end }}
+
+  egress:
+    {{- include "heavy-weather.dnsEgress" . | nindent 4 }}
+    
+    {{- include "heavy-weather.egressToComponent" (dict "ctx" . "component" "telemetry-worker" "port" 80) | nindent 4 }}
+    {{- include "heavy-weather.egressToComponent" (dict "ctx" . "component" "provisioning" "port" 8080) | nindent 4 }}
+
+    {{- if .Values.gateway.networkPolicy.additionalEgress }}
+    {{- toYaml .Values.gateway.networkPolicy.additionalEgress | nindent 4 }}
+    {{- end }}
+{{- end }}

@@ -1,0 +1,107 @@
+{{- if .Values.telemetryWorker.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "heavy-weather.fullname" . }}-telemetry-worker
+  labels:
+    {{- include "heavy-weather.labels" . | nindent 4 }}
+    app.kubernetes.io/component: telemetry-worker
+spec:
+  replicas: {{ .Values.telemetryWorker.replicaCount | default 2 }}
+  selector:
+    matchLabels:
+      {{- include "heavy-weather.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: telemetry-worker
+  template:
+    metadata:
+      labels:
+        {{- include "heavy-weather.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: telemetry-worker
+    spec:
+      {{- with .Values.global.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: wait-for-azurite
+          image: busybox:1.36
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 10000
+            runAsGroup: 10000
+            capabilities:
+              drop:
+                - ALL
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z -w 3 azurite-sv 10000; do
+                printf "Waiting for Azurite Storage Emulator to spin up...\n"
+                sleep 2
+              done
+              printf "Azurite is UP!\n"
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+              ephemeral-storage: "10Mi"
+            limits:
+              memory: "64Mi"
+              cpu: "50m"
+              ephemeral-storage: "20Mi"
+          volumeMounts:
+            - name: tmp-volume
+              mountPath: /tmp
+      containers:
+        - name: telemetry-worker
+          image: "{{ .Values.telemetryWorker.image.repository }}:{{ .Values.telemetryWorker.image.tag }}"
+          imagePullPolicy: {{ .Values.telemetryWorker.image.pullPolicy | default .Values.global.image.pullPolicy | default "IfNotPresent" }}
+          securityContext:
+            {{- include "heavy-weather.containerSecurityContext" .Values.telemetryWorker | nindent 12 }}
+          ports:
+            - containerPort: 80
+          resources:
+            {{- toYaml .Values.telemetryWorker.resources | nindent 12 }}
+          env:
+            - name: AZURITE_ACCOUNT
+              value: "devstoreaccount1"
+            - name: AZURITE_KEY
+              value: "Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw=="
+            - name: COSMOS_ENDPOINT
+              value: {{ .Values.global.cosmosDb.endpoint | quote }}
+            - name: COSMOS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.global.secrets.name }}
+                  key: {{ .Values.global.secrets.keys.cosmosKey }}
+            - name: FUNCTIONS_WORKER_RUNTIME
+              value: "dotnet-isolated"
+            - name: AzureWebJobsStorage
+              value: "DefaultEndpointsProtocol=http;AccountName=$(AZURITE_ACCOUNT);AccountKey=$(AZURITE_KEY);BlobEndpoint=http://azurite-sv:10000/$(AZURITE_ACCOUNT);QueueEndpoint=http://azurite-sv:10001/$(AZURITE_ACCOUNT);TableEndpoint=http://azurite-sv:10002/$(AZURITE_ACCOUNT)"
+            - name: COSMOS_CONNECTION
+              value: "AccountEndpoint=$(COSMOS_ENDPOINT);AccountKey=$(COSMOS_KEY)"
+            - name: COSMOS_DATABASE
+              value: {{ .Values.global.cosmosDb.database | quote }}
+            - name: COSMOS_CONTAINER
+              value: "device-registry"
+            - name: COSMOS_VIEWS_CONTAINER
+              value: "views"
+            - name: COSMOS_TELEMETRY_CONTAINER
+              value: "telemetry-raw"
+            - name: COSMOS_TLS_INSECURE
+              value: {{ .Values.global.cosmosDb.tlsInsecure | quote }}
+          volumeMounts:
+            - name: tmp-volume
+              mountPath: /tmp
+      volumes:
+        - name: tmp-volume
+          emptyDir: {}
+      {{- with .Values.telemetryWorker.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

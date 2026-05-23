@@ -1,0 +1,17 @@
+{{- if .Values.keycloakPostgres.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-kc-sv
+  labels:
+    {{- include "heavy-weather.labels" . | nindent 4 }}
+    app.kubernetes.io/component: keycloak-postgres
+spec:
+  clusterIP: None
+  selector:
+    {{- include "heavy-weather.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: keycloak-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+{{- end }}

@@ -1,0 +1,46 @@
+{{- if and .Values.cosmosDbEmulator.enabled .Values.cosmosDbEmulator.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "heavy-weather.fullname" . }}-cosmos
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "heavy-weather.labels" . | nindent 4 }}
+    app.kubernetes.io/component: cosmos
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "heavy-weather.componentSelectorLabels" (dict "ctx" . "component" "cosmos") | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "heavy-weather.componentSelectorLabels" (dict "ctx" . "component" "api-server") | nindent 14 }}
+        - podSelector:
+            matchLabels:
+              {{- include "heavy-weather.componentSelectorLabels" (dict "ctx" . "component" "cosmos-init") | nindent 14 }}
+        - podSelector:
+            matchLabels:
+              {{- include "heavy-weather.componentSelectorLabels" (dict "ctx" . "component" "telemetry-worker") | nindent 14 }}
+        - podSelector:
+            matchLabels:
+              {{- include "heavy-weather.componentSelectorLabels" (dict "ctx" . "component" "provisioning") | nindent 14 }}
+      ports:
+        - port: 8081
+          protocol: TCP
+
+    {{- if .Values.cosmosDbEmulator.networkPolicy.additionalIngress }}
+    {{- toYaml .Values.cosmosDbEmulator.networkPolicy.additionalIngress | nindent 4 }}
+    {{- end }}
+
+  egress:
+    {{- include "heavy-weather.dnsEgress" . | nindent 4 }}
+
+    {{- if .Values.cosmosDbEmulator.networkPolicy.additionalEgress }}
+    {{- toYaml .Values.cosmosDbEmulator.networkPolicy.additionalEgress | nindent 4 }}
+    {{- end }}
+{{- end }}
