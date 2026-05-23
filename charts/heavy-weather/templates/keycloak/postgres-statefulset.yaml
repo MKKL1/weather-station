@@ -32,7 +32,7 @@ spec:
               command:
                 - pg_isready
                 - -U
-                - postgres
+                - keycloak_admin
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:

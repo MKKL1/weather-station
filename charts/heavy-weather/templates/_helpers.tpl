@@ -83,11 +83,7 @@ app.kubernetes.io/component: {{ .component }}
 Standard DNS egress rule
 */}}
 {{- define "heavy-weather.dnsEgress" -}}
-- to:
-    - namespaceSelector:
-        matchLabels:
-          kubernetes.io/metadata.name: kube-system
-  ports:
+- ports:
     - protocol: UDP
       port: 53
     - protocol: TCP

@@ -32,7 +32,7 @@ spec:
               command:
                 - pg_isready
                 - -U
-                - postgres
+                - {{ .Values.global.database.postgres.user | default "postgres" }}
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
