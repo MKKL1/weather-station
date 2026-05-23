@@ -66,9 +66,9 @@ spec:
               value: "http://cosmos-sv:8081/"
             - name: COSMOS_KEY
               valueFrom:
-                configMapKeyRef:
-                  name: ws-config
-                  key: COSMOS_KEY
+                secretKeyRef:
+                  name: {{ .Values.global.secrets.name }}
+                  key: {{ .Values.global.secrets.keys.cosmosKey }}
             - name: COSMOS_DATABASE
               value: {{ .Values.global.cosmosDb.database | default "weather-station-db" | quote }}
           resources:
