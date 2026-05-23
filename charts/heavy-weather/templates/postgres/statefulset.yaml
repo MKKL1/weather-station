@@ -33,6 +33,8 @@ spec:
                 - pg_isready
                 - -U
                 - {{ .Values.global.database.postgres.user | default "postgres" }}
+                - -d
+                - {{ .Values.global.database.postgres.dbName | default "postgres" }}
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:

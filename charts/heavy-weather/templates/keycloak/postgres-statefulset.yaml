@@ -33,6 +33,8 @@ spec:
                 - pg_isready
                 - -U
                 - keycloak_admin
+                - -d
+                - keycloak_db
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
