@@ -26,7 +26,9 @@ spec:
           image: "{{ .Values.cosmosDbEmulator.image.repository }}:{{ .Values.cosmosDbEmulator.image.tag }}"
           imagePullPolicy: {{ .Values.cosmosDbEmulator.image.pullPolicy | default .Values.global.image.pullPolicy | default "IfNotPresent" }}
           securityContext:
-            allowPrivilegeEscalation: false
+            allowPrivilegeEscalation: true
+            runAsUser: 0
+            runAsGroup: 0
           readinessProbe:
             tcpSocket:
               port: 8081
