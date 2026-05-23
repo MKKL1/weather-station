@@ -1,0 +1,12 @@
+{{- if and .Values.ingress.enabled (contains "traefik" (.Values.ingress.iot.ingressClassName | default "nginx")) }}
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ include "heavy-weather.fullname" . }}-strip-v1
+  labels:
+    {{- include "heavy-weather.labels" . | nindent 4 }}
+spec:
+  stripPrefix:
+    prefixes:
+      - /v1
+{{- end }}

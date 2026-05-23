@@ -333,7 +333,11 @@ ingress:
   enabled: true
   api:
     host: weather-station.local
+    ingressClassName: "nginx"
+    annotations: {}
   iot:
     host: iot.weather-station.local
+    ingressClassName: "nginx"
+    annotations: {}
 
 createSecrets: true
