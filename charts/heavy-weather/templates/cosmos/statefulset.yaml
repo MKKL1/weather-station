@@ -21,14 +21,45 @@ spec:
     spec:
       securityContext:
         fsGroup: 1000
+      initContainers:
+        - name: volume-permissions
+          image: busybox:1.36
+          imagePullPolicy: IfNotPresent
+          command:
+            - sh
+            - -c
+            - |
+              if [ -d "/data/db" ] && [ ! -f "/data/db/PG_VERSION" ]; then
+                echo "Removing empty/uninitialized postgres directory..."
+                rm -rf /data/db
+              fi
+              chown -R 1000:1000 /data
+              chmod 755 /data
+              if [ -d "/data/db" ]; then
+                chmod -R 700 /data/db
+              fi
+              find /data -maxdepth 1 -name "*.key" -exec chmod 600 {} +
+              find /data -maxdepth 1 -name "*.crt" -exec chmod 644 {} +
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+            allowPrivilegeEscalation: true
+          resources:
+            requests:
+              cpu: 10m
+              memory: 10Mi
+            limits:
+              cpu: 50m
+              memory: 50Mi
+          volumeMounts:
+            - mountPath: /data
+              name: cosmos-v
       containers:
         - name: cosmos
           image: "{{ .Values.cosmosDbEmulator.image.repository }}:{{ .Values.cosmosDbEmulator.image.tag }}"
           imagePullPolicy: {{ .Values.cosmosDbEmulator.image.pullPolicy | default .Values.global.image.pullPolicy | default "IfNotPresent" }}
           securityContext:
             allowPrivilegeEscalation: true
-            runAsUser: 0
-            runAsGroup: 0
           readinessProbe:
             tcpSocket:
               port: 8081
@@ -38,8 +69,9 @@ spec:
             httpGet:
               path: /
               port: 8081
-            initialDelaySeconds: 30
+            initialDelaySeconds: 180
             periodSeconds: 20
+            failureThreshold: 5
           env:
             - name: AZURE_COSMOS_EMULATOR_PARTITION_COUNT
               value: "3"
