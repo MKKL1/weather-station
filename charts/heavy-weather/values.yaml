@@ -294,11 +294,11 @@ cosmosDbEmulator:
     requests:
       memory: "1.5Gi"
       cpu: "500m"
-      ephemeral-storage: "100Mi"
+      ephemeral-storage: "1Gi"
     limits:
       memory: "3Gi"
       cpu: "1"
-      ephemeral-storage: "250Mi"
+      ephemeral-storage: "4Gi"
   storage: 1Gi
   networkPolicy:
     enabled: true
