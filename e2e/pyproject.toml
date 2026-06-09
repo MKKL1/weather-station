@@ -19,10 +19,10 @@ dependencies = [
 [tool.uv.sources]
 heavyweather-cli = { path = "../cli", editable = true }
 
-[tool.pytest_env]
-API_SERVER_URL = "http://localhost:8002"
-GATEWAY_URL = "http://localhost:8000"
-ADMIN_API_KEY = "super-secret-admin-key"
-HTTP_PROXY = "http://localhost:8080"
-HTTPS_PROXY = "http://localhost:8080"
-NO_PROXY = ""
+# [tool.pytest_env]
+# API_SERVER_URL = "http://localhost:8002"
+# GATEWAY_URL = "http://localhost:8000"
+# ADMIN_API_KEY = "super-secret-admin-key"
+# HTTP_PROXY = "http://localhost:8080"
+# HTTPS_PROXY = "http://localhost:8080"
+# NO_PROXY = ""

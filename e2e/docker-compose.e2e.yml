@@ -19,8 +19,8 @@ services:
       - frontend
       - api
     ports:
-      - "8080:8080"  # Proxy port
-      - "8085:8081"  # Web UI port
+      - "8080:8080"
+      - "8085:8081"
     environment:
       PYTHONUNBUFFERED: "1"
     volumes:

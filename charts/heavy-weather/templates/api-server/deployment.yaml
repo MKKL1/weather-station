@@ -54,7 +54,7 @@ spec:
                   name: {{ .Values.global.secrets.name }}
                   key: {{ .Values.global.secrets.keys.postgresPassword }}
             - name: Postgres__ConnectionString
-              value: "Host={{ .Values.global.services.postgres }};Port=5432;Database=$(POSTGRES_DB);Username=$(POSTGRES_USER);Password=$(POSTGRES_PASSWORD);"
+              value: 'Host={{ .Values.global.services.postgres | trimPrefix "tcp://" | trimSuffix ":5432" }};Port=5432;Database=$(POSTGRES_DB);Username=$(POSTGRES_USER);Password=$(POSTGRES_PASSWORD);'
 
             # CosmosDB
             - name: COSMOS_ENDPOINT
