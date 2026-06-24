@@ -28,7 +28,7 @@ packages = ["hw_cli"]
 
 [dependency-groups]
 dev = [
-    "pytest>=8.4.2,<9.0.0",
+    "pytest>=8.4.2,<10.0.0",
 ]
 
 [tool.pytest.ini_options]
